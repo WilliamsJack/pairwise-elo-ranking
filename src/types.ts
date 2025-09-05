@@ -16,7 +16,7 @@ export interface EloStore {
 }
 
 export interface PlayerSnapshot {
-  path: string;
+  id: string;
   rating: number;
   matches: number;
   wins: number;

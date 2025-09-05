@@ -59,27 +59,27 @@ export class PluginDataStore {
     await this.saveAll();
   }
 
-  ensurePlayer(cohortKey: string, path: string) {
+  ensurePlayer(cohortKey: string, id: string) {
     const cohort = (this.store.cohorts[cohortKey] ??= { players: {} } as CohortData);
-    const player = (cohort.players[path] ??= { rating: 1500, matches: 0, wins: 0 });
+    const player = (cohort.players[id] ??= { rating: 1500, matches: 0, wins: 0 });
     return { cohort, player };
   }
 
   applyMatch(
     cohortKey: string,
-    aPath: string,
-    bPath: string,
+    aId: string,
+    bId: string,
     result: MatchResult
-  ): { winnerPath?: string; undo: UndoFrame } {
+  ): { winnerId?: string; undo: UndoFrame } {
     const cohort = (this.store.cohorts[cohortKey] ??= { players: {} });
 
-    const a = (cohort.players[aPath] ??= { rating: 1500, matches: 0, wins: 0 });
-    const b = (cohort.players[bPath] ??= { rating: 1500, matches: 0, wins: 0 });
+    const a = (cohort.players[aId] ??= { rating: 1500, matches: 0, wins: 0 });
+    const b = (cohort.players[bId] ??= { rating: 1500, matches: 0, wins: 0 });
 
     const undo: UndoFrame = {
       cohortKey,
-      a: snapshot(aPath, a.rating, a.matches, a.wins),
-      b: snapshot(bPath, b.rating, b.matches, b.wins),
+      a: snapshot(aId, a.rating, a.matches, a.wins),
+      b: snapshot(bId, b.rating, b.matches, b.wins),
       result,
       ts: Date.now(),
     };
@@ -93,16 +93,16 @@ export class PluginDataStore {
     if (result === 'A') a.wins += 1;
     if (result === 'B') b.wins += 1;
 
-    const winnerPath = result === 'A' ? aPath : result === 'B' ? bPath : undefined;
-    return { winnerPath, undo };
+    const winnerId = result === 'A' ? aId : result === 'B' ? bId : undefined;
+    return { winnerId, undo };
   }
 
   revert(frame: UndoFrame): boolean {
     const cohort = this.store.cohorts[frame.cohortKey];
     if (!cohort) return false;
 
-    const a = cohort.players[frame.a.path];
-    const b = cohort.players[frame.b.path];
+    const a = cohort.players[frame.a.id];
+    const b = cohort.players[frame.b.id];
     if (!a || !b) return false;
 
     a.rating = frame.a.rating;
@@ -117,6 +117,6 @@ export class PluginDataStore {
   }
 }
 
-function snapshot(path: string, rating: number, matches: number, wins: number): PlayerSnapshot {
-  return { path, rating, matches, wins };
+function snapshot(id: string, rating: number, matches: number, wins: number): PlayerSnapshot {
+  return { id, rating, matches, wins };
 }

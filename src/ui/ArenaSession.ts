@@ -1,5 +1,6 @@
-import { App, MarkdownView, Notice, TFile, WorkspaceLeaf } from 'obsidian';
+import { App, MarkdownView, Notice, TFile, ViewState, WorkspaceLeaf } from 'obsidian';
 import { MatchResult, UndoFrame } from '../types';
+import { ensureEloId, getEloId } from '../utils/NoteIds';
 
 import type EloPlugin from '../../main';
 import { pairSig } from '../utils/pair';
@@ -19,6 +20,8 @@ export default class ArenaSession {
   private leftLeaf!: WorkspaceLeaf;
   private rightLeaf!: WorkspaceLeaf;
   private createdRightLeaf = false;
+
+  private idByPath = new Map<string, string>();
 
   private undoStack: UndoFrame[] = [];
   private overlayEl?: HTMLElement;
@@ -91,8 +94,31 @@ export default class ArenaSession {
     this.undoStack = [];
   }
 
+  onFileRenamed(oldPath: string, newFile: TFile) {
+    // Update our id map to the new path
+    const id = this.idByPath.get(oldPath);
+    if (id) {
+      this.idByPath.delete(oldPath);
+      this.idByPath.set(newFile.path, id);
+    }
+    // Update labels if visible
+    if (this.leftFile?.path === oldPath) this.leftFile = newFile;
+    if (this.rightFile?.path === oldPath) this.rightFile = newFile;
+    this.lastPairSig = this.leftFile && this.rightFile
+      ? pairSig(this.leftFile.path, this.rightFile.path)
+      : undefined;
+    this.updateOverlay();
+  }
+
   private async openCurrent() {
     if (!this.leftFile || !this.rightFile) return;
+
+    // Lazily ensure eloIds only for the notes being displayed
+    await Promise.all([
+      this.getIdForFile(this.leftFile),
+      this.getIdForFile(this.rightFile),
+    ]);
+
     await Promise.all([
       this.openInReadingMode(this.leftLeaf, this.leftFile),
       this.openInReadingMode(this.rightLeaf, this.rightFile),
@@ -196,19 +222,25 @@ export default class ArenaSession {
     }
   }
 
-  private choose(result: MatchResult) {
+  private async choose(result: MatchResult) {
     if (!this.leftFile || !this.rightFile) return;
 
-    const { winnerPath, undo } = this.plugin.dataStore.applyMatch(
+    const [aId, bId] = await Promise.all([
+      this.getIdForFile(this.leftFile),
+      this.getIdForFile(this.rightFile),
+    ]);
+
+    const { undo } = this.plugin.dataStore.applyMatch(
       this.cohortKey,
-      this.leftFile.path,
-      this.rightFile.path,
+      aId,
+      bId,
       result,
     );
     this.undoStack.push(undo);
 
     if (this.plugin.settings.showToasts) {
-      if (winnerPath) new Notice(`Winner: ${this.basenameOf(winnerPath)}`);
+      if (result === 'A') new Notice(`Winner: ${this.leftFile.basename}`);
+      else if (result === 'B') new Notice(`Winner: ${this.rightFile.basename}`);
       else new Notice('Draw');
     }
     this.plugin.dataStore.saveStore();
@@ -216,6 +248,20 @@ export default class ArenaSession {
     this.pickNextPair();
     this.openCurrent();
     this.updateOverlay();
+  }
+
+  private async getIdForFile(file: TFile): Promise<string> {
+    const cached = this.idByPath.get(file.path);
+    if (cached) return cached;
+
+    const existing = getEloId(this.app, file);
+    if (existing) {
+      this.idByPath.set(file.path, existing);
+      return existing;
+    }
+    const id = await ensureEloId(this.app, file);
+    this.idByPath.set(file.path, id);
+    return id;
   }
 
   private undo() {
@@ -265,10 +311,5 @@ export default class ArenaSession {
       this.rightFile = a;
     }
     this.lastPairSig = pairSig(this.leftFile.path, this.rightFile.path);
-  }
-
-  private basenameOf(p: string): string {
-    const f = this.files.find((x) => x.path === p);
-    return f?.basename ?? p.split('/').pop() ?? p;
   }
 }

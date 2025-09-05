@@ -1,4 +1,4 @@
-import { App, Notice, Plugin, TFile } from 'obsidian';
+import { App, Notice, Plugin, TAbstractFile, TFile } from 'obsidian';
 
 import ArenaSession from './ui/ArenaSession';
 import { EloSettings } from './settings/settings';
@@ -47,6 +47,15 @@ export default class EloPlugin extends Plugin {
       },
     });
 
+    // Keep the session UI in sync with renames
+    this.registerEvent(
+      this.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
+        if (file instanceof TFile && file.extension === 'md') {
+          this.currentSession?.onFileRenamed(oldPath, file);
+        }
+      }),
+    );
+
     this.addSettingTab(new EloSettingsTab(this.app, this));
   }
 
@@ -60,7 +69,6 @@ export default class EloPlugin extends Plugin {
 
   private startQuickSession(files: TFile[]) {
     const cohortKey = this.getCohortKey();
-    for (const f of files) this.dataStore.ensurePlayer(cohortKey, f.path);
 
     // End any existing session first
     this.endSession();
