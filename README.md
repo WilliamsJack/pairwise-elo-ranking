@@ -1,94 +1,109 @@
-# Obsidian Sample Plugin
+Rank the notes in a Base by pairwise comparisons using the Elo rating system.
+# Motivation
+Rate and rank notes by pairwise comparison using the Elo rating system.
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+It can be difficult to give an item a rating in a vacuum. What happens if you rate it ten stars, and then find something better later? Do you have to readjust your previous ratings? Do you have to add an eleventh star?
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+*Why don't you just make ten better and make ten be the top number and make that a little better?*
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+That's essentially what this plugin does. Given two items, I find it much easier to choose a preference between them than to rate them on their own. By comparing two notes directly, you avoid the ambiguity of absolute ratings and create a dynamic ranking that adjusts as you add more comparisons.
+# Design
+## Dataset
+An Obsidian Base and view defines "What's in scope" for an Elo rating. The Base's filters (or the filters of a specific view, if specified) determine the cohort.
+The [[Elo Rating Obsidian Plugin#Elo Block|Elo Block]] contains a link to the Base and view that determined the current note's cohort.
+## Launch Contexts
+An Elo rating session can be started or resumed by:
+- Running a command or clicking a sidebar icon while in an Obsidian Base
+- Running a command or clicking a sidebar icon while in a note that contains an Elo block (if multiple Elo blocks, bring up a palette for selection)
+## Comparison UI
+Two random notes from the Base are shown side by side. The user uses keys on the keyboard or buttons on the screen. Keyboard shortcuts are configurable in the plugin settings, and can even be multiple keys.
+- Left arrow to choose left, right arrow to choose right
+- Up or down arrows for a draw
+- Backspace to undo the last rating
+- Escape to end the rating session
 
-## First time developing plugins?
+After each comparison, a toast notification appears to let the user know the name of the note that won. This can be turned off in the plugin settings.
+## Ranking
+The Elo algorithm outputs a score. A more human-readable format may be a integer number rank. The plugin can sort notes by their Elo score and give them a rank. Updating many notes in real-time may be inefficient - this could be recalculated at the end of a session or with a command.
+## Elo Block
+Every note that is part of an Elo rating will have an Elo block. A note can have multiple Elo blocks.
 
-Quick starting guide for new plugin devs:
+Each Elo block links to an Obsidian Base, which defines the behaviour of the Elo rating.
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+> Elo: [[Daily Photo.base]]
+> Score: 1606.570927336755
+> Matches: 17
+> Wins: 15
 
-## Releasing new releases
+*Note: Only `Score` is required for an Elo rating. The other fields are optional (defined in the Base/Elo Rating Note) and provide additional statistics about the note's performance.*
+## Defining Advanced Behaviour
+Advanced behaviour is defined in the Obsidian Base that the Elo rating is running on.
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+Example Base with Elo plugin configuration:
+```base
+filters:
+  and:
+    - file.ext.lower() == "md"
+    - file.hasTag("Personal/Life/Recipe")
+    - '!file.name.lower().contains("template")'
+formulas:
+  firstImage: '[file.embeds, file.links].flat().filter(value.asFile() && ["png","jpg","jpeg","gif","webp","svg","bmp","avif","tif","tiff"].contains(value.asFile().ext.lower()))[0]'
+  cover: if(formula.firstImage, image(formula.firstImage.asFile()))
+  mealTag: file.tags.map(value.replace(/^#/, "")).filter(value.startsWith("Personal/Life/Recipe/"))[0]
+  mealCourse: if(formula.mealTag, formula.mealTag.split("/")[3], "Uncategorised")
+  title: file.asLink()
+properties:
+  formula.cover:
+    displayName: Photo
+  formula.title:
+    displayName: Recipe
+  formula.mealCourse:
+    displayName: Course
+views:
+  - type: cards
+    name: Recipes
+    order:
+      - file.name
+      - formula.mealCourse
+      - Serves
+      - Diet
+    image: formula.cover
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+    # Elo plugin configuration
+    elo:
+      # 1) Pairing preferences
+      pairing:
+        preferSimilar: true     # Prefer pairing notes with similar Elo scores
+        preferLowMatches: true  # Prefer pairing notes with fewer matches
 
-## Adding your plugin to the community plugin list
-
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
-
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint .\src\`
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+      # 2) Define where statistics are shown and how they are labelled
+      # Results from the Elo block can be mirrored to frontmatter properties.
+      statistics:
+        rating:  # Rating is the only required statistic.
+          eloBlock:
+            name: Rating
+          frontmatterMirror:
+            enabled: false
+            property: eloRating
+        rank:
+          eloBlock:
+            enabled: true
+            name: Rank
+          frontmatterMirror:
+            enabled: true
+            property: Rank
+        matches:
+          eloBlock:
+            enabled: true
+            name: Matches
+          frontmatterMirror:
+            enabled: false
+            property: eloMatches
+        wins:
+          eloBlock:
+            enabled: true
+            name: Wins
+          frontmatterMirror:
+            enabled: false
+            property: eloWins
 ```
-
-If you have multiple URLs, you can also do:
-
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
-
-## API Documentation
-
-See https://github.com/obsidianmd/obsidian-api
