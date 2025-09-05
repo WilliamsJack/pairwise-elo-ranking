@@ -2,7 +2,7 @@
 	"name": "PairwiseEloRanking",
 	"version": "0.1.0",
 	"description": "Rank the notes in a Base by pairwise comparisons using the Elo rating system.",
-	"main": "src/main.ts",
+	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
