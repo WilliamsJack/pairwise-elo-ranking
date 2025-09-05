@@ -1,6 +1,6 @@
 import { App, Notice, Plugin, TFile } from 'obsidian';
 
-import CompareModal from './ui/CompareModal';
+import ArenaSession from './ui/ArenaSession';
 import { EloSettings } from './settings/settings';
 import EloSettingsTab from './settings/SettingsTab';
 import { PluginDataStore } from './storage/PluginDataStore';
@@ -8,6 +8,8 @@ import { PluginDataStore } from './storage/PluginDataStore';
 export default class EloPlugin extends Plugin {
   dataStore: PluginDataStore;
   settings: EloSettings;
+
+  private currentSession?: ArenaSession;
 
   async onload() {
     this.dataStore = new PluginDataStore(this);
@@ -35,10 +37,22 @@ export default class EloPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: 'elo-end-session',
+      name: 'Elo: End current session',
+      checkCallback: (checking) => {
+        const has = !!this.currentSession;
+        if (!checking && has) this.endSession();
+        return has;
+      },
+    });
+
     this.addSettingTab(new EloSettingsTab(this.app, this));
   }
 
-  onunload(): void {}
+  onunload(): void {
+    this.endSession();
+  }
 
   async saveSettings() {
     await this.dataStore.saveSettings();
@@ -47,7 +61,21 @@ export default class EloPlugin extends Plugin {
   private startQuickSession(files: TFile[]) {
     const cohortKey = this.getCohortKey();
     for (const f of files) this.dataStore.ensurePlayer(cohortKey, f.path);
-    new CompareModal(this.app, this, cohortKey, files).open();
+
+    // End any existing session first
+    this.endSession();
+
+    this.currentSession = new ArenaSession(this.app, this, cohortKey, files);
+    // Clean up automatically if the plugin unloads
+    this.register(() => this.currentSession?.end());
+    this.currentSession.start();
+  }
+
+  private endSession() {
+    if (this.currentSession) {
+      this.currentSession.end();
+      this.currentSession = undefined;
+    }
   }
 
   private getCohortKey(): string {

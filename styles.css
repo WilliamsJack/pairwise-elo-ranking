@@ -1,8 +1,33 @@
-/*
+/* Floating controls for Elo arena */
+.elo-session-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: var(--shadow-s);
+  z-index: 9999;
+  pointer-events: auto;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.elo-session-bar .elo-side {
+  min-width: 140px;
+  text-align: center;
+  font-weight: 600;
+}
 
-If your plugin does not need CSS, delete this file.
+.elo-session-bar .elo-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 
-*/
+.elo-session-bar button {
+  padding: 4px 8px;
+}
