@@ -1,5 +1,5 @@
 {
-	"id": "PairwiseEloRanking",
+	"id": "pairwise-elo-ranking",
 	"name": "Pairwise Elo Ranking",
 	"version": "0.1.0",
 	"minAppVersion": "1.9.10",
