@@ -1,7 +1,5 @@
 Rank the notes in a Base by pairwise comparisons using the Elo rating system.
 # Motivation
-Rate and rank notes by pairwise comparison using the Elo rating system.
-
 It can be difficult to give an item a rating in a vacuum. What happens if you rate it ten stars, and then find something better later? Do you have to readjust your previous ratings? Do you have to add an eleventh star?
 
 *Why don't you just make ten better and make ten be the top number and make that a little better?*
@@ -10,13 +8,12 @@ That's essentially what this plugin does. Given two items, I find it much easier
 # Design
 ## Dataset
 An Obsidian Base and view defines "What's in scope" for an Elo rating. The Base's filters (or the filters of a specific view, if specified) determine the cohort.
-The [[Elo Rating Obsidian Plugin#Elo Block|Elo Block]] contains a link to the Base and view that determined the current note's cohort.
-## Launch Contexts
+## Starting a Session
 An Elo rating session can be started or resumed by:
 - Running a command or clicking a sidebar icon while in an Obsidian Base
-- Running a command or clicking a sidebar icon while in a note that contains an Elo block (if multiple Elo blocks, bring up a palette for selection)
+- Running a command or clicking a sidebar icon while in a note that is in an Elo rating cohort (if the note is in multiple cohorts, a palette will appear for selection)
 ## Comparison UI
-Two random notes from the Base are shown side by side. The user uses keys on the keyboard or buttons on the screen. Keyboard shortcuts are configurable in the plugin settings, and can even be multiple keys.
+Two random notes from the Base are shown side by side. The user uses keys on the keyboard or buttons on the screen to select the winner. Keyboard controls are configurable in the plugin settings. By default:
 - Left arrow to choose left, right arrow to choose right
 - Up or down arrows for a draw
 - Backspace to undo the last rating
@@ -25,19 +22,8 @@ Two random notes from the Base are shown side by side. The user uses keys on the
 After each comparison, a toast notification appears to let the user know the name of the note that won. This can be turned off in the plugin settings.
 ## Ranking
 The Elo algorithm outputs a score. A more human-readable format may be a integer number rank. The plugin can sort notes by their Elo score and give them a rank. Updating many notes in real-time may be inefficient - this could be recalculated at the end of a session or with a command.
-## Elo Block
-Every note that is part of an Elo rating will have an Elo block. A note can have multiple Elo blocks.
-
-Each Elo block links to an Obsidian Base, which defines the behaviour of the Elo rating.
-
-> Elo: [[Daily Photo.base]]
-> Score: 1606.570927336755
-> Matches: 17
-> Wins: 15
-
-*Note: Only `Score` is required for an Elo rating. The other fields are optional (defined in the Base/Elo Rating Note) and provide additional statistics about the note's performance.*
 ## Defining Advanced Behaviour
-Advanced behaviour is defined in the Obsidian Base that the Elo rating is running on.
+Advanced behaviour or settings overrides are defined in the Obsidian Base that the Elo rating is running on.
 
 Example Base with Elo plugin configuration:
 ```base
@@ -76,34 +62,18 @@ views:
         preferSimilar: true     # Prefer pairing notes with similar Elo scores
         preferLowMatches: true  # Prefer pairing notes with fewer matches
 
-      # 2) Define where statistics are shown and how they are labelled
-      # Results from the Elo block can be mirrored to frontmatter properties.
+      # 2) Define which statistics are shown in the frontmatter of this cohort
       statistics:
-        rating:  # Rating is the only required statistic.
-          eloBlock:
-            name: Rating
-          frontmatterMirror:
+        rating:
+            property: Rating
             enabled: false
-            property: eloRating
         rank:
-          eloBlock:
-            enabled: true
-            name: Rank
-          frontmatterMirror:
-            enabled: true
-            property: Rank
+          property: Rank
+          enabled: true
         matches:
-          eloBlock:
-            enabled: true
-            name: Matches
-          frontmatterMirror:
-            enabled: false
-            property: eloMatches
+          property: Matches
+          enabled: false
         wins:
-          eloBlock:
-            enabled: true
-            name: Wins
-          frontmatterMirror:
-            enabled: false
-            property: eloWins
+          property: Wins
+          enabled: false
 ```
