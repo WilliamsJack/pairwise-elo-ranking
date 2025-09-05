@@ -14,11 +14,11 @@ export default class ArenaSession {
   private rightFile?: TFile;
   private lastPairSig?: string;
 
+  private originalLeftViewState?: ViewState;
   private originalLeftLeaf!: WorkspaceLeaf;
   private leftLeaf!: WorkspaceLeaf;
   private rightLeaf!: WorkspaceLeaf;
   private createdRightLeaf = false;
-  private originalLeftFile?: TFile;
 
   private undoStack: UndoFrame[] = [];
   private overlayEl?: HTMLElement;
@@ -48,10 +48,11 @@ export default class ArenaSession {
     }
 
     // Remember original left file to restore later
-    const lv = this.leftLeaf.view;
-    if ((lv as MarkdownView)?.file) {
-      this.originalLeftFile = (lv as MarkdownView).file!;
-    }
+     const vs = this.leftLeaf.getViewState();
+     this.originalLeftViewState = {
+       ...vs,
+       state: vs.state ? JSON.parse(JSON.stringify(vs.state)) : {},
+     };
 
     this.pickNextPair();
     await this.openCurrent();
@@ -72,13 +73,12 @@ export default class ArenaSession {
     try { this.leftLeaf.setPinned(false); } catch {}
     try { this.rightLeaf.setPinned(false); } catch {}
 
-    // Restore the user's original left file if there was one
-    if (this.originalLeftFile) {
+    // Restore the user's original left file view state
+    if (this.originalLeftViewState) {
       try {
         await this.leftLeaf.setViewState({
-          type: 'markdown',
-          state: { file: this.originalLeftFile.path, mode: 'preview' },
-          active: false,
+          ...this.originalLeftViewState,
+          active: true, // give focus back to the user's original tab
         });
       } catch {}
     }
