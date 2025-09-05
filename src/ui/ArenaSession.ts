@@ -53,12 +53,12 @@ export default class ArenaSession {
       this.originalLeftFile = (lv as MarkdownView).file!;
     }
 
+    this.pickNextPair();
+    await this.openCurrent();
+
     // Pin both leaves during the session
     try { this.leftLeaf.setPinned(true); } catch {}
     try { this.rightLeaf.setPinned(true); } catch {}
-
-    this.pickNextPair();
-    await this.openCurrent();
 
     this.mountOverlay();
     window.addEventListener('keydown', this.keydownHandler, true);
@@ -74,7 +74,13 @@ export default class ArenaSession {
 
     // Restore the user's original left file if there was one
     if (this.originalLeftFile) {
-      try { await this.leftLeaf.openFile(this.originalLeftFile, { eState: { mode: 'preview' } }); } catch {}
+      try {
+        await this.leftLeaf.setViewState({
+          type: 'markdown',
+          state: { file: this.originalLeftFile.path, mode: 'preview' },
+          active: false,
+        });
+      } catch {}
     }
 
     // Close the right leaf we created
@@ -87,8 +93,32 @@ export default class ArenaSession {
 
   private async openCurrent() {
     if (!this.leftFile || !this.rightFile) return;
-    await this.leftLeaf.openFile(this.leftFile, { eState: { mode: 'preview' } });
-    await this.rightLeaf.openFile(this.rightFile, { eState: { mode: 'preview' } });
+    await Promise.all([
+      this.openInReadingMode(this.leftLeaf, this.leftFile),
+      this.openInReadingMode(this.rightLeaf, this.rightFile),
+    ]);
+  }
+
+  private async openInReadingMode(leaf: WorkspaceLeaf, file: TFile) {
+    // Force Reading Mode and prevent focus grabbing
+    await leaf.setViewState({
+      type: 'markdown',
+      state: { file: file.path, mode: 'preview' },
+      active: false,
+    });
+
+    // Safety: if somehow still in edit mode, flip to preview
+    const v = leaf.view as MarkdownView | undefined;
+    if (v && (v.getState()?.mode as string | undefined) !== 'preview') {
+      try {
+        const vs = leaf.getViewState();
+        await leaf.setViewState({
+          ...vs,
+          state: { ...(vs.state as any), mode: 'preview' },
+          active: false,
+        });
+      } catch {}
+    }
   }
 
   private mountOverlay() {
