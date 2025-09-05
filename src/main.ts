@@ -1,22 +1,69 @@
-import { DEFAULT_SETTINGS, EloSettings } from './settings/settings';
+import { App, Notice, Plugin, TFile } from 'obsidian';
 
+import CompareModal from './ui/CompareModal';
+import { EloSettings } from './settings/settings';
 import EloSettingsTab from './settings/SettingsTab';
-import { Plugin } from 'obsidian';
+import { PluginDataStore } from './storage/PluginDataStore';
 
 export default class EloPlugin extends Plugin {
+  dataStore: PluginDataStore;
   settings: EloSettings;
 
   async onload() {
-    await this.loadSettings();
+    this.dataStore = new PluginDataStore(this);
+    await this.dataStore.load();
+    this.settings = this.dataStore.settings;
+
+    this.addRibbonIcon('trophy', 'Elo: Quick session', () => {
+      const files = this.getCohortFiles();
+      if (files.length < 2) {
+        new Notice('Need at least two Markdown notes to compare.');
+        return;
+      }
+      this.startQuickSession(files);
+    });
+
+    this.addCommand({
+      id: 'elo-quick-session-active-folder',
+      name: 'Elo: Quick rating (active folder)',
+      checkCallback: (checking) => {
+        const files = this.getCohortFiles();
+        if (files.length >= 2) {
+          if (!checking) this.startQuickSession(files);
+          return true;
+        }
+      },
+    });
+
     this.addSettingTab(new EloSettingsTab(this.app, this));
   }
 
-  async loadSettings() {
-    const data = await this.loadData();
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
-  }
+  onunload(): void {}
 
   async saveSettings() {
-    await this.saveData(this.settings);
+    await this.dataStore.saveSettings();
+  }
+
+  private startQuickSession(files: TFile[]) {
+    const cohortKey = this.getCohortKey();
+    for (const f of files) this.dataStore.ensurePlayer(cohortKey, f.path);
+    new CompareModal(this.app, this, cohortKey, files).open();
+  }
+
+  private getCohortKey(): string {
+    const active = this.app.workspace.getActiveFile();
+    if (active?.parent) return `folder:${active.parent.path}`;
+    return 'vault:all';
+  }
+
+  private getCohortFiles(): TFile[] {
+    const all = this.app.vault.getMarkdownFiles();
+    const active = this.app.workspace.getActiveFile();
+
+    if (active?.parent) {
+      const folderPath = active.parent.path;
+      return all.filter((f) => f.parent?.path === folderPath);
+    }
+    return all;
   }
 }
