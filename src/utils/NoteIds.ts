@@ -1,23 +1,60 @@
 import { App, TFile } from 'obsidian';
 
-export function getEloId(app: App, file: TFile): string | undefined {
+// Matches HTML comments like: <!-- eloId: 123e4567-e89b-12d3-a456-426614174000 -->
+const ELO_ID_COMMENT_RE = /<!--\s*eloId\s*:\s*([0-9A-Za-z][0-9A-Za-z._-]*)\s*-->/g;
+
+export async function getEloId(app: App, file: TFile): Promise<string | undefined> {
+  // Prefer frontmatter
   const fm = app.metadataCache.getFileCache(file)?.frontmatter;
   const id = fm?.eloId;
-  return typeof id === 'string' && id.length > 0 ? id : undefined;
+  if (typeof id === 'string' && id.length > 0) return id;
+
+  // Fallback: look for an HTML comment marker anywhere in the note
+  try {
+    const text = await app.vault.cachedRead(file);
+    let match: RegExpExecArray | null;
+    let lastId: string | undefined;
+    while ((match = ELO_ID_COMMENT_RE.exec(text)) !== null) {
+      lastId = match[1];
+    }
+    return lastId;
+  } catch {
+    return undefined;
+  }
 }
 
-export async function ensureEloId(app: App, file: TFile): Promise<string> {
-  const existing = getEloId(app, file);
+export async function ensureEloId(
+  app: App,
+  file: TFile,
+  preferredLocation: 'frontmatter' | 'end' = 'frontmatter'
+): Promise<string> {
+  const existing = await getEloId(app, file);
   if (existing) return existing;
 
   const id = (window.crypto && 'randomUUID' in window.crypto)
     ? window.crypto.randomUUID()
     : fallbackUUID();
 
-  await app.fileManager.processFrontMatter(file, (fm) => {
-    if (!fm.eloId) fm.eloId = id;
-  });
-  return id;
+  if (preferredLocation === 'end') {
+    const text = await app.vault.read(file);
+
+    // Safety: if somehow there already is one in the body, use it
+    let m: RegExpExecArray | null;
+    let last: string | undefined;
+    while ((m = ELO_ID_COMMENT_RE.exec(text)) !== null) last = m[1];
+    if (last) return last;
+
+    const needsNewline = text.length > 0 && !text.endsWith('\n');
+    const marker = `<!-- eloId: ${id} -->`;
+    const newText = text + (needsNewline ? '\n' : '') + '\n' + marker + '\n';
+    await app.vault.modify(file, newText);
+    return id;
+  } else {
+    await app.fileManager.processFrontMatter(file, (fm) => {
+      if (!fm.eloId) fm.eloId = id;
+    });
+    return id;
+  }
 }
 
 function fallbackUUID(): string {

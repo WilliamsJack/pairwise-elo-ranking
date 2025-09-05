@@ -254,12 +254,12 @@ export default class ArenaSession {
     const cached = this.idByPath.get(file.path);
     if (cached) return cached;
 
-    const existing = getEloId(this.app, file);
+    const existing = await getEloId(this.app, file);
     if (existing) {
       this.idByPath.set(file.path, existing);
       return existing;
     }
-    const id = await ensureEloId(this.app, file);
+    const id = await ensureEloId(this.app, file, this.plugin.settings.eloIdLocation ?? 'frontmatter');
     this.idByPath.set(file.path, id);
     return id;
   }

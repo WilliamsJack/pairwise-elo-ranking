@@ -41,5 +41,21 @@ export default class EloSettingsTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }),
       );
+
+    new Setting(containerEl)
+      .setName('eloId location')
+      .setDesc('Where to store the Elo ID when creating a new one. The plugin can support a mix of both. If both are found, the plugin will use the frontmatter ID.')
+      .addDropdown((dd) => {
+        dd.addOptions({
+          frontmatter: 'Frontmatter (YAML)',
+          end: 'End of note (HTML comment)',
+        })
+          .setValue(this.plugin.settings.eloIdLocation ?? 'frontmatter')
+          .onChange(async (v) => {
+            const val = v === 'end' ? 'end' : 'frontmatter';
+            this.plugin.settings.eloIdLocation = val;
+            await this.plugin.saveSettings();
+          });
+      });
   }
 }
