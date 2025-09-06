@@ -32,19 +32,6 @@ export default class EloPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'elo-quick-session-active-folder',
-      name: 'Elo: Quick rating (active folder)',
-      checkCallback: (checking) => {
-        const def = this.getActiveFolderCohort();
-        const files = resolveFilesForCohort(this.app, def);
-        if (files.length >= 2) {
-          if (!checking) this.startSessionForCohort(def, files, { saveDef: false });
-          return true;
-        }
-      },
-    });
-
-    this.addCommand({
       id: 'elo-end-session',
       name: 'Elo: End current session',
       checkCallback: (checking) => {
@@ -111,13 +98,5 @@ export default class EloPlugin extends Plugin {
       this.currentSession.end();
       this.currentSession = undefined;
     }
-  }
-
-  private getActiveFolderCohort(): CohortDefinition {
-    const active = this.app.workspace.getActiveFile();
-    if (active?.parent) {
-      return createDefinition('folder', { path: active.parent.path }, `Folder: ${active.parent.path}`);
-    }
-    return createDefinition('vault:all', {}, 'Vault: All notes');
   }
 }
