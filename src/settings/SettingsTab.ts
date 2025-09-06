@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, TextComponent } from 'obsidian';
 
 import type EloPlugin from '../main';
 
@@ -57,5 +57,74 @@ export default class EloSettingsTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
+
+    // Frontmatter properties
+    containerEl.createEl('h4', { text: 'Frontmatter properties' });
+    containerEl.createEl('p', {
+      text:
+        'Choose which Elo statistics to write into a note\'s frontmatter and the property names to use. ' +
+        'These are global defaults; cohort-specific overrides can be defined in Bases (upcoming).',
+    });
+
+    const fm = this.plugin.settings.frontmatterProperties;
+
+    const addFrontmatterSetting = (
+      key: keyof typeof fm,
+      label: string,
+      desc: string,
+      placeholder: string,
+    ) => {
+      const cfg = fm[key];
+      let textRef: TextComponent;
+
+      new Setting(containerEl)
+        .setName(label)
+        .setDesc(desc)
+        .addToggle((t) =>
+          t
+            .setValue(Boolean(cfg.enabled))
+            .onChange(async (val) => {
+              cfg.enabled = val;
+              if (textRef) textRef.setDisabled(!val);
+              await this.plugin.saveSettings();
+            }),
+        )
+        .addText((t) => {
+          textRef = t;
+          t.setPlaceholder(placeholder)
+            .setValue(cfg.property)
+            .setDisabled(!cfg.enabled)
+            .onChange(async (v) => {
+              const trimmed = v.trim();
+              cfg.property = trimmed.length > 0 ? trimmed : placeholder;
+              await this.plugin.saveSettings();
+            });
+        });
+    };
+
+    addFrontmatterSetting(
+      'rating',
+      'Rating',
+      'Write the current Elo rating to this frontmatter property.',
+      'eloRating',
+    );
+    addFrontmatterSetting(
+      'rank',
+      'Rank',
+      'Write the rank (1 = highest) within the cohort to this frontmatter property.',
+      'eloRank',
+    );
+    addFrontmatterSetting(
+      'matches',
+      'Matches',
+      'Write the total number of matches to this frontmatter property.',
+      'eloMatches',
+    );
+    addFrontmatterSetting(
+      'wins',
+      'Wins',
+      'Write the number of wins to this frontmatter property.',
+      'eloWins',
+    );
   }
 }

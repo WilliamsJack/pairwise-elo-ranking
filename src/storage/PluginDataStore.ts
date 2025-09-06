@@ -34,7 +34,7 @@ export class PluginDataStore {
   async load(): Promise<void> {
     const raw = (await this.plugin.loadData()) as PersistedData | null;
 
-    this.settings = raw?.settings ?? { ...DEFAULT_SETTINGS };
+    this.settings = { ...DEFAULT_SETTINGS, ...(raw?.settings ?? {}) };
     this.store = raw?.store ?? { ...DEFAULT_STORE };
 
     if (!raw?.settings || !raw?.store) {
