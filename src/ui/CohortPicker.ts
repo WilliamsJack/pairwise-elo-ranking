@@ -1,4 +1,4 @@
-import { App, FuzzySuggestModal, Modal, Setting, TFolder, TextComponent, ToggleComponent } from 'obsidian';
+import { App, FuzzySuggestModal, Modal, Notice, Setting, TFolder, TextComponent, ToggleComponent } from 'obsidian';
 import { allFolderChoices, createDefinition, labelForDefinition, parseCohortKey } from '../domain/cohort/CohortResolver';
 
 import { CohortDefinition } from '../types';
@@ -132,7 +132,10 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
       case 'active-folder': {
         const active = this.app.workspace.getActiveFile();
         const path = active?.parent?.path;
-        if (!path) return createDefinition('vault:all', {}, 'Vault: All notes');
+        if (!path) {
+          new Notice('No file selected. Please select a file to use its folder.');
+          return undefined;
+        }
         return await this.chooseFolderCohort(path);
       }
       case 'pick-folder':
