@@ -16,21 +16,25 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     containerEl.createEl('h3', { text: 'Pairwise Elo Ranking' });
 
-    new Setting(containerEl)
-      .setName('K-factor')
-      .setDesc('Adjusts how quickly ratings move. Typical values are 16–40.')
-      .addText((t) =>
-        t
-          .setPlaceholder('24')
-          .setValue(String(this.plugin.settings.kFactor))
-          .onChange(async (v) => {
-            const num = Number(v);
-            if (!Number.isNaN(num) && num > 0) {
-              this.plugin.settings.kFactor = num;
+      const minK = 8;
+      const maxK = 64;
+      const stepK = 1;
+      let initialK = this.plugin.settings.kFactor;
+      if (!Number.isFinite(initialK)) initialK = 24;
+      initialK = Math.min(maxK, Math.max(minK, Math.round(initialK)));
+
+      new Setting(containerEl)
+        .setName('K-factor')
+        .setDesc('Adjusts how quickly ratings move. Typical values are 16–40.')
+        .addSlider((s) => {
+          s.setLimits(minK, maxK, stepK)
+            .setValue(initialK)
+            .setDynamicTooltip()
+            .onChange(async (value) => {
+              this.plugin.settings.kFactor = value;
               await this.plugin.saveSettings();
-            }
-          }),
-      );
+            });
+        });
 
     new Setting(containerEl)
       .setName('Show win/draw notices')
@@ -43,7 +47,7 @@ export default class EloSettingsTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('eloId location')
+      .setName('Elo ID location')
       .setDesc('Where to store the Elo ID. Changing this setting will not move existing IDs, but they will continue to work.')
       .addDropdown((dd) => {
         dd.addOptions({
