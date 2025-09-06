@@ -4,6 +4,7 @@ import { ensureEloId, getEloId } from '../utils/NoteIds';
 
 import type EloPlugin from '../../main';
 import { pairSig } from '../utils/pair';
+import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
 
 export default class ArenaSession {
   private app: App;
@@ -51,11 +52,11 @@ export default class ArenaSession {
     }
 
     // Remember original left file to restore later
-     const vs = this.leftLeaf.getViewState();
-     this.originalLeftViewState = {
-       ...vs,
-       state: vs.state ? JSON.parse(JSON.stringify(vs.state)) : {},
-     };
+    const vs = this.leftLeaf.getViewState();
+    this.originalLeftViewState = {
+      ...vs,
+      state: vs.state ? JSON.parse(JSON.stringify(vs.state)) : {},
+    };
 
     this.pickNextPair();
     await this.openCurrent();
@@ -245,6 +246,18 @@ export default class ArenaSession {
     }
     this.plugin.dataStore.saveStore();
 
+    // Write frontmatter stats to both notes
+    const cohort = this.plugin.dataStore.store.cohorts[this.cohortKey];
+    void writeFrontmatterStatsForPair(
+      this.app,
+      this.plugin.settings,
+      cohort,
+      this.leftFile,
+      aId,
+      this.rightFile,
+      bId,
+    );
+
     this.pickNextPair();
     this.openCurrent();
     this.updateOverlay();
@@ -273,6 +286,30 @@ export default class ArenaSession {
     const ok = this.plugin.dataStore.revert(frame);
     if (ok && this.plugin.settings.showToasts) new Notice('Undid last match.');
     this.plugin.dataStore.saveStore();
+
+    // Update the two notes involved in the undone match, if we can find them
+    const aFile = this.findFileById(frame.a.id);
+    const bFile = this.findFileById(frame.b.id);
+    const cohort = this.plugin.dataStore.store.cohorts[frame.cohortKey];
+    void writeFrontmatterStatsForPair(
+      this.app,
+      this.plugin.settings,
+      cohort,
+      aFile,
+      frame.a.id,
+      bFile,
+      frame.b.id,
+    );
+  }
+
+  private findFileById(id: string): TFile | undefined {
+    for (const [path, knownId] of this.idByPath) {
+      if (knownId === id) {
+        const af = this.app.vault.getAbstractFileByPath(path);
+        if (af instanceof TFile) return af;
+      }
+    }
+    return undefined;
   }
 
   private pickNextPair() {
