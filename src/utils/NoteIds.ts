@@ -1,7 +1,13 @@
 import { App, TFile } from 'obsidian';
 
 // Matches HTML comments like: <!-- eloId: 123e4567-e89b-12d3-a456-426614174000 -->
-const ELO_ID_COMMENT_RE = /<!--\s*eloId\s*:\s*([0-9A-Za-z][0-9A-Za-z._-]*)\s*-->/g;
+const ELO_ID_COMMENT_BASE = /<!--\s*eloId\s*:\s*([0-9A-Za-z][0-9A-Za-z._-]*)\s*-->/;
+
+function extractEloIdFromHtmlComment(text: string): string | undefined {
+  const re = new RegExp(ELO_ID_COMMENT_BASE.source, 'g');
+  const m = re.exec(text);
+  return m ? m[1] : undefined;
+}
 
 export async function getEloId(app: App, file: TFile): Promise<string | undefined> {
   // Prefer frontmatter
@@ -12,12 +18,7 @@ export async function getEloId(app: App, file: TFile): Promise<string | undefine
   // Fallback: look for an HTML comment marker anywhere in the note
   try {
     const text = await app.vault.cachedRead(file);
-    let match: RegExpExecArray | null;
-    let lastId: string | undefined;
-    while ((match = ELO_ID_COMMENT_RE.exec(text)) !== null) {
-      lastId = match[1];
-    }
-    return lastId;
+    return extractEloIdFromHtmlComment(text);
   } catch {
     return undefined;
   }
@@ -38,10 +39,7 @@ export async function ensureEloId(
   if (preferredLocation === 'end') {
     const text = await app.vault.read(file);
 
-    // Safety: if somehow there already is one in the body, use it
-    let m: RegExpExecArray | null;
-    let last: string | undefined;
-    while ((m = ELO_ID_COMMENT_RE.exec(text)) !== null) last = m[1];
+    const last = extractEloIdFromHtmlComment(text);
     if (last) return last;
 
     const needsNewline = text.length > 0 && !text.endsWith('\n');
