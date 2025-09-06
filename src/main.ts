@@ -86,14 +86,14 @@ export default class EloPlugin extends Plugin {
     this.endSession();
 
     this.currentSession = new ArenaSession(this.app, this, def.key, files);
-    this.register(() => this.currentSession?.end());
+    this.register(() => this.endSession());
     this.currentSession.start();
 
     this.dataStore.setLastUsedCohortKey(def.key);
     void this.dataStore.saveStore();
   }
 
-  private endSession() {
+  public endSession() {
     if (this.currentSession) {
       this.currentSession.end();
       this.currentSession = undefined;

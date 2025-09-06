@@ -163,7 +163,7 @@ export default class ArenaSession {
       this.makeButton('↑ Draw', () => this.choose('D')),
       this.makeButton('→ Right', () => this.choose('B')),
       this.makeButton('Undo ⌫', () => this.undo()),
-      this.makeButton('End Esc', () => this.end()),
+      this.makeButton('End Esc', () => this.plugin.endSession()),
     );
     el.append(controls);
 
@@ -219,7 +219,7 @@ export default class ArenaSession {
       this.undo();
     } else if (ev.key === 'Escape') {
       ev.preventDefault();
-      this.end();
+      this.plugin.endSession();
     }
   }
 
