@@ -105,6 +105,8 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
   }
 
   async onChooseItem(item: Choice): Promise<void> {
+    const shouldAskOverrides = this.plugin.settings.askForOverridesOnCohortCreation;
+
     if (item.kind === 'saved') {
       const def = item.def ?? parseCohortKey(item.key);
       this.emit(def);
@@ -114,13 +116,17 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
 
     if (item.action === 'vault-all') {
       const def = createDefinition('vault:all', {}, 'Vault: All notes');
-      const overrides = await this.chooseFrontmatterOverrides();
-      if (!overrides) {
-        this.emit(undefined);
-        this.close();
-        return;
+
+      if (shouldAskOverrides) {
+        const overrides = await this.chooseFrontmatterOverrides();
+        if (!overrides) {
+          this.emit(undefined);
+          this.close();
+          return;
+        }
+        def.frontmatterOverrides = overrides;
       }
-      def.frontmatterOverrides = overrides;
+
       this.emit(def);
       this.close();
       return;
@@ -131,6 +137,30 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
       const path = active?.parent?.path;
       if (!path) {
         const def = createDefinition('vault:all', {}, 'Vault: All notes');
+
+        if (shouldAskOverrides) {
+          const overrides = await this.chooseFrontmatterOverrides();
+          if (!overrides) {
+            this.emit(undefined);
+            this.close();
+            return;
+          }
+          def.frontmatterOverrides = overrides;
+        }
+
+        this.emit(def);
+        this.close();
+        return;
+      }
+
+      const def = await this.runChild(() => this.chooseFolderCohort(path));
+      if (!def) {
+        this.emit(undefined);
+        this.close();
+        return;
+      }
+
+      if (shouldAskOverrides) {
         const overrides = await this.chooseFrontmatterOverrides();
         if (!overrides) {
           this.emit(undefined);
@@ -138,23 +168,8 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
           return;
         }
         def.frontmatterOverrides = overrides;
-        this.emit(def);
-        this.close();
-        return;
       }
-      const def = await this.runChild(() => this.chooseFolderCohort(path));
-      if (!def) {
-        this.emit(undefined);
-        this.close();
-        return;
-      }
-      const overrides = await this.chooseFrontmatterOverrides();
-      if (!overrides) {
-        this.emit(undefined);
-        this.close();
-        return;
-      }
-      def.frontmatterOverrides = overrides;
+
       this.emit(def);
       this.close();
       return;
@@ -167,13 +182,17 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
         this.close();
         return;
       }
-      const overrides = await this.chooseFrontmatterOverrides();
-      if (!overrides) {
-        this.emit(undefined);
-        this.close();
-        return;
+
+      if (shouldAskOverrides) {
+        const overrides = await this.chooseFrontmatterOverrides();
+        if (!overrides) {
+          this.emit(undefined);
+          this.close();
+          return;
+        }
+        def.frontmatterOverrides = overrides;
       }
-      def.frontmatterOverrides = overrides;
+
       this.emit(def);
       this.close();
       return;
@@ -186,13 +205,17 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
         this.close();
         return;
       }
-      const overrides = await this.chooseFrontmatterOverrides();
-      if (!overrides) {
-        this.emit(undefined);
-        this.close();
-        return;
+
+      if (shouldAskOverrides) {
+        const overrides = await this.chooseFrontmatterOverrides();
+        if (!overrides) {
+          this.emit(undefined);
+          this.close();
+          return;
+        }
+        res.frontmatterOverrides = overrides;
       }
-      res.frontmatterOverrides = overrides;
+
       this.emit(res);
       this.close();
       return;

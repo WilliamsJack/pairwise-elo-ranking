@@ -60,6 +60,19 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     // Frontmatter properties
     containerEl.createEl('h4', { text: 'Frontmatter properties' });
+
+    new Setting(containerEl)
+      .setName('Ask for per-cohort overrides on creation')
+      .setDesc('When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults.')
+      .addToggle((t) =>
+        t
+          .setValue(this.plugin.settings.askForOverridesOnCohortCreation)
+          .onChange(async (v) => {
+            this.plugin.settings.askForOverridesOnCohortCreation = v;
+            await this.plugin.saveSettings();
+          }),
+      );
+
     containerEl.createEl('p', {
       text:
         'Choose which Elo statistics to write into a note\'s frontmatter and the property names to use. ' +

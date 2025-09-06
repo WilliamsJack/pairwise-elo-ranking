@@ -17,6 +17,7 @@ export interface EloSettings {
   showToasts: boolean;
   eloIdLocation: EloIdLocation;
   frontmatterProperties: FrontmatterPropertiesSettings;
+  askForOverridesOnCohortCreation: boolean;
 }
 
 export const DEFAULT_SETTINGS: EloSettings = {
@@ -29,4 +30,5 @@ export const DEFAULT_SETTINGS: EloSettings = {
     matches: { property: 'eloMatches',  enabled: false },
     wins:    { property: 'eloWins',     enabled: false },
   },
+  askForOverridesOnCohortCreation: true,
 };
