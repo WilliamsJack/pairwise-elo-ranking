@@ -1,9 +1,9 @@
 import { App, FuzzySuggestModal, Modal, Setting, TFolder, TextComponent, ToggleComponent } from 'obsidian';
-import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '../settings/settings';
 import { allFolderChoices, createDefinition, labelForDefinition, parseCohortKey } from '../domain/cohort/CohortResolver';
 
 import { CohortDefinition } from '../types';
 import type EloPlugin from '../../main';
+import type { FrontmatterPropertiesSettings } from '../settings/settings';
 
 type Choice =
   | { kind: 'saved'; key: string; label: string; def?: CohortDefinition }
@@ -71,6 +71,11 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     r?.(def);
   }
 
+  private complete(def?: CohortDefinition): void {
+    this.emit(def);
+    this.close();
+  }
+
   // Wraps any child modal flow and manages the awaitingChild flag
   private async runChild<T>(fn: () => Promise<T>): Promise<T> {
     this.awaitingChild = true;
@@ -83,19 +88,25 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
 
   // Handles folder selection (optional) + scope, and returns a ready CohortDefinition
   private async chooseFolderCohort(initialPath?: string): Promise<CohortDefinition | undefined> {
-    let path = initialPath;
+    return await this.runChild(async () => {
+      let path = initialPath;
 
-    if (!path) {
-      const folder = await new FolderSelectModal(this.app).openAndGetSelection();
-      if (!folder) return undefined;
-      path = folder.path;
-    }
+      if (!path) {
+        const folder = await new FolderSelectModal(this.app).openAndGetSelection();
+        if (!folder) return undefined;
+        path = folder.path;
+      }
 
-    const scope = await new FolderScopeModal(this.app, path).openAndGetScope();
-    if (!scope) return undefined;
+      const scope = await new FolderScopeModal(this.app, path).openAndGetScope();
+      if (!scope) return undefined;
 
-    const kind = scope === 'folder-recursive' ? 'folder-recursive' : 'folder';
-    return createDefinition(kind, { path });
+      const kind = scope === 'folder-recursive' ? 'folder-recursive' : 'folder';
+      return createDefinition(kind, { path });
+    });
+  }
+
+  private async chooseTagCohort(): Promise<CohortDefinition | undefined> {
+    return await this.runChild(() => new TagCohortModal(this.app).openAndGetDefinition());
   }
 
   private async chooseFrontmatterOverrides(): Promise<FrontmatterPropertiesSettings | undefined> {
@@ -104,122 +115,45 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     );
   }
 
-  async onChooseItem(item: Choice): Promise<void> {
-    const shouldAskOverrides = this.plugin.settings.askForOverridesOnCohortCreation;
+  private async applyFrontmatterOverrides(def: CohortDefinition | undefined): Promise<CohortDefinition | undefined> {
+    if (!def) return undefined;
+    if (!this.plugin.settings.askForOverridesOnCohortCreation) return def;
 
+    const overrides = await this.chooseFrontmatterOverrides();
+    if (!overrides) return undefined;
+    def.frontmatterOverrides = overrides;
+    return def;
+  }
+
+  private async buildDefinitionForAction(action: Choice['action']): Promise<CohortDefinition | undefined> {
+    switch (action) {
+      case 'vault-all':
+        return createDefinition('vault:all', {}, 'Vault: All notes');
+      case 'active-folder': {
+        const active = this.app.workspace.getActiveFile();
+        const path = active?.parent?.path;
+        if (!path) return createDefinition('vault:all', {}, 'Vault: All notes');
+        return await this.chooseFolderCohort(path);
+      }
+      case 'pick-folder':
+        return await this.chooseFolderCohort();
+      case 'tag-dialog':
+        return await this.chooseTagCohort();
+      default:
+        return undefined;
+    }
+  }
+
+  async onChooseItem(item: Choice): Promise<void> {
     if (item.kind === 'saved') {
       const def = item.def ?? parseCohortKey(item.key);
-      this.emit(def);
-      this.close();
+      this.complete(def);
       return;
     }
 
-    if (item.action === 'vault-all') {
-      const def = createDefinition('vault:all', {}, 'Vault: All notes');
-
-      if (shouldAskOverrides) {
-        const overrides = await this.chooseFrontmatterOverrides();
-        if (!overrides) {
-          this.emit(undefined);
-          this.close();
-          return;
-        }
-        def.frontmatterOverrides = overrides;
-      }
-
-      this.emit(def);
-      this.close();
-      return;
-    }
-
-    if (item.action === 'active-folder') {
-      const active = this.app.workspace.getActiveFile();
-      const path = active?.parent?.path;
-      if (!path) {
-        const def = createDefinition('vault:all', {}, 'Vault: All notes');
-
-        if (shouldAskOverrides) {
-          const overrides = await this.chooseFrontmatterOverrides();
-          if (!overrides) {
-            this.emit(undefined);
-            this.close();
-            return;
-          }
-          def.frontmatterOverrides = overrides;
-        }
-
-        this.emit(def);
-        this.close();
-        return;
-      }
-
-      const def = await this.runChild(() => this.chooseFolderCohort(path));
-      if (!def) {
-        this.emit(undefined);
-        this.close();
-        return;
-      }
-
-      if (shouldAskOverrides) {
-        const overrides = await this.chooseFrontmatterOverrides();
-        if (!overrides) {
-          this.emit(undefined);
-          this.close();
-          return;
-        }
-        def.frontmatterOverrides = overrides;
-      }
-
-      this.emit(def);
-      this.close();
-      return;
-    }
-
-    if (item.action === 'pick-folder') {
-      const def = await this.runChild(() => this.chooseFolderCohort());
-      if (!def) {
-        this.emit(undefined);
-        this.close();
-        return;
-      }
-
-      if (shouldAskOverrides) {
-        const overrides = await this.chooseFrontmatterOverrides();
-        if (!overrides) {
-          this.emit(undefined);
-          this.close();
-          return;
-        }
-        def.frontmatterOverrides = overrides;
-      }
-
-      this.emit(def);
-      this.close();
-      return;
-    }
-
-    if (item.action === 'tag-dialog') {
-      const res = await this.runChild(() => new TagCohortModal(this.app).openAndGetDefinition());
-      if (!res) {
-        this.emit(undefined);
-        this.close();
-        return;
-      }
-
-      if (shouldAskOverrides) {
-        const overrides = await this.chooseFrontmatterOverrides();
-        if (!overrides) {
-          this.emit(undefined);
-          this.close();
-          return;
-        }
-        res.frontmatterOverrides = overrides;
-      }
-
-      this.emit(res);
-      this.close();
-      return;
-    }
+    const baseDef = await this.buildDefinitionForAction(item.action);
+    const finalDef = await this.applyFrontmatterOverrides(baseDef);
+    this.complete(finalDef);
   }
 
   onClose(): void {
