@@ -3,6 +3,7 @@ import { MatchResult, UndoFrame } from '../types';
 import { ensureEloId, getEloId } from '../utils/NoteIds';
 
 import type EloPlugin from '../../main';
+import type { FrontmatterPropertiesSettings } from '../settings/settings';
 import { pairSig } from '../utils/pair';
 import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
 
@@ -223,6 +224,11 @@ export default class ArenaSession {
     }
   }
 
+  private getEffectiveFrontmatter(): FrontmatterPropertiesSettings {
+    const def = this.plugin.dataStore.getCohortDef(this.cohortKey);
+    return def?.frontmatterOverrides ?? this.plugin.settings.frontmatterProperties;
+  }
+
   private async choose(result: MatchResult) {
     if (!this.leftFile || !this.rightFile) return;
 
@@ -248,9 +254,10 @@ export default class ArenaSession {
 
     // Write frontmatter stats to both notes
     const cohort = this.plugin.dataStore.store.cohorts[this.cohortKey];
+    const fm = this.getEffectiveFrontmatter();
     void writeFrontmatterStatsForPair(
       this.app,
-      this.plugin.settings,
+      fm,
       cohort,
       this.leftFile,
       aId,
@@ -291,9 +298,10 @@ export default class ArenaSession {
     const aFile = this.findFileById(frame.a.id);
     const bFile = this.findFileById(frame.b.id);
     const cohort = this.plugin.dataStore.store.cohorts[frame.cohortKey];
+    const fm = this.getEffectiveFrontmatter();
     void writeFrontmatterStatsForPair(
       this.app,
-      this.plugin.settings,
+      fm,
       cohort,
       aFile,
       frame.a.id,

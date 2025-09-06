@@ -1,3 +1,5 @@
+import type { FrontmatterPropertiesSettings } from './settings/settings';
+
 export type MatchResult = 'A' | 'B' | 'D';
 
 export interface EloPlayer {
@@ -32,6 +34,7 @@ export interface CohortDefinition {
   // - manual { paths: string[] }
   // - base { baseId: string; view?: string }
   params: any;
+  frontmatterOverrides?: FrontmatterPropertiesSettings;
   createdAt: number;
   updatedAt: number;
 }

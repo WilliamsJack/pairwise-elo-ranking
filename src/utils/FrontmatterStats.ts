@@ -1,7 +1,7 @@
 import { App, TFile } from 'obsidian';
 
 import { CohortData } from '../types';
-import { EloSettings } from '../settings/settings';
+import type { FrontmatterPropertiesSettings } from '../settings/settings';
 
 type PlayerStats = {
   rating: number;
@@ -10,8 +10,7 @@ type PlayerStats = {
   rank: number;
 };
 
-function anyEnabled(settings: EloSettings): boolean {
-  const fm = settings.frontmatterProperties;
+function anyEnabled(fm: FrontmatterPropertiesSettings): boolean {
   return (
     !!fm?.rating?.enabled ||
     !!fm?.rank?.enabled ||
@@ -42,21 +41,20 @@ function computeRankMap(cohort: CohortData): Map<string, number> {
   return map;
 }
 
-function buildProps(settings: EloSettings, stats: PlayerStats): Record<string, number> {
-  const cfg = settings.frontmatterProperties;
+function buildProps(fm: FrontmatterPropertiesSettings, stats: PlayerStats): Record<string, number> {
   const out: Record<string, number> = {};
 
-  if (cfg.rating.enabled && cfg.rating.property) {
-    out[cfg.rating.property] = Math.round(stats.rating);
+  if (fm.rating.enabled && fm.rating.property) {
+    out[fm.rating.property] = Math.round(stats.rating);
   }
-  if (cfg.rank.enabled && cfg.rank.property) {
-    out[cfg.rank.property] = stats.rank;
+  if (fm.rank.enabled && fm.rank.property) {
+    out[fm.rank.property] = stats.rank;
   }
-  if (cfg.matches.enabled && cfg.matches.property) {
-    out[cfg.matches.property] = stats.matches;
+  if (fm.matches.enabled && fm.matches.property) {
+    out[fm.matches.property] = stats.matches;
   }
-  if (cfg.wins.enabled && cfg.wins.property) {
-    out[cfg.wins.property] = stats.wins;
+  if (fm.wins.enabled && fm.wins.property) {
+    out[fm.wins.property] = stats.wins;
   }
   return out;
 }
@@ -72,15 +70,15 @@ async function writeProps(app: App, file: TFile, props: Record<string, number>):
 
 export async function writeFrontmatterStatsForPair(
   app: App,
-  settings: EloSettings,
+  fm: FrontmatterPropertiesSettings,
   cohort: CohortData | undefined,
   aFile?: TFile,
   aId?: string,
   bFile?: TFile,
   bId?: string,
 ): Promise<void> {
-  if (!anyEnabled(settings)) return;
   if (!cohort) return;
+  if (!anyEnabled(fm)) return;
 
   const rankMap = computeRankMap(cohort);
   const tasks: Promise<void>[] = [];
@@ -88,7 +86,7 @@ export async function writeFrontmatterStatsForPair(
   if (aFile && aId) {
     const p = cohort.players[aId];
     if (p) {
-      const props = buildProps(settings, {
+      const props = buildProps(fm, {
         rating: p.rating,
         matches: p.matches,
         wins: p.wins,
@@ -101,7 +99,7 @@ export async function writeFrontmatterStatsForPair(
   if (bFile && bId) {
     const p = cohort.players[bId];
     if (p) {
-      const props = buildProps(settings, {
+      const props = buildProps(fm, {
         rating: p.rating,
         matches: p.matches,
         wins: p.wins,

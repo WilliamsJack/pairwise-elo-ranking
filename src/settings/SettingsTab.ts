@@ -63,7 +63,7 @@ export default class EloSettingsTab extends PluginSettingTab {
     containerEl.createEl('p', {
       text:
         'Choose which Elo statistics to write into a note\'s frontmatter and the property names to use. ' +
-        'These are global defaults; cohort-specific overrides can be defined in Bases (upcoming).',
+        'These are global defaults; cohort-specific overrides can be applied during creation.',
     });
 
     const fm = this.plugin.settings.frontmatterProperties;

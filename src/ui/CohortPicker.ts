@@ -1,4 +1,5 @@
-import { App, FuzzySuggestModal, Modal, Setting, TFolder } from 'obsidian';
+import { App, FuzzySuggestModal, Modal, Setting, TFolder, TextComponent, ToggleComponent } from 'obsidian';
+import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '../settings/settings';
 import { allFolderChoices, createDefinition, labelForDefinition, parseCohortKey } from '../domain/cohort/CohortResolver';
 
 import { CohortDefinition } from '../types';
@@ -97,6 +98,12 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     return createDefinition(kind, { path });
   }
 
+  private async chooseFrontmatterOverrides(): Promise<FrontmatterPropertiesSettings | undefined> {
+    return await this.runChild(() =>
+      new CohortFrontmatterOptionsModal(this.app, this.plugin).openAndGetOverrides()
+    );
+  }
+
   async onChooseItem(item: Choice): Promise<void> {
     if (item.kind === 'saved') {
       const def = item.def ?? parseCohortKey(item.key);
@@ -107,6 +114,13 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
 
     if (item.action === 'vault-all') {
       const def = createDefinition('vault:all', {}, 'Vault: All notes');
+      const overrides = await this.chooseFrontmatterOverrides();
+      if (!overrides) {
+        this.emit(undefined);
+        this.close();
+        return;
+      }
+      def.frontmatterOverrides = overrides;
       this.emit(def);
       this.close();
       return;
@@ -117,26 +131,69 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
       const path = active?.parent?.path;
       if (!path) {
         const def = createDefinition('vault:all', {}, 'Vault: All notes');
+        const overrides = await this.chooseFrontmatterOverrides();
+        if (!overrides) {
+          this.emit(undefined);
+          this.close();
+          return;
+        }
+        def.frontmatterOverrides = overrides;
         this.emit(def);
         this.close();
         return;
       }
       const def = await this.runChild(() => this.chooseFolderCohort(path));
-      this.emit(def ?? undefined);
+      if (!def) {
+        this.emit(undefined);
+        this.close();
+        return;
+      }
+      const overrides = await this.chooseFrontmatterOverrides();
+      if (!overrides) {
+        this.emit(undefined);
+        this.close();
+        return;
+      }
+      def.frontmatterOverrides = overrides;
+      this.emit(def);
       this.close();
       return;
     }
 
     if (item.action === 'pick-folder') {
       const def = await this.runChild(() => this.chooseFolderCohort());
-      this.emit(def ?? undefined);
+      if (!def) {
+        this.emit(undefined);
+        this.close();
+        return;
+      }
+      const overrides = await this.chooseFrontmatterOverrides();
+      if (!overrides) {
+        this.emit(undefined);
+        this.close();
+        return;
+      }
+      def.frontmatterOverrides = overrides;
+      this.emit(def);
       this.close();
       return;
     }
 
     if (item.action === 'tag-dialog') {
       const res = await this.runChild(() => new TagCohortModal(this.app).openAndGetDefinition());
-      this.emit(res ?? undefined);
+      if (!res) {
+        this.emit(undefined);
+        this.close();
+        return;
+      }
+      const overrides = await this.chooseFrontmatterOverrides();
+      if (!overrides) {
+        this.emit(undefined);
+        this.close();
+        return;
+      }
+      res.frontmatterOverrides = overrides;
+      this.emit(res);
       this.close();
       return;
     }
@@ -333,6 +390,115 @@ class TagCohortModal extends Modal {
         const r = this.resolver;
         this.resolver = undefined;
         r?.(def);
+        this.close();
+      }),
+    );
+  }
+
+  onClose(): void {
+    if (!this.resolved) {
+      this.resolved = true;
+      const r = this.resolver;
+      this.resolver = undefined;
+      r?.(undefined);
+    }
+  }
+}
+
+class CohortFrontmatterOptionsModal extends Modal {
+  private plugin: EloPlugin;
+  private resolver?: (overrides?: FrontmatterPropertiesSettings) => void;
+  private resolved = false;
+
+  private working: FrontmatterPropertiesSettings;
+
+  constructor(app: App, plugin: EloPlugin) {
+    super(app);
+    this.plugin = plugin;
+    const d = plugin.settings.frontmatterProperties;
+    this.working = {
+      rating: { property: d.rating.property, enabled: d.rating.enabled },
+      rank: { property: d.rank.property, enabled: d.rank.enabled },
+      matches: { property: d.matches.property, enabled: d.matches.enabled },
+      wins: { property: d.wins.property, enabled: d.wins.enabled },
+    };
+  }
+
+  async openAndGetOverrides(): Promise<FrontmatterPropertiesSettings | undefined> {
+    return new Promise((resolve) => {
+      this.resolver = resolve;
+      this.open();
+    });
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    contentEl.createEl('h3', { text: 'Cohort options' });
+    contentEl.createEl('p', {
+      text:
+        'Configure which Elo statistics to write into frontmatter for this cohort and the property names to use. ' +
+        'These defaults are prefilled from the plugin settings.',
+    });
+
+    const defaults = this.plugin.settings.frontmatterProperties;
+
+    const addRow = (
+      key: keyof FrontmatterPropertiesSettings,
+      label: string,
+      desc: string,
+      placeholder: string,
+    ) => {
+      const cfg = this.working[key];
+      let textRef: TextComponent;
+
+      new Setting(contentEl)
+        .setName(label)
+        .setDesc(desc)
+        .addToggle((t: ToggleComponent) =>
+          t
+            .setValue(Boolean(cfg.enabled))
+            .onChange((val) => {
+              cfg.enabled = val;
+              if (textRef) textRef.setDisabled(!val);
+            }),
+        )
+        .addText((t) => {
+          textRef = t;
+          t.setPlaceholder(placeholder)
+            .setValue(cfg.property)
+            .setDisabled(!cfg.enabled)
+            .onChange((v) => {
+              const trimmed = (v ?? '').trim();
+              cfg.property = trimmed.length > 0 ? trimmed : placeholder;
+            });
+        });
+    };
+
+    addRow('rating', 'Rating', 'Write the current Elo rating to this property.', defaults.rating.property || 'eloRating');
+    addRow('rank', 'Rank', 'Write the cohort rank (1 = highest) to this property.', defaults.rank.property || 'eloRank');
+    addRow('matches', 'Matches', 'Write the number of matches to this property.', defaults.matches.property || 'eloMatches');
+    addRow('wins', 'Wins', 'Write the number of wins to this property.', defaults.wins.property || 'eloWins');
+
+    const btns = new Setting(contentEl);
+    btns.addButton((b) =>
+      b.setButtonText('Cancel').onClick(() => {
+        if (this.resolved) return;
+        this.resolved = true;
+        const r = this.resolver;
+        this.resolver = undefined;
+        r?.(undefined);
+        this.close();
+      }),
+    );
+    btns.addButton((b) =>
+      b.setCta().setButtonText('Create cohort').onClick(() => {
+        if (this.resolved) return;
+        this.resolved = true;
+        const r = this.resolver;
+        this.resolver = undefined;
+        r?.(this.working);
         this.close();
       }),
     );
