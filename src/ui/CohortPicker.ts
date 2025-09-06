@@ -74,6 +74,33 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     r?.(def);
   }
 
+  // Wraps any child modal flow and manages the awaitingChild flag
+  private async runChild<T>(fn: () => Promise<T>): Promise<T> {
+    this.awaitingChild = true;
+    try {
+      return await fn();
+    } finally {
+      this.awaitingChild = false;
+    }
+  }
+
+  // Handles folder selection (optional) + scope, and returns a ready CohortDefinition
+  private async chooseFolderCohort(initialPath?: string): Promise<CohortDefinition | undefined> {
+    let path = initialPath;
+
+    if (!path) {
+      const folder = await new FolderSelectModal(this.app).openAndGetSelection();
+      if (!folder) return undefined;
+      path = folder.path;
+    }
+
+    const scope = await new FolderScopeModal(this.app, path).openAndGetScope();
+    if (!scope) return undefined;
+
+    const kind = scope === 'folder-recursive' ? 'folder-recursive' : 'folder';
+    return createDefinition(kind, { path });
+  }
+
   async onChooseItem(item: Choice): Promise<void> {
     if (item.kind === 'saved') {
       const def = item.def ?? parseCohortKey(item.key);
@@ -98,51 +125,21 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
         this.close();
         return;
       }
-      this.awaitingChild = true;
-      const scope = await new FolderScopeModal(this.app, path).openAndGetScope();
-      this.awaitingChild = false;
-
-      if (!scope) {
-        this.emit(undefined);
-        this.close();
-        return;
-      }
-      const kind = scope === 'folder-recursive' ? 'folder-recursive' as const : 'folder' as const;
-      const def = createDefinition(kind, { path });
-      this.emit(def);
+      const def = await this.runChild(() => this.chooseFolderCohort(path));
+      this.emit(def ?? undefined);
       this.close();
       return;
     }
 
     if (item.action === 'pick-folder') {
-      this.awaitingChild = true;
-      const folder = await new FolderSelectModal(this.app).openAndGetSelection();
-      if (!folder) {
-        this.awaitingChild = false;
-        this.emit(undefined);
-        this.close();
-        return;
-      }
-      const scope = await new FolderScopeModal(this.app, folder.path).openAndGetScope();
-      this.awaitingChild = false;
-
-      if (!scope) {
-        this.emit(undefined);
-        this.close();
-        return;
-      }
-      const kind = scope === 'folder-recursive' ? 'folder-recursive' as const : 'folder' as const;
-      const def = createDefinition(kind, { path: folder.path });
-      this.emit(def);
+      const def = await this.runChild(() => this.chooseFolderCohort());
+      this.emit(def ?? undefined);
       this.close();
       return;
     }
 
     if (item.action === 'tag-dialog') {
-      this.awaitingChild = true;
-      const res = await new TagCohortModal(this.app).openAndGetDefinition();
-      this.awaitingChild = false;
-
+      const res = await this.runChild(() => new TagCohortModal(this.app).openAndGetDefinition());
       this.emit(res ?? undefined);
       this.close();
       return;
