@@ -1,6 +1,9 @@
 import { App, Notice, Plugin, TAbstractFile, TFile } from 'obsidian';
+import { createDefinition, resolveFilesForCohort } from './domain/cohort/CohortResolver';
 
 import ArenaSession from './ui/ArenaSession';
+import { CohortDefinition } from './types';
+import { CohortPicker } from './ui/CohortPicker';
 import { EloSettings } from './settings/settings';
 import EloSettingsTab from './settings/SettingsTab';
 import { PluginDataStore } from './storage/PluginDataStore';
@@ -16,22 +19,26 @@ export default class EloPlugin extends Plugin {
     await this.dataStore.load();
     this.settings = this.dataStore.settings;
 
-    this.addRibbonIcon('trophy', 'Elo: Quick session', () => {
-      const files = this.getCohortFiles();
-      if (files.length < 2) {
-        new Notice('Need at least two Markdown notes to compare.');
-        return;
-      }
-      this.startQuickSession(files);
+    this.addRibbonIcon('trophy', 'Elo: Start rating session…', async () => {
+      await this.selectCohortAndStart();
+    });
+
+    this.addCommand({
+      id: 'elo-start-session',
+      name: 'Elo: Start rating session…',
+      callback: async () => {
+        await this.selectCohortAndStart();
+      },
     });
 
     this.addCommand({
       id: 'elo-quick-session-active-folder',
       name: 'Elo: Quick rating (active folder)',
       checkCallback: (checking) => {
-        const files = this.getCohortFiles();
+        const def = this.getActiveFolderCohort();
+        const files = resolveFilesForCohort(this.app, def);
         if (files.length >= 2) {
-          if (!checking) this.startQuickSession(files);
+          if (!checking) this.startSessionForCohort(def, files, { saveDef: false });
           return true;
         }
       },
@@ -67,16 +74,36 @@ export default class EloPlugin extends Plugin {
     await this.dataStore.saveSettings();
   }
 
-  private startQuickSession(files: TFile[]) {
-    const cohortKey = this.getCohortKey();
+  private async selectCohortAndStart() {
+    const picker = new CohortPicker(this.app, this);
+    const def = await picker.openAndGetSelection();
+    if (!def) return;
 
+    const files = resolveFilesForCohort(this.app, def);
+    if (files.length < 2) {
+      new Notice('Need at least two Markdown notes to compare.');
+      return;
+    }
+
+    // Save this definition if it's not already saved (only for non-ephemeral types)
+    if (!this.dataStore.getCohortDef(def.key)) {
+      this.dataStore.upsertCohortDef(def);
+      await this.dataStore.saveStore();
+    }
+
+    this.startSessionForCohort(def, files, { saveDef: false });
+  }
+
+  private startSessionForCohort(def: CohortDefinition, files: TFile[], opts?: { saveDef?: boolean }) {
     // End any existing session first
     this.endSession();
 
-    this.currentSession = new ArenaSession(this.app, this, cohortKey, files);
-    // Clean up automatically if the plugin unloads
+    this.currentSession = new ArenaSession(this.app, this, def.key, files);
     this.register(() => this.currentSession?.end());
     this.currentSession.start();
+
+    this.dataStore.setLastUsedCohortKey(def.key);
+    void this.dataStore.saveStore();
   }
 
   private endSession() {
@@ -86,20 +113,11 @@ export default class EloPlugin extends Plugin {
     }
   }
 
-  private getCohortKey(): string {
+  private getActiveFolderCohort(): CohortDefinition {
     const active = this.app.workspace.getActiveFile();
-    if (active?.parent) return `folder:${active.parent.path}`;
-    return 'vault:all';
-  }
-
-  private getCohortFiles(): TFile[] {
-    const all = this.app.vault.getMarkdownFiles();
-    const active = this.app.workspace.getActiveFile();
-
     if (active?.parent) {
-      const folderPath = active.parent.path;
-      return all.filter((f) => f.parent?.path === folderPath);
+      return createDefinition('folder', { path: active.parent.path }, `Folder: ${active.parent.path}`);
     }
-    return all;
+    return createDefinition('vault:all', {}, 'Vault: All notes');
   }
 }

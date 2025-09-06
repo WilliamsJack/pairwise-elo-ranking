@@ -1,5 +1,6 @@
 import {
   CohortData,
+  CohortDefinition,
   EloStore,
   MatchResult,
   PlayerSnapshot,
@@ -19,6 +20,8 @@ interface PersistedData {
 const DEFAULT_STORE: EloStore = {
   version: 1,
   cohorts: {},
+  cohortDefs: {},
+  lastUsedCohortKey: undefined,
 };
 
 export class PluginDataStore {
@@ -114,6 +117,24 @@ export class PluginDataStore {
     b.wins = frame.b.wins;
 
     return true;
+  }
+
+  listCohortDefs(): CohortDefinition[] {
+    return Object.values(this.store.cohortDefs ?? {});
+  }
+
+  getCohortDef(key: string): CohortDefinition | undefined {
+    return this.store.cohortDefs?.[key];
+  }
+
+  upsertCohortDef(def: CohortDefinition): void {
+    const defs = (this.store.cohortDefs ??= {});
+    def.updatedAt = Date.now();
+    defs[def.key] = def;
+  }
+
+  setLastUsedCohortKey(key: string | undefined): void {
+    this.store.lastUsedCohortKey = key;
   }
 }
 
