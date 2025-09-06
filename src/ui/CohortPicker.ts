@@ -37,24 +37,20 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
       if (lastDef) items.push({ kind: 'saved', key: lastDef.key, label: `Last used: ${labelForDefinition(lastDef)}`, def: lastDef });
     }
 
-    // Existing cohorts with Elo data
-    const existingKeys = Object.keys(this.plugin.dataStore.store.cohorts ?? {});
-    for (const key of existingKeys) {
-      const def = this.plugin.dataStore.getCohortDef(key) ?? parseCohortKey(key);
-      if (def) items.push({ kind: 'saved', key, label: labelForDefinition(def), def });
-      else items.push({ kind: 'saved', key, label: key });
-    }
-
-    // Saved definitions (no data yet)
+    // Saved definitions
     const defs = this.plugin.dataStore.listCohortDefs();
     for (const def of defs) {
-      if (!existingKeys.includes(def.key) && def.key !== lastKey) {
-        items.push({ kind: 'saved', key: def.key, label: labelForDefinition(def), def });
-      }
+      if (def.key === 'vault:all') continue;
+      if (def.key === lastKey) continue;
+      items.push({ kind: 'saved', key: def.key, label: labelForDefinition(def), def });
+    }
+
+    // Add "Vault: All notes" only if not already present
+    if (!items.some(item => item.kind === 'saved' && item.def?.key === 'vault:all')) {
+      items.push({ kind: 'action', action: 'vault-all', label: 'Vault: All notes' });
     }
 
     // Creation actions
-    items.push({ kind: 'action', action: 'vault-all', label: 'New: Whole vault' });
     items.push({ kind: 'action', action: 'active-folder', label: 'New: Active folder' });
     items.push({ kind: 'action', action: 'pick-folder', label: 'New: Pick a folder…' });
     items.push({ kind: 'action', action: 'tag-dialog', label: 'New: Tag cohort (any/all)…' });
