@@ -44,7 +44,7 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('eloId location')
-      .setDesc('Where to store the Elo ID when creating a new one. The plugin can support a mix of both. If both are found, the plugin will use the frontmatter ID.')
+      .setDesc('Where to store the Elo ID. Changing this setting will not move existing IDs, but they will continue to work.')
       .addDropdown((dd) => {
         dd.addOptions({
           frontmatter: 'Frontmatter (YAML)',
@@ -63,7 +63,7 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Ask for per-cohort overrides on creation')
-      .setDesc('When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults.')
+      .setDesc('When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults. Disabling this will cause clashes if you choose to use frontmatter properties and have notes in multiple cohorts.')
       .addToggle((t) =>
         t
           .setValue(this.plugin.settings.askForOverridesOnCohortCreation)
