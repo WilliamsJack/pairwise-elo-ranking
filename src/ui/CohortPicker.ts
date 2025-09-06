@@ -1,4 +1,4 @@
-import { App, FuzzySuggestModal, Modal, Notice, Setting, TFolder, TextComponent, ToggleComponent } from 'obsidian';
+import { App, ButtonComponent, FuzzySuggestModal, Modal, Notice, Setting, TFolder, TextComponent, ToggleComponent } from 'obsidian';
 import { allFolderChoices, createDefinition, labelForDefinition, parseCohortKey } from '../domain/cohort/CohortResolver';
 
 import { CohortDefinition } from '../types';
@@ -288,12 +288,23 @@ class FolderScopeModal extends Modal {
   }
 }
 
+function normaliseTag(tag: string): string {
+  const t = (tag ?? '').trim();
+  if (!t) return '';
+  return t.startsWith('#') ? t : `#${t}`;
+}
+
 class TagCohortModal extends Modal {
   private resolver?: (def?: CohortDefinition) => void;
   private resolved = false;
 
-  private tagsInputValue = '';
   private mode: 'any' | 'all' = 'any';
+
+  private availableTags: string[] = [];
+  private selectedTags: Set<string> = new Set();
+  private selectedTagsEl?: HTMLElement;
+  private dropdownSelected?: string;
+  private createBtn?: ButtonComponent;
 
   constructor(app: App) {
     super(app);
@@ -306,18 +317,120 @@ class TagCohortModal extends Modal {
     });
   }
 
+  private collectVaultTags(): string[] {
+    const set = new Set<string>();
+
+    try {
+      const inline = this.app.metadataCache.getTags?.();
+      if (inline && typeof inline === 'object') {
+        for (const k of Object.keys(inline)) {
+          if (k) set.add(normaliseTag(k));
+        }
+      }
+    } catch {}
+
+    return Array.from(set).filter(Boolean).sort();
+  }
+
+  private renderSelectedTags(): void {
+    const el = this.selectedTagsEl;
+    if (!el) return;
+    el.empty();
+
+    const tags = Array.from(this.selectedTags).sort();
+    if (tags.length === 0) {
+      const hint = document.createElement('div');
+      hint.textContent = 'No tags selected.';
+      hint.style.opacity = '0.7';
+      el.appendChild(hint);
+      return;
+    }
+
+    const list = document.createElement('div');
+    list.style.display = 'flex';
+    list.style.flexWrap = 'wrap';
+    list.style.gap = '6px';
+
+    for (const tag of tags) {
+      const pill = document.createElement('span');
+      pill.className = 'tag';
+      pill.textContent = tag;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.textContent = '×';
+      removeBtn.ariaLabel = `Remove ${tag}`;
+      removeBtn.style.marginLeft = '6px';
+      removeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.selectedTags.delete(tag);
+        this.renderSelectedTags();
+        this.updateCreateDisabled();
+      });
+
+      const wrap = document.createElement('span');
+      wrap.style.display = 'inline-flex';
+      wrap.style.alignItems = 'center';
+      wrap.appendChild(pill);
+      wrap.appendChild(removeBtn);
+
+      list.appendChild(wrap);
+    }
+
+    el.appendChild(list);
+  }
+
+  private updateCreateDisabled(): void {
+    if (this.createBtn) this.createBtn.setDisabled(this.selectedTags.size === 0);
+  }
+
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
 
+    this.availableTags = this.collectVaultTags();
+
     contentEl.createEl('h3', { text: 'Create tag cohort' });
 
+    const hasAvailable = this.availableTags.length > 0;
     new Setting(contentEl)
-      .setName('Tags')
-      .setDesc('Comma-separated tags (with or without leading #).')
-      .addText((t) => {
-        t.setPlaceholder('#recipes, #dinner').onChange((v) => (this.tagsInputValue = v ?? ''));
-      });
+      .setName('Select tags')
+      .setDesc(hasAvailable ? 'Pick a tag and click Add. Repeat to add multiple.' : 'No tags found in your vault.')
+      .addDropdown((dd) => {
+        const options: Record<string, string> = {};
+        for (const t of this.availableTags) options[t] = t;
+        dd.addOptions(options).setDisabled(!hasAvailable).onChange((v) => {
+          this.dropdownSelected = v;
+        });
+        if (hasAvailable) {
+          this.dropdownSelected = this.availableTags[0];
+          dd.setValue(this.dropdownSelected);
+        }
+      })
+      .addButton((b) =>
+        b
+          .setButtonText('Add')
+          .setDisabled(!hasAvailable)
+          .onClick(() => {
+            const tag = normaliseTag(this.dropdownSelected ?? '');
+            if (!tag) return;
+            this.selectedTags.add(tag);
+            this.renderSelectedTags();
+            this.updateCreateDisabled();
+          }),
+      )
+      .addButton((b) =>
+        b
+          .setButtonText('Clear')
+          .onClick(() => {
+            this.selectedTags.clear();
+            this.renderSelectedTags();
+            this.updateCreateDisabled();
+          }),
+      );
+
+    const sel = new Setting(contentEl).setName('Selected tags');
+    this.selectedTagsEl = sel.controlEl.createDiv();
+    this.renderSelectedTags();
 
     new Setting(contentEl)
       .setName('Match mode')
@@ -339,10 +452,10 @@ class TagCohortModal extends Modal {
         this.close();
       }),
     );
-    btns.addButton((b) =>
-      b.setCta().setButtonText('Create').onClick(() => {
-        const raw = this.tagsInputValue ?? '';
-        const tags = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    btns.addButton((b) => {
+      this.createBtn = b.setCta().setButtonText('Create').onClick(() => {
+        if (this.selectedTags.size === 0) return; // require at least one tag
+        const tags = Array.from(this.selectedTags).sort();
         const kind = this.mode === 'all' ? 'tag:all' : 'tag:any';
         const def = createDefinition(kind, { tags });
         if (this.resolved) return;
@@ -351,8 +464,10 @@ class TagCohortModal extends Modal {
         this.resolver = undefined;
         r?.(def);
         this.close();
-      }),
-    );
+      });
+      this.updateCreateDisabled();
+      return this.createBtn;
+    });
   }
 
   onClose(): void {
