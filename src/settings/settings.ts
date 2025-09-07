@@ -76,7 +76,7 @@ export const DEFAULT_SETTINGS: EloSettings = {
   },
   askForOverridesOnCohortCreation: true,
 
-  // Modest defaults; only provisional + upset boosts on by default.
+  // Modest defaults; provisional + upset + big-gap draw boosts on by default.
   heuristics: {
     provisional: {
       enabled: true,

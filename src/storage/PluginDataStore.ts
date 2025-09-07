@@ -24,6 +24,38 @@ const DEFAULT_STORE: EloStore = {
   lastUsedCohortKey: undefined,
 };
 
+function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
+  // Safe clone of defaults
+  const base: EloSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+
+  if (!raw) return base;
+
+  const out: EloSettings = { ...base, ...raw };
+
+  if (raw.heuristics) {
+    out.heuristics = {
+      ...base.heuristics,
+      ...raw.heuristics,
+      provisional: { ...base.heuristics.provisional, ...raw.heuristics.provisional },
+      decay: { ...base.heuristics.decay, ...raw.heuristics.decay },
+      upsetBoost: { ...base.heuristics.upsetBoost, ...raw.heuristics.upsetBoost },
+      drawGapBoost: { ...base.heuristics.drawGapBoost, ...raw.heuristics.drawGapBoost },
+    };
+  }
+
+  if (raw.matchmaking) {
+    out.matchmaking = {
+      ...base.matchmaking,
+      ...raw.matchmaking,
+      similarRatings: { ...base.matchmaking.similarRatings, ...raw.matchmaking.similarRatings },
+      lowMatchesBias: { ...base.matchmaking.lowMatchesBias, ...raw.matchmaking.lowMatchesBias },
+      upsetProbes: { ...base.matchmaking.upsetProbes, ...raw.matchmaking.upsetProbes },
+    };
+  }
+
+  return out;
+}
+
 export class PluginDataStore {
   private plugin: Plugin;
 
@@ -43,7 +75,7 @@ export class PluginDataStore {
   async load(): Promise<void> {
     const raw = (await this.plugin.loadData()) as PersistedData | null;
 
-    this.settings = { ...DEFAULT_SETTINGS, ...(raw?.settings ?? {}) };
+    this.settings = mergeSettings(raw?.settings);
     this.store = raw?.store ?? { ...DEFAULT_STORE };
 
     if (!raw?.settings || !raw?.store) {
@@ -149,12 +181,6 @@ export class PluginDataStore {
     };
 
     const hs = this.settings.heuristics;
-    const heuristicsOn =
-      !!hs &&
-      (hs.provisional?.enabled ||
-        hs.decay?.enabled ||
-        hs.upsetBoost?.enabled ||
-        hs.drawGapBoost?.enabled);
 
     const { newA, newB } = updateElo(
       a.rating,

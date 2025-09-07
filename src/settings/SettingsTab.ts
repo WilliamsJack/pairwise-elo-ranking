@@ -1,4 +1,4 @@
-import { App, ButtonComponent, Modal, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
+import { App, Modal, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
 import { DEFAULT_SETTINGS, FrontmatterPropertiesSettings, effectiveFrontmatterProperties } from './settings';
 import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFrontmatter } from '../utils/FrontmatterStats';
 import { labelForDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
@@ -226,7 +226,7 @@ export default class EloSettingsTab extends PluginSettingTab {
       .setDesc(`Lower bound on K for very experienced notes. Tip: keep this ≤ your base K (currently ${this.plugin.settings.kFactor}). Default: ${defaults.decay.minK}.`)
       .addSlider((sl) => {
         minKSlider = sl;
-        sl.setLimits(4, 32, 1)
+        sl.setLimits(4, 64, 1)
           .setValue(Math.max(1, Math.min(64, hs.decay.minK)))
           .setDynamicTooltip()
           .onChange(async (value) => {
@@ -279,11 +279,11 @@ export default class EloSettingsTab extends PluginSettingTab {
       .setDesc(`Multiplier applied when the underdog wins. Default: ${defaults.upsetBoost.multiplier}.`)
       .addSlider((sl) => {
         upsetMultSlider = sl;
-        sl.setLimits(1.0, 2.0, 0.05)
-          .setValue(Math.max(1.0, Math.min(2.5, hs.upsetBoost.multiplier)))
+        sl.setLimits(1.0, 3, 0.05)
+          .setValue(Math.max(1.0, Math.min(3, hs.upsetBoost.multiplier)))
           .setDynamicTooltip()
           .onChange(async (value) => {
-            hs.upsetBoost.multiplier = Math.max(1.0, Math.min(3.0, value));
+            hs.upsetBoost.multiplier = Math.max(1.0, Math.min(2.5, value));
             await this.plugin.saveSettings();
           })
           .setDisabled(!hs.upsetBoost.enabled);
@@ -332,8 +332,8 @@ export default class EloSettingsTab extends PluginSettingTab {
       .setDesc(`Multiplier applied to both sides for qualifying draws. Default: ${defaults.drawGapBoost.multiplier}.`)
       .addSlider((sl) => {
         drawMultSlider = sl;
-        sl.setLimits(1.0, 2.0, 0.05)
-          .setValue(Math.max(1.0, Math.min(2.5, hs.drawGapBoost.multiplier)))
+        sl.setLimits(1.0, 3.0, 0.05)
+          .setValue(Math.max(1.0, Math.min(3.0, hs.drawGapBoost.multiplier)))
           .setDynamicTooltip()
           .onChange(async (value) => {
             hs.drawGapBoost.multiplier = Math.max(1.0, Math.min(3.0, value));

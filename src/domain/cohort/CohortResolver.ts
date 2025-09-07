@@ -1,11 +1,7 @@
 import { App, TAbstractFile, TFile, TFolder } from 'obsidian';
 import { CohortDefinition, CohortKind } from '../../types';
 
-function normaliseTag(tag: string): string {
-  const t = tag.trim();
-  if (!t) return t;
-  return t.startsWith('#') ? t : `#${t}`;
-}
+import { normaliseTag } from '../../utils/tags';
 
 function getAllFolders(app: App): TFolder[] {
   const out: TFolder[] = [];

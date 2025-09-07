@@ -1,4 +1,4 @@
-import { App, ButtonComponent, FuzzySuggestModal, Modal, Notice, Setting, TextComponent, ToggleComponent } from 'obsidian';
+import { App, ButtonComponent, FuzzySuggestModal, Modal, Notice, Setting } from 'obsidian';
 import { createDefinition, labelForDefinition, parseCohortKey } from '../domain/cohort/CohortResolver';
 
 import { CohortDefinition } from '../types';
@@ -6,6 +6,7 @@ import { CohortOptionsModal } from './CohortOptionsModal';
 import type EloPlugin from '../../main';
 import { FolderSelectModal } from './FolderPicker';
 import type { FrontmatterPropertiesSettings } from '../settings/settings';
+import { normaliseTag } from 'src/utils/tags';
 
 type Choice =
   | { kind: 'saved'; key: string; label: string; def?: CohortDefinition }
@@ -275,12 +276,6 @@ class FolderScopeModal extends Modal {
       r?.(undefined);
     }
   }
-}
-
-function normaliseTag(tag: string): string {
-  const t = (tag ?? '').trim();
-  if (!t) return '';
-  return t.startsWith('#') ? t : `#${t}`;
 }
 
 class TagCohortModal extends Modal {
