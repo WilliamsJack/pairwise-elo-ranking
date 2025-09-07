@@ -1,5 +1,5 @@
 import { App, ButtonComponent, Modal, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
-import { FrontmatterPropertiesSettings, effectiveFrontmatterProperties } from './settings';
+import { DEFAULT_SETTINGS, FrontmatterPropertiesSettings, effectiveFrontmatterProperties } from './settings';
 import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFrontmatter } from '../utils/FrontmatterStats';
 import { labelForDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 
@@ -78,9 +78,9 @@ export default class EloSettingsTab extends PluginSettingTab {
     initialK = Math.min(maxK, Math.max(minK, Math.round(initialK)));
 
     new Setting(containerEl)
-      .setName('K-factor')
-      .setDesc('Adjusts how quickly ratings move. Typical values are 16–40.')
-      .addSlider((s) => {
+  .setName('K-factor')
+  .setDesc(`Adjusts how quickly ratings move (larger K = faster changes). Typical values 16–40. Default: ${DEFAULT_SETTINGS.kFactor}.`)
+  .addSlider((s) => {
         s.setLimits(minK, maxK, stepK)
           .setValue(initialK)
           .setDynamicTooltip()
@@ -91,9 +91,9 @@ export default class EloSettingsTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Show win/draw notices')
-      .setDesc('Show a toast with the winner after each comparison.')
-      .addToggle((t) =>
+  .setName('Show win/draw notices')
+  .setDesc(`Show a toast with the winner after each comparison. Default: ${DEFAULT_SETTINGS.showToasts ? 'On' : 'Off'}.`)
+  .addToggle((t) =>
         t.setValue(this.plugin.settings.showToasts).onChange(async (v) => {
           this.plugin.settings.showToasts = v;
           await this.plugin.saveSettings();
@@ -102,7 +102,7 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Elo ID location')
-      .setDesc('Where to store the Elo ID. Changing this setting will not move existing IDs, but they will continue to work.')
+      .setDesc('Where to store the Elo ID. Changing this setting will not move existing IDs, but they will continue to work. Default: Frontmatter.')
       .addDropdown((dd) => {
         dd.addOptions({
           frontmatter: 'Frontmatter (YAML)',
@@ -115,13 +115,241 @@ export default class EloSettingsTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
+    
+    // Advanced heuristics accordion
+    const hs = this.plugin.settings.heuristics;
+    const defaults = DEFAULT_SETTINGS.heuristics;
+
+    const adv = containerEl.createEl('details', { cls: 'elo-advanced-accordion' });
+    adv.open = false;
+
+    adv.createEl('summary', { text: 'Advanced: Convergence heuristics' });
+    adv.createEl('p', {
+      text:
+        'Optional tweaks that help new notes stabilise quickly and move ratings faster when results are more informative.',
+    });
+    const advBody = adv.createEl('div', { cls: 'elo-advanced-body' });
+
+    // Provisional K boost
+    advBody.createEl('h5', { text: 'Provisional K boost' });
+    advBody.createEl('p', {
+      text:
+        'Use a higher K-factor for a note\'s first N matches to place new notes quickly. ' +
+        'This is applied per note, per cohort.',
+    });
+
+    let provMatchesSlider: any;
+    let provMultSlider: any;
+
+    new Setting(advBody)
+      .setName('Enable provisional boost')
+      .setDesc(`Default: ${defaults.provisional.enabled ? 'On' : 'Off'}.`)
+      .addToggle((t) =>
+        t.setValue(hs.provisional.enabled).onChange(async (v) => {
+          hs.provisional.enabled = v;
+          await this.plugin.saveSettings();
+          provMatchesSlider?.setDisabled(!v);
+          provMultSlider?.setDisabled(!v);
+        }),
+      );
+
+    new Setting(advBody)
+      .setName('Provisional period (matches)')
+      .setDesc(`Applies while the note has played fewer than N matches. Default: ${defaults.provisional.matches}.`)
+      .addSlider((sl) => {
+        provMatchesSlider = sl;
+        sl.setLimits(1, 30, 1)
+          .setValue(Math.max(1, Math.min(30, hs.provisional.matches)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            hs.provisional.matches = Math.round(value);
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!hs.provisional.enabled);
+      });
+
+    new Setting(advBody)
+      .setName('Provisional K multiplier')
+      .setDesc(`Multiplier on K during the provisional period. 1.0 disables the boost. Default: ${defaults.provisional.multiplier}.`)
+      .addSlider((sl) => {
+        provMultSlider = sl;
+        sl.setLimits(1.0, 3.0, 0.05)
+          .setValue(Math.max(1.0, Math.min(3.0, hs.provisional.multiplier)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            hs.provisional.multiplier = Math.max(1.0, Math.min(3.0, value));
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!hs.provisional.enabled);
+      });
+
+    // Decay with experience
+    advBody.createEl('h5', { text: 'Decay K with experience' });
+    advBody.createEl('p', {
+      text:
+        'Gradually reduce K as a note plays more matches, stabilising mature ratings. ' +
+        'Effective K follows k = baseK / (1 + matches / halfLife).',
+    });
+
+    let halfSlider: any;
+    let minKSlider: any;
+
+    new Setting(advBody)
+      .setName('Enable K decay')
+      .setDesc(`Default: ${defaults.decay.enabled ? 'On' : 'Off'}.`)
+      .addToggle((t) =>
+        t.setValue(hs.decay.enabled).onChange(async (v) => {
+          hs.decay.enabled = v;
+          await this.plugin.saveSettings();
+          halfSlider?.setDisabled(!v);
+          minKSlider?.setDisabled(!v);
+        }),
+      );
+
+    new Setting(advBody)
+      .setName('Half-life (matches)')
+      .setDesc(`At this many matches, the effective K is half of your base K. Default: ${defaults.decay.halfLife}.`)
+      .addSlider((sl) => {
+        halfSlider = sl;
+        sl.setLimits(10, 500, 5)
+          .setValue(Math.max(10, Math.min(500, hs.decay.halfLife)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            hs.decay.halfLife = Math.round(value);
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!hs.decay.enabled);
+      });
+
+    new Setting(advBody)
+      .setName('Minimum K')
+      .setDesc(`Lower bound on K for very experienced notes. Tip: keep this ≤ your base K (currently ${this.plugin.settings.kFactor}). Default: ${defaults.decay.minK}.`)
+      .addSlider((sl) => {
+        minKSlider = sl;
+        sl.setLimits(4, 32, 1)
+          .setValue(Math.max(1, Math.min(64, hs.decay.minK)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            hs.decay.minK = Math.round(value);
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!hs.decay.enabled);
+      });
+
+    // Upset boost
+    advBody.createEl('h5', { text: 'Upset boost' });
+    advBody.createEl('p', {
+      text:
+        'Increase K when a significantly lower-rated note wins. This helps ratings correct faster after surprises. ' +
+        'Both sides receive the multiplier for the qualifying match.',
+    });
+
+    let upsetGapSlider: any;
+    let upsetMultSlider: any;
+
+    new Setting(advBody)
+      .setName('Enable upset boost')
+      .setDesc(`Default: ${defaults.upsetBoost.enabled ? 'On' : 'Off'}.`)
+      .addToggle((t) =>
+        t.setValue(hs.upsetBoost.enabled).onChange(async (v) => {
+          hs.upsetBoost.enabled = v;
+          await this.plugin.saveSettings();
+          upsetGapSlider?.setDisabled(!v);
+          upsetMultSlider?.setDisabled(!v);
+        }),
+      );
+
+    new Setting(advBody)
+      .setName('Upset gap threshold')
+      .setDesc(`Minimum pre-match rating gap for an underdog win to qualify. Default: ${defaults.upsetBoost.threshold}.`)
+      .addSlider((sl) => {
+        upsetGapSlider = sl;
+        sl.setLimits(50, 600, 25)
+          .setValue(Math.max(0, Math.min(600, hs.upsetBoost.threshold)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            hs.upsetBoost.threshold = Math.round(value);
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!hs.upsetBoost.enabled);
+      });
+
+    new Setting(advBody)
+      .setName('Upset K multiplier')
+      .setDesc(`Multiplier applied when the underdog wins. Default: ${defaults.upsetBoost.multiplier}.`)
+      .addSlider((sl) => {
+        upsetMultSlider = sl;
+        sl.setLimits(1.0, 2.0, 0.05)
+          .setValue(Math.max(1.0, Math.min(2.5, hs.upsetBoost.multiplier)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            hs.upsetBoost.multiplier = Math.max(1.0, Math.min(3.0, value));
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!hs.upsetBoost.enabled);
+      });
+
+    // Big-gap draw boost
+    advBody.createEl('h5', { text: 'Big-gap draw boost' });
+    advBody.createEl('p', {
+      text:
+        'Increase K for draws across a large rating gap. A draw here suggests the ratings should move. ' +
+        'Both sides receive the multiplier for the qualifying draw.',
+    });
+
+    let drawGapSlider: any;
+    let drawMultSlider: any;
+
+    new Setting(advBody)
+      .setName('Enable big-gap draw boost')
+      .setDesc(`Default: ${defaults.drawGapBoost.enabled ? 'On' : 'Off'}.`)
+      .addToggle((t) =>
+        t.setValue(hs.drawGapBoost.enabled).onChange(async (v) => {
+          hs.drawGapBoost.enabled = v;
+          await this.plugin.saveSettings();
+          drawGapSlider?.setDisabled(!v);
+          drawMultSlider?.setDisabled(!v);
+        }),
+      );
+
+    new Setting(advBody)
+      .setName('Draw gap threshold')
+      .setDesc(`Minimum pre-match rating gap for a draw to qualify. Default: ${defaults.drawGapBoost.threshold}.`)
+      .addSlider((sl) => {
+        drawGapSlider = sl;
+        sl.setLimits(50, 800, 25)
+          .setValue(Math.max(0, Math.min(800, hs.drawGapBoost.threshold)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            hs.drawGapBoost.threshold = Math.round(value);
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!hs.drawGapBoost.enabled);
+      });
+
+    new Setting(advBody)
+      .setName('Draw K multiplier')
+      .setDesc(`Multiplier applied to both sides for qualifying draws. Default: ${defaults.drawGapBoost.multiplier}.`)
+      .addSlider((sl) => {
+        drawMultSlider = sl;
+        sl.setLimits(1.0, 2.0, 0.05)
+          .setValue(Math.max(1.0, Math.min(2.5, hs.drawGapBoost.multiplier)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            hs.drawGapBoost.multiplier = Math.max(1.0, Math.min(3.0, value));
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!hs.drawGapBoost.enabled);
+      });
 
     // Frontmatter properties (global defaults)
     containerEl.createEl('h4', { text: 'Default Frontmatter properties' });
 
     new Setting(containerEl)
       .setName('Ask for per-cohort overrides on creation')
-      .setDesc('When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults. Disabling this will cause clashes if you choose to use frontmatter properties and have notes in multiple cohorts.')
+      .setDesc(`When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults. 
+        Disabling this may cause clashes if you write frontmatter properties across multiple cohorts. 
+        Default: ${DEFAULT_SETTINGS.askForOverridesOnCohortCreation ? 'On' : 'Off'}`)
       .addToggle((t) =>
         t
           .setValue(this.plugin.settings.askForOverridesOnCohortCreation)

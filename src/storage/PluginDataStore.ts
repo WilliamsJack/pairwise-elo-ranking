@@ -148,7 +148,23 @@ export class PluginDataStore {
       ts: Date.now(),
     };
 
-    const { newA, newB } = updateElo(a.rating, b.rating, result, this.settings.kFactor);
+    const hs = this.settings.heuristics;
+    const heuristicsOn =
+      !!hs &&
+      (hs.provisional?.enabled ||
+        hs.decay?.enabled ||
+        hs.upsetBoost?.enabled ||
+        hs.drawGapBoost?.enabled);
+
+    const { newA, newB } = updateElo(
+      a.rating,
+      b.rating,
+      result,
+      this.settings.kFactor,
+      a.matches,
+      b.matches,
+      hs as any,
+    );
     a.rating = newA;
     b.rating = newB;
 
