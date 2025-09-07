@@ -1,21 +1,20 @@
-import { App, Modal, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
 import { DEFAULT_SETTINGS, FrontmatterPropertiesSettings, effectiveFrontmatterProperties } from './settings';
 import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFrontmatter } from '../utils/FrontmatterStats';
 import { labelForDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 
+import { BasePromiseModal } from '../ui/PromiseModal';
 import type { CohortData } from '../types';
 import { CohortOptionsModal } from '../ui/CohortOptionsModal';
 import type EloPlugin from '../main';
 
 type PropKey = keyof FrontmatterPropertiesSettings;
 
-class ConfirmModal extends Modal {
+class ConfirmModal extends BasePromiseModal<boolean> {
   private titleText: string;
   private message: string;
   private ctaText: string;
   private cancelText: string;
-  private resolver?: (ok: boolean) => void;
-  private resolved = false;
 
   constructor(app: App, titleText: string, message: string, ctaText: string, cancelText: string) {
     super(app);
@@ -26,10 +25,8 @@ class ConfirmModal extends Modal {
   }
 
   async openAndConfirm(): Promise<boolean> {
-    return new Promise((resolve) => {
-      this.resolver = resolve;
-      this.open();
-    });
+    const v = await this.openAndGetValue();
+    return !!v;
   }
 
   onOpen(): void {
@@ -42,19 +39,6 @@ class ConfirmModal extends Modal {
     const btns = new Setting(contentEl);
     btns.addButton((b) => b.setButtonText(this.cancelText).onClick(() => this.finish(false)));
     btns.addButton((b) => b.setCta().setButtonText(this.ctaText).onClick(() => this.finish(true)));
-  }
-
-  private finish(ok: boolean) {
-    if (this.resolved) return;
-    this.resolved = true;
-    const r = this.resolver;
-    this.resolver = undefined;
-    r?.(ok);
-    this.close();
-  }
-
-  onClose(): void {
-    if (!this.resolved) this.finish(false);
   }
 }
 

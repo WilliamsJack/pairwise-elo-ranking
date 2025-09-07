@@ -1,10 +1,9 @@
-import { App, FuzzySuggestModal, TFolder } from 'obsidian';
+import { App, TFolder } from 'obsidian';
 
+import { BasePromiseFuzzyModal } from './PromiseModal';
 import { allFolderChoices } from '../domain/cohort/CohortResolver';
 
-export class FolderSelectModal extends FuzzySuggestModal<TFolder> {
-  private resolver?: (f?: TFolder) => void;
-  private resolved = false;
+export class FolderSelectModal extends BasePromiseFuzzyModal<TFolder> {
   private folders: TFolder[];
 
   constructor(app: App) {
@@ -14,10 +13,7 @@ export class FolderSelectModal extends FuzzySuggestModal<TFolder> {
   }
 
   async openAndGetSelection(): Promise<TFolder | undefined> {
-    return new Promise((resolve) => {
-      this.resolver = resolve;
-      this.open();
-    });
+    return this.openAndGetValue();
   }
 
   getItems(): TFolder[] {
@@ -26,25 +22,5 @@ export class FolderSelectModal extends FuzzySuggestModal<TFolder> {
 
   getItemText(item: TFolder): string {
     return item.path || '/';
-  }
-
-  onChooseItem(item: TFolder): void {
-    if (this.resolved) return;
-    this.resolved = true;
-    const r = this.resolver;
-    this.resolver = undefined;
-    r?.(item);
-    this.close();
-  }
-
-  onClose(): void {
-    setTimeout(() => {
-      if (!this.resolved) {
-        this.resolved = true;
-        const r = this.resolver;
-        this.resolver = undefined;
-        r?.(undefined);
-      }
-    }, 0);
   }
 }

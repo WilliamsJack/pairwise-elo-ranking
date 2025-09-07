@@ -1,4 +1,5 @@
-import { App, ButtonComponent, FuzzySuggestModal, Modal, Notice, Setting } from 'obsidian';
+import { App, ButtonComponent, FuzzySuggestModal, Notice, Setting } from 'obsidian';
+import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
 import { createDefinition, labelForDefinition, parseCohortKey } from '../domain/cohort/CohortResolver';
 
 import { CohortDefinition } from '../types';
@@ -205,10 +206,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
   }
 }
 
-class FolderScopeModal extends Modal {
-  private resolver?: (kind?: 'folder' | 'folder-recursive') => void;
-  private resolved = false;
-
+class FolderScopeModal extends BasePromiseModal<'folder' | 'folder-recursive' | undefined> {
   private selected: 'folder' | 'folder-recursive' = 'folder';
   private folderPath: string;
 
@@ -218,10 +216,7 @@ class FolderScopeModal extends Modal {
   }
 
   async openAndGetScope(): Promise<'folder' | 'folder-recursive' | undefined> {
-    return new Promise((resolve) => {
-      this.resolver = resolve;
-      this.open();
-    });
+    return this.openAndGetValue();
   }
 
   onOpen(): void {
@@ -248,57 +243,51 @@ class FolderScopeModal extends Modal {
     const btns = new Setting(contentEl);
     btns.addButton((b) =>
       b.setButtonText('Cancel').onClick(() => {
-        if (this.resolved) return;
-        this.resolved = true;
-        const r = this.resolver;
-        this.resolver = undefined;
-        r?.(undefined);
-        this.close();
+        this.finish(undefined);
       }),
     );
     btns.addButton((b) =>
       b.setCta().setButtonText('Select').onClick(() => {
-        if (this.resolved) return;
-        this.resolved = true;
-        const r = this.resolver;
-        this.resolver = undefined;
-        r?.(this.selected);
-        this.close();
+        this.finish(this.selected);
       }),
     );
   }
+}
 
-  onClose(): void {
-    if (!this.resolved) {
-      this.resolved = true;
-      const r = this.resolver;
-      this.resolver = undefined;
-      r?.(undefined);
-    }
+// Reusable fuzzy tag picker that returns a single tag
+class TagSelectFuzzyModal extends BasePromiseFuzzyModal<string> {
+  private tags: string[];
+
+  constructor(app: App, tags: string[]) {
+    super(app);
+    this.tags = tags;
+    this.setPlaceholder('Search tags...');
+  }
+
+  getItems(): string[] {
+    return this.tags;
+  }
+
+  getItemText(item: string): string {
+    return item;
   }
 }
 
-class TagCohortModal extends Modal {
-  private resolver?: (def?: CohortDefinition) => void;
-  private resolved = false;
-
+class TagCohortModal extends BasePromiseModal<CohortDefinition | undefined> {
   private mode: 'any' | 'all' = 'any';
 
   private availableTags: string[] = [];
   private selectedTags: Set<string> = new Set();
   private selectedTagsEl?: HTMLElement;
-  private dropdownSelected?: string;
   private createBtn?: ButtonComponent;
+  private addBtn?: ButtonComponent;
 
   constructor(app: App) {
     super(app);
   }
 
   async openAndGetDefinition(): Promise<CohortDefinition | undefined> {
-    return new Promise((resolve) => {
-      this.resolver = resolve;
-      this.open();
-    });
+    return this.openAndGetValue();
   }
 
   private collectVaultTags(): string[] {
@@ -348,7 +337,7 @@ class TagCohortModal extends Modal {
         e.preventDefault();
         this.selectedTags.delete(tag);
         this.renderSelectedTags();
-        this.updateCreateDisabled();
+        this.updateButtonsDisabled();
       });
 
       const wrap = document.createElement('span');
@@ -363,8 +352,21 @@ class TagCohortModal extends Modal {
     el.appendChild(list);
   }
 
-  private updateCreateDisabled(): void {
+  private updateButtonsDisabled(): void {
+    const remaining = this.availableTags.filter((t) => !this.selectedTags.has(t));
+    if (this.addBtn) this.addBtn.setDisabled(remaining.length === 0);
     if (this.createBtn) this.createBtn.setDisabled(this.selectedTags.size === 0);
+  }
+
+  private async addTagViaFuzzy(): Promise<void> {
+    const remaining = this.availableTags.filter((t) => !this.selectedTags.has(t));
+    if (remaining.length === 0) return;
+    const picked = await new TagSelectFuzzyModal(this.app, remaining).openAndGetValue();
+    const tag = normaliseTag(picked ?? '');
+    if (!tag) return;
+    this.selectedTags.add(tag);
+    this.renderSelectedTags();
+    this.updateButtonsDisabled();
   }
 
   onOpen(): void {
@@ -375,40 +377,27 @@ class TagCohortModal extends Modal {
 
     contentEl.createEl('h3', { text: 'Create tag cohort' });
 
+    // Add/clear actions with fuzzy tag selection
     const hasAvailable = this.availableTags.length > 0;
     new Setting(contentEl)
       .setName('Select tags')
-      .setDesc(hasAvailable ? 'Pick a tag and click Add. Repeat to add multiple.' : 'No tags found in your vault.')
-      .addDropdown((dd) => {
-        const options: Record<string, string> = {};
-        for (const t of this.availableTags) options[t] = t;
-        dd.addOptions(options).setDisabled(!hasAvailable).onChange((v) => {
-          this.dropdownSelected = v;
-        });
-        if (hasAvailable) {
-          this.dropdownSelected = this.availableTags[0];
-          dd.setValue(this.dropdownSelected);
-        }
-      })
-      .addButton((b) =>
-        b
-          .setButtonText('Add')
+      .setDesc(hasAvailable ? 'Click "Add tag..." and search to add multiple tags.' : 'No tags found in your vault.')
+      .addButton((b) => {
+        this.addBtn = b
+          .setButtonText('Add tag...')
           .setDisabled(!hasAvailable)
-          .onClick(() => {
-            const tag = normaliseTag(this.dropdownSelected ?? '');
-            if (!tag) return;
-            this.selectedTags.add(tag);
-            this.renderSelectedTags();
-            this.updateCreateDisabled();
-          }),
-      )
+          .onClick(async () => {
+            await this.addTagViaFuzzy();
+          });
+        return this.addBtn;
+      })
       .addButton((b) =>
         b
           .setButtonText('Clear')
           .onClick(() => {
             this.selectedTags.clear();
             this.renderSelectedTags();
-            this.updateCreateDisabled();
+            this.updateButtonsDisabled();
           }),
       );
 
@@ -428,12 +417,7 @@ class TagCohortModal extends Modal {
     const btns = new Setting(contentEl);
     btns.addButton((b) =>
       b.setButtonText('Cancel').onClick(() => {
-        if (this.resolved) return;
-        this.resolved = true;
-        const r = this.resolver;
-        this.resolver = undefined;
-        r?.(undefined);
-        this.close();
+        this.finish(undefined);
       }),
     );
     btns.addButton((b) => {
@@ -442,24 +426,10 @@ class TagCohortModal extends Modal {
         const tags = Array.from(this.selectedTags).sort();
         const kind = this.mode === 'all' ? 'tag:all' : 'tag:any';
         const def = createDefinition(kind, { tags });
-        if (this.resolved) return;
-        this.resolved = true;
-        const r = this.resolver;
-        this.resolver = undefined;
-        r?.(def);
-        this.close();
+        this.finish(def);
       });
-      this.updateCreateDisabled();
+      this.updateButtonsDisabled();
       return this.createBtn;
     });
-  }
-
-  onClose(): void {
-    if (!this.resolved) {
-      this.resolved = true;
-      const r = this.resolver;
-      this.resolver = undefined;
-      r?.(undefined);
-    }
   }
 }

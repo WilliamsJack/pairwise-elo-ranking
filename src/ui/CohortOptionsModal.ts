@@ -1,6 +1,7 @@
-import { App, ButtonComponent, Modal, Setting, TextComponent, ToggleComponent } from 'obsidian';
+import { App, ButtonComponent, Setting, TextComponent, ToggleComponent } from 'obsidian';
 import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '../settings';
 
+import { BasePromiseModal } from './PromiseModal';
 import type EloPlugin from '../../main';
 
 type Mode = 'create' | 'edit';
@@ -19,10 +20,8 @@ export type CohortOptionsResult = {
   name?: string;
 };
 
-export class CohortOptionsModal extends Modal {
+export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | undefined> {
   private plugin: EloPlugin;
-  private resolver?: (res?: CohortOptionsResult) => void;
-  private resolved = false;
 
   private mode: Mode;
   private base: FrontmatterPropertiesSettings;
@@ -67,10 +66,7 @@ export class CohortOptionsModal extends Modal {
   }
 
   async openAndGetOptions(): Promise<CohortOptionsResult | undefined> {
-    return new Promise((resolve) => {
-      this.resolver = resolve;
-      this.open();
-    });
+    return this.openAndGetValue();
   }
 
   private resetRowToDefault(row: RowState, textRef?: TextComponent, toggleRef?: ToggleComponent) {
@@ -169,12 +165,7 @@ export class CohortOptionsModal extends Modal {
     const btns = new Setting(contentEl);
     btns.addButton((b) =>
       b.setButtonText('Cancel').onClick(() => {
-        if (this.resolved) return;
-        this.resolved = true;
-        const r = this.resolver;
-        this.resolver = undefined;
-        r?.(undefined);
-        this.close();
+        this.finish(undefined);
       }),
     );
     btns.addButton((b) =>
@@ -182,26 +173,12 @@ export class CohortOptionsModal extends Modal {
         .setCta()
         .setButtonText(this.mode === 'create' ? 'Create cohort' : 'Save changes')
         .onClick(() => {
-          if (this.resolved) return;
           const result: CohortOptionsResult = {
             overrides: this.buildOverridesPayload(),
             name: this.nameWorking || undefined,
           };
-          this.resolved = true;
-          const r = this.resolver;
-          this.resolver = undefined;
-          r?.(result);
-          this.close();
+          this.finish(result);
         }),
     );
-  }
-
-  onClose(): void {
-    if (!this.resolved) {
-      this.resolved = true;
-      const r = this.resolver;
-      this.resolver = undefined;
-      r?.(undefined);
-    }
   }
 }

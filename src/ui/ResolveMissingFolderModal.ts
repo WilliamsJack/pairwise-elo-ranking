@@ -1,5 +1,6 @@
-import { App, Modal, Setting } from 'obsidian';
+import { App, Setting } from 'obsidian';
 
+import { BasePromiseModal } from './PromiseModal';
 import { FolderSelectModal } from './FolderPicker';
 import { getEloId } from '../utils/NoteIds';
 
@@ -8,13 +9,10 @@ type Suggestion = {
   count: number;
 };
 
-export class ResolveMissingFolderModal extends Modal {
+export class ResolveMissingFolderModal extends BasePromiseModal<string | undefined> {
   private oldPath: string;
   private recursive: boolean;
   private cohortIds: Set<string>;
-
-  private resolver?: (path?: string) => void;
-  private resolved = false;
 
   private listEl?: HTMLElement;
   private progressEl?: HTMLElement;
@@ -33,10 +31,7 @@ export class ResolveMissingFolderModal extends Modal {
   }
 
   async openAndGetFolderPath(): Promise<string | undefined> {
-    return new Promise((resolve) => {
-      this.resolver = resolve;
-      this.open();
-    });
+    return this.openAndGetValue();
   }
 
   onOpen(): void {
@@ -160,22 +155,9 @@ export class ResolveMissingFolderModal extends Modal {
     this.renderList();
   }
 
-  private finish(path?: string) {
-    if (this.resolved) return;
-    this.cancelled = true;
-    this.resolved = true;
-    const r = this.resolver;
-    this.resolver = undefined;
-    r?.(path);
-    this.close();
-  }
-
   onClose(): void {
-    if (!this.resolved) {
-      this.resolved = true;
-      const r = this.resolver;
-      this.resolver = undefined;
-      r?.(undefined);
-    }
+    // Ensure background scan stops if the user closes via the "X" or ESC.
+    this.cancelled = true;
+    super.onClose();
   }
 }
