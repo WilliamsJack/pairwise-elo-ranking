@@ -3,8 +3,8 @@ import { MatchResult, UndoFrame } from '../types';
 import { ensureEloId, getEloId } from '../utils/NoteIds';
 
 import type EloPlugin from '../../main';
-import type { FrontmatterPropertiesSettings } from '../settings/settings';
-import { effectiveFrontmatterProperties } from '../settings/settings';
+import type { FrontmatterPropertiesSettings } from '../settings';
+import { effectiveFrontmatterProperties } from '../settings';
 import { pairSig } from '../utils/pair';
 import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
 

@@ -1,4 +1,4 @@
-import { EloSettings, effectiveFrontmatterProperties } from './settings/settings';
+import { EloSettings, effectiveFrontmatterProperties } from './settings';
 import { Notice, Plugin, TAbstractFile, TFile } from 'obsidian';
 import { computeRankMap, updateCohortFrontmatter } from './utils/FrontmatterStats';
 

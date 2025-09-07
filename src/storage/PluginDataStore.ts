@@ -6,8 +6,9 @@ import {
   PlayerSnapshot,
   UndoFrame,
 } from '../types';
-import { DEFAULT_SETTINGS, EloSettings } from '../settings/settings';
+import { DEFAULT_SETTINGS, EloSettings } from '../settings';
 
+import type { EloHeuristicsSettings as EloHeuristics } from '../settings'
 import { Plugin } from 'obsidian';
 import { updateElo } from '../domain/elo/EloEngine';
 
@@ -189,7 +190,7 @@ export class PluginDataStore {
       this.settings.kFactor,
       a.matches,
       b.matches,
-      hs as any,
+      hs as EloHeuristics,
     );
     a.rating = newA;
     b.rating = newB;

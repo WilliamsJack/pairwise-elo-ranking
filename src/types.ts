@@ -1,4 +1,4 @@
-import type { FrontmatterPropertiesSettings } from './settings/settings';
+import type { FrontmatterPropertiesSettings } from './settings';
 
 export type MatchResult = 'A' | 'B' | 'D';
 

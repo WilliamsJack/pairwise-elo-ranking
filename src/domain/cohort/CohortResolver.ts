@@ -21,7 +21,7 @@ function getFileTags(app: App, file: TFile): string[] {
 
   // Body tags
   if (cache?.tags) {
-    for (const t of cache.tags) if (t?.tag) set.add(t.tag);
+    for (const t of cache.tags) if (t?.tag) set.add(normaliseTag(t.tag));
   }
 
   // Frontmatter tags (string | string[] | unknown)

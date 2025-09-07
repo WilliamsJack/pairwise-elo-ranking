@@ -5,8 +5,8 @@ import { CohortDefinition } from '../types';
 import { CohortOptionsModal } from './CohortOptionsModal';
 import type EloPlugin from '../../main';
 import { FolderSelectModal } from './FolderPicker';
-import type { FrontmatterPropertiesSettings } from '../settings/settings';
-import { normaliseTag } from 'src/utils/tags';
+import type { FrontmatterPropertiesSettings } from '../settings';
+import { normaliseTag } from '../utils/tags';
 
 type Choice =
   | { kind: 'saved'; key: string; label: string; def?: CohortDefinition }

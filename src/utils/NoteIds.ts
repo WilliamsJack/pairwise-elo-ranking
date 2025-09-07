@@ -4,7 +4,7 @@ import { App, TFile } from 'obsidian';
 const ELO_ID_COMMENT_BASE = /<!--\s*eloId\s*:\s*([0-9A-Za-z][0-9A-Za-z._-]*)\s*-->/;
 
 function extractEloIdFromHtmlComment(text: string): string | undefined {
-  const re = new RegExp(ELO_ID_COMMENT_BASE.source, 'g');
+  const re = new RegExp(ELO_ID_COMMENT_BASE.source);
   const m = re.exec(text);
   return m ? m[1] : undefined;
 }

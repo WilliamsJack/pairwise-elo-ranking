@@ -19,7 +19,8 @@ function kFromMatches(baseK: number, matches: number, decay?: EloHeuristics['dec
   if (!decay?.enabled) return baseK;
 
   const halfLife = Math.max(1, Math.round(decay.halfLife ?? 200));
-  const minK = Math.max(1, Math.round(decay.minK ?? 8));
+  let minK = Math.max(1, Math.round(decay.minK ?? 8));
+  minK = Math.min(minK, baseK);
 
   // Hyperbolic decay with half-life:
   // factor = 1 / (1 + matches / halfLife)

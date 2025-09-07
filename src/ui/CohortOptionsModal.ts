@@ -1,5 +1,5 @@
 import { App, ButtonComponent, Modal, Setting, TextComponent, ToggleComponent } from 'obsidian';
-import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '../settings/settings';
+import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '../settings';
 
 import type EloPlugin from '../../main';
 
