@@ -1,5 +1,4 @@
-import { App, Notice, Plugin, TAbstractFile, TFile } from 'obsidian';
-import { createDefinition, resolveFilesForCohort } from './domain/cohort/CohortResolver';
+import { Notice, Plugin, TAbstractFile, TFile } from 'obsidian';
 
 import ArenaSession from './ui/ArenaSession';
 import { CohortDefinition } from './types';
@@ -8,6 +7,8 @@ import { EloSettings } from './settings/settings';
 import EloSettingsTab from './settings/SettingsTab';
 import { PluginDataStore } from './storage/PluginDataStore';
 import { reconcileCohortPlayersWithFiles } from './domain/cohort/CohortIntegrity';
+import { resolveFilesForCohort } from './domain/cohort/CohortResolver';
+import { updateCohortRanksInFrontmatter } from './utils/FrontmatterStats';
 
 export default class EloPlugin extends Plugin {
   dataStore: PluginDataStore;
@@ -98,9 +99,34 @@ export default class EloPlugin extends Plugin {
   }
 
   public endSession() {
-    if (this.currentSession) {
-      this.currentSession.end();
-      this.currentSession = undefined;
-    }
+    if (!this.currentSession) return;
+
+    const session = this.currentSession;
+    const cohortKey = session.getCohortKey();
+
+    session.end();
+    this.currentSession = undefined;
+
+    // After session ends, update rank across the cohort if enabled
+    const def = this.dataStore.getCohortDef(cohortKey);
+    const cohort = this.dataStore.store.cohorts[cohortKey];
+    if (!def || !cohort) return;
+
+    const fm = def.frontmatterOverrides ?? this.settings.frontmatterProperties;
+    const rankCfg = fm?.rank;
+    if (!rankCfg?.enabled || !rankCfg.property) return;
+
+    const files = resolveFilesForCohort(this.app, def);
+    if (files.length === 0) return;
+
+    const workingNotice = new Notice('Updating ranks in frontmatter…', 0);
+
+    updateCohortRanksInFrontmatter(this.app, cohort, files, rankCfg.property)
+      .catch((e) => {
+        try { console.error('[Elo] Failed to update ranks in frontmatter', e); } catch {}
+      })
+      .finally(() => {
+        try { workingNotice.hide(); } catch {}
+      });
   }
 }

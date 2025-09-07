@@ -96,6 +96,10 @@ export default class ArenaSession {
     this.undoStack = [];
   }
 
+  public getCohortKey(): string {
+    return this.cohortKey;
+  }
+
   onFileRenamed(oldPath: string, newFile: TFile) {
     // Update our id map to the new path
     const id = this.idByPath.get(oldPath);

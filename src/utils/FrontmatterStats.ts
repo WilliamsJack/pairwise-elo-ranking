@@ -2,6 +2,7 @@ import { App, TFile } from 'obsidian';
 
 import { CohortData } from '../types';
 import type { FrontmatterPropertiesSettings } from '../settings/settings';
+import { getEloId } from './NoteIds';
 
 type PlayerStats = {
   rating: number;
@@ -110,4 +111,73 @@ export async function writeFrontmatterStatsForPair(
   }
 
   await Promise.all(tasks);
+}
+
+// Generic bulk updater for frontmatter properties based on a values map.
+// If oldPropName is provided, it will be removed if present (rename).
+export async function updateCohortFrontmatterProperties(
+  app: App,
+  files: TFile[],
+  valuesById: Map<string, number>,
+  newPropName: string,
+  oldPropName?: string,
+): Promise<{ updated: number; totalConsidered: number }> {
+  const prop = (newPropName ?? '').trim();
+  const oldProp = (oldPropName ?? '').trim();
+  if (!prop) return { updated: 0, totalConsidered: 0 };
+
+  let updated = 0;
+  let totalConsidered = 0;
+
+  for (const file of files) {
+    let id: string | undefined;
+    try {
+      id = await getEloId(app, file);
+    } catch {
+      id = undefined;
+    }
+    if (!id) continue;
+
+    const newVal = valuesById.get(id);
+    if (typeof newVal === 'undefined') continue;
+
+    totalConsidered += 1;
+
+    const fmCache = app.metadataCache.getFileCache(file)?.frontmatter;
+
+    const curNewRaw = fmCache?.[prop];
+    const curNew =
+      typeof curNewRaw === 'number'
+        ? curNewRaw
+        : typeof curNewRaw === 'string'
+        ? parseInt(curNewRaw, 10)
+        : undefined;
+
+    const hasOld =
+      !!oldProp && oldProp !== prop && typeof fmCache?.[oldProp] !== 'undefined';
+
+    const needSet = curNew !== newVal;
+    const needRemoveOld = hasOld;
+
+    if (!needSet && !needRemoveOld) continue;
+
+    await app.fileManager.processFrontMatter(file, (yaml) => {
+      if (needSet) yaml[prop] = newVal;
+      if (needRemoveOld) delete yaml[oldProp];
+    });
+    updated += 1;
+  }
+
+  return { updated, totalConsidered };
+}
+
+export async function updateCohortRanksInFrontmatter(
+  app: App,
+  cohort: CohortData | undefined,
+  files: TFile[],
+  newPropName: string,
+): Promise<{ updated: number; totalConsidered: number }> {
+  if (!cohort) return { updated: 0, totalConsidered: 0 };
+  const rankMap = computeRankMap(cohort);
+  return updateCohortFrontmatterProperties(app, files, rankMap, newPropName);
 }
