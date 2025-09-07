@@ -113,19 +113,25 @@ export async function writeFrontmatterStatsForPair(
   await Promise.all(tasks);
 }
 
-// Compute how many files would be updated by a rename/remove operation.
-export async function previewCohortFrontmatterPropertyUpdates(
+type FrontmatterUpdatePlan = {
+  file: TFile;
+  setKey?: string;
+  setValue?: number;
+  deleteKey?: string;
+};
+
+// Shared planner to compute per-file frontmatter updates (set and/or delete).
+async function planFrontmatterUpdates(
   app: App,
   files: TFile[],
   valuesById: Map<string, number>,
   newPropName: string,
   oldPropName?: string,
-): Promise<{ wouldUpdate: number; totalWithId: number }> {
+): Promise<{ plans: FrontmatterUpdatePlan[] }> {
   const prop = (newPropName ?? '').trim();
   const oldProp = (oldPropName ?? '').trim();
 
-  let wouldUpdate = 0;
-  let totalWithId = 0;
+  const plans: FrontmatterUpdatePlan[] = [];
 
   for (const file of files) {
     let id: string | undefined;
@@ -135,18 +141,22 @@ export async function previewCohortFrontmatterPropertyUpdates(
       id = undefined;
     }
     if (!id) continue;
-    totalWithId += 1;
 
     const fmCache = app.metadataCache.getFileCache(file)?.frontmatter;
 
+    // Removal-only mode: delete oldProp if present.
     if (!prop && oldProp) {
       const hasOld = typeof fmCache?.[oldProp] !== 'undefined';
-      if (hasOld) wouldUpdate += 1;
+      if (hasOld) {
+        plans.push({ file, deleteKey: oldProp });
+      }
       continue;
     }
 
+    // Nothing to do if no new prop.
     if (!prop) continue;
 
+    // Only consider files that have a value provided for this id.
     const newVal = valuesById.get(id);
     if (typeof newVal === 'undefined') continue;
 
@@ -159,15 +169,33 @@ export async function previewCohortFrontmatterPropertyUpdates(
         : undefined;
 
     const hasOld = !!oldProp && oldProp !== prop && typeof fmCache?.[oldProp] !== 'undefined';
+
     const needSet = curNew !== newVal;
     const needRemoveOld = hasOld;
 
     if (needSet || needRemoveOld) {
-      wouldUpdate += 1;
+      plans.push({
+        file,
+        setKey: needSet ? prop : undefined,
+        setValue: needSet ? newVal : undefined,
+        deleteKey: needRemoveOld ? oldProp : undefined,
+      });
     }
   }
 
-  return { wouldUpdate, totalWithId };
+  return { plans };
+}
+
+// Compute how many files would be updated by a rename/remove operation.
+export async function previewCohortFrontmatterPropertyUpdates(
+  app: App,
+  files: TFile[],
+  valuesById: Map<string, number>,
+  newPropName: string,
+  oldPropName?: string,
+): Promise<{ wouldUpdate: number }> {
+  const { plans } = await planFrontmatterUpdates(app, files, valuesById, newPropName, oldPropName);
+  return { wouldUpdate: plans.length };
 }
 
 // Generic bulk updater for frontmatter properties based on a values map.
@@ -179,81 +207,19 @@ export async function updateCohortFrontmatterProperties(
   valuesById: Map<string, number>,
   newPropName: string,
   oldPropName?: string,
-): Promise<{ updated: number; totalConsidered: number }> {
-  const prop = (newPropName ?? '').trim();
-  const oldProp = (oldPropName ?? '').trim();
-
-  // Removal-only mode
-  if (!prop && oldProp) {
-    let updated = 0;
-    let totalConsidered = 0;
-    for (const file of files) {
-      let id: string | undefined;
-      try {
-        id = await getEloId(app, file);
-      } catch {
-        id = undefined;
-      }
-      if (!id) continue;
-
-      const fmCache = app.metadataCache.getFileCache(file)?.frontmatter;
-      const hasOld = typeof fmCache?.[oldProp] !== 'undefined';
-      if (!hasOld) continue;
-
-      totalConsidered += 1;
-      await app.fileManager.processFrontMatter(file, (yaml) => {
-        delete (yaml as any)[oldProp];
-      });
-      updated += 1;
-    }
-    return { updated, totalConsidered };
-  }
-
-  if (!prop) return { updated: 0, totalConsidered: 0 };
+): Promise<{ updated: number }> {
+  const { plans } = await planFrontmatterUpdates(app, files, valuesById, newPropName, oldPropName);
 
   let updated = 0;
-  let totalConsidered = 0;
-
-  for (const file of files) {
-    let id: string | undefined;
-    try {
-      id = await getEloId(app, file);
-    } catch {
-      id = undefined;
-    }
-    if (!id) continue;
-
-    const newVal = valuesById.get(id);
-    if (typeof newVal === 'undefined') continue;
-
-    totalConsidered += 1;
-
-    const fmCache = app.metadataCache.getFileCache(file)?.frontmatter;
-
-    const curNewRaw = fmCache?.[prop];
-    const curNew =
-      typeof curNewRaw === 'number'
-        ? curNewRaw
-        : typeof curNewRaw === 'string'
-        ? parseInt(curNewRaw, 10)
-        : undefined;
-
-    const hasOld =
-      !!oldProp && oldProp !== prop && typeof fmCache?.[oldProp] !== 'undefined';
-
-    const needSet = curNew !== newVal;
-    const needRemoveOld = hasOld;
-
-    if (!needSet && !needRemoveOld) continue;
-
-    await app.fileManager.processFrontMatter(file, (yaml) => {
-      if (needSet) (yaml as any)[prop] = newVal;
-      if (needRemoveOld) delete (yaml as any)[oldProp];
+  for (const p of plans) {
+    await app.fileManager.processFrontMatter(p.file, (yaml) => {
+      if (p.setKey) (yaml as any)[p.setKey] = p.setValue;
+      if (p.deleteKey) delete (yaml as any)[p.deleteKey];
     });
     updated += 1;
   }
 
-  return { updated, totalConsidered };
+  return { updated };
 }
 
 /**
@@ -267,7 +233,7 @@ export async function updateCohortFrontmatter(
   newPropName: string,
   oldPropName?: string,
   noticeMessage?: string,
-): Promise<{ updated: number; totalConsidered: number }> {
+): Promise<{ updated: number }> {
   const working = new Notice(noticeMessage ?? 'Updating frontmatter...', 0);
   try {
     return await updateCohortFrontmatterProperties(app, files, valuesById, newPropName, oldPropName);
@@ -281,8 +247,8 @@ export async function updateCohortRanksInFrontmatter(
   cohort: CohortData | undefined,
   files: TFile[],
   newPropName: string,
-): Promise<{ updated: number; totalConsidered: number }> {
-  if (!cohort) return { updated: 0, totalConsidered: 0 };
+): Promise<{ updated: number }> {
+  if (!cohort) return { updated: 0 };
   const rankMap = computeRankMap(cohort);
   return updateCohortFrontmatterProperties(app, files, rankMap, newPropName);
 }

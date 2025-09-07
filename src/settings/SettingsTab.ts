@@ -13,14 +13,16 @@ class ConfirmModal extends Modal {
   private titleText: string;
   private message: string;
   private ctaText: string;
+  private cancelText: string;
   private resolver?: (ok: boolean) => void;
   private resolved = false;
 
-  constructor(app: App, titleText: string, message: string, ctaText: string) {
+  constructor(app: App, titleText: string, message: string, ctaText: string, cancelText: string) {
     super(app);
     this.titleText = titleText;
     this.message = message;
     this.ctaText = ctaText;
+    this.cancelText = cancelText;
   }
 
   async openAndConfirm(): Promise<boolean> {
@@ -38,7 +40,7 @@ class ConfirmModal extends Modal {
     p.textContent = this.message;
 
     const btns = new Setting(contentEl);
-    btns.addButton((b) => b.setButtonText('Cancel').onClick(() => this.finish(false)));
+    btns.addButton((b) => b.setButtonText(this.cancelText).onClick(() => this.finish(false)));
     btns.addButton((b) => b.setCta().setButtonText(this.ctaText).onClick(() => this.finish(true)));
   }
 
@@ -698,7 +700,8 @@ export default class EloSettingsTab extends PluginSettingTab {
           this.app,
           'Remove cohort property?',
           `Remove frontmatter property "${change.oldProp}" from ${preview.wouldUpdate} notes in this cohort?`,
-          'Remove',
+          'Yes, remove',
+          'No, don\'t update'
         ).openAndConfirm();
         if (!ok) continue;
 
@@ -725,7 +728,8 @@ export default class EloSettingsTab extends PluginSettingTab {
           this.app,
           'Rename cohort property?',
           `Rename frontmatter property "${change.oldProp}" to "${change.newProp}" on ${preview.wouldUpdate} notes in this cohort?`,
-          'Rename',
+          'Yes, rename',
+          'No, don\'t rename'
         ).openAndConfirm();
         if (!ok) continue;
 
@@ -751,7 +755,8 @@ export default class EloSettingsTab extends PluginSettingTab {
           this.app,
           'Write cohort property?',
           `Write frontmatter property "${change.newProp}" to ${preview.wouldUpdate} notes in this cohort?`,
-          'Write',
+          'Yes, write',
+          'No, don\'t write'
         ).openAndConfirm();
         if (!ok) continue;
     
