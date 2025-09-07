@@ -315,7 +315,7 @@ export default class EloSettingsTab extends PluginSettingTab {
         const ok = await new ConfirmModal(
           this.app,
           'Remove cohort property?',
-          `Remove frontmatter property "${change.oldProp}" from ${preview.wouldUpdate} note(s) in this cohort?`,
+          `Remove frontmatter property "${change.oldProp}" from ${preview.wouldUpdate} notes in this cohort?`,
           'Remove',
         ).openAndConfirm();
         if (!ok) continue;
@@ -326,9 +326,9 @@ export default class EloSettingsTab extends PluginSettingTab {
           new Map(),
           '',
           change.oldProp,
-          `Removing "${change.oldProp}" from ${preview.wouldUpdate} note(s)...`,
+          `Removing "${change.oldProp}" from ${preview.wouldUpdate} notes...`,
         );
-        new Notice(`Removed "${change.oldProp}" from ${res.updated} note(s).`);
+        new Notice(`Removed "${change.oldProp}" from ${res.updated} notes.`);
       } else if (change.action === 'rename' && change.oldProp && change.newProp) {
         const preview = await previewCohortFrontmatterPropertyUpdates(
           this.app,
@@ -342,7 +342,7 @@ export default class EloSettingsTab extends PluginSettingTab {
         const ok = await new ConfirmModal(
           this.app,
           'Rename cohort property?',
-          `Rename frontmatter property "${change.oldProp}" to "${change.newProp}" on ${preview.wouldUpdate} note(s) in this cohort?`,
+          `Rename frontmatter property "${change.oldProp}" to "${change.newProp}" on ${preview.wouldUpdate} notes in this cohort?`,
           'Rename',
         ).openAndConfirm();
         if (!ok) continue;
@@ -353,9 +353,9 @@ export default class EloSettingsTab extends PluginSettingTab {
           vals,
           change.newProp,
           change.oldProp,
-          `Renaming "${change.oldProp}" to "${change.newProp}" on ${preview.wouldUpdate} note(s)...`,
+          `Renaming "${change.oldProp}" to "${change.newProp}" on ${preview.wouldUpdate} notes...`,
         );
-        new Notice(`Updated ${res.updated} note(s).`);
+        new Notice(`Updated ${res.updated} notes.`);
       } else if (change.action === 'upsert' && change.newProp) {
         const preview = await previewCohortFrontmatterPropertyUpdates(
           this.app,
@@ -368,7 +368,7 @@ export default class EloSettingsTab extends PluginSettingTab {
         const ok = await new ConfirmModal(
           this.app,
           'Write cohort property?',
-          `Write frontmatter property "${change.newProp}" to ${preview.wouldUpdate} note(s) in this cohort?`,
+          `Write frontmatter property "${change.newProp}" to ${preview.wouldUpdate} notes in this cohort?`,
           'Write',
         ).openAndConfirm();
         if (!ok) continue;
@@ -379,9 +379,9 @@ export default class EloSettingsTab extends PluginSettingTab {
           vals,
           change.newProp,
           undefined,
-          `Writing "${change.newProp}" to ${preview.wouldUpdate} note(s)...`,
+          `Writing "${change.newProp}" to ${preview.wouldUpdate} notes...`,
         );
-        new Notice(`Wrote "${change.newProp}" on ${res.updated} note(s).`);
+        new Notice(`Wrote "${change.newProp}" on ${res.updated} notes.`);
       }
     }
   }
