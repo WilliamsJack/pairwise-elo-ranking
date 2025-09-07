@@ -251,8 +251,8 @@ export default class EloSettingsTab extends PluginSettingTab {
     // Determine changes that require optional bulk updates
     const changed: Array<{
       key: PropKey;
-      action: 'rename' | 'remove';
-      oldProp: string;
+      action: 'rename' | 'remove' | 'upsert';
+      oldProp?: string;
       newProp?: string;
     }> = [];
 
@@ -267,6 +267,10 @@ export default class EloSettingsTab extends PluginSettingTab {
       }
       if (newCfg.enabled && oldCfg.enabled && oldCfg.property !== newCfg.property) {
         changed.push({ key, action: 'rename', oldProp: oldCfg.property, newProp: newCfg.property });
+        continue;
+      }
+      if (!oldCfg.enabled && newCfg.enabled) {
+        changed.push({ key, action: 'upsert', newProp: newCfg.property });
         continue;
       }
     }
@@ -296,49 +300,67 @@ export default class EloSettingsTab extends PluginSettingTab {
     // Run prompts sequentially
     for (const change of changed) {
       const key = change.key;
-      const oldProp = change.oldProp;
-      if (change.action === 'remove') {
+      const vals = valuesFor(key);
+
+      if (change.action === 'remove' && change.oldProp) {
         const preview = await previewCohortFrontmatterPropertyUpdates(
           this.app,
           files,
           new Map(),
           '',
-          oldProp,
+          change.oldProp,
         );
         if (preview.wouldUpdate === 0) continue;
 
         const ok = await new ConfirmModal(
           this.app,
           'Remove cohort property?',
-          `Remove frontmatter property "${oldProp}" from ${preview.wouldUpdate} note(s) in this cohort?`,
+          `Remove frontmatter property "${change.oldProp}" from ${preview.wouldUpdate} note(s) in this cohort?`,
           'Remove',
         ).openAndConfirm();
         if (!ok) continue;
 
-        const res = await updateCohortFrontmatterProperties(this.app, files, new Map(), '', oldProp);
-        new Notice(`Removed "${oldProp}" from ${res.updated} note(s).`);
-      } else if (change.action === 'rename' && change.newProp) {
-        const newProp = change.newProp;
-        const vals = valuesFor(key);
+        const res = await updateCohortFrontmatterProperties(this.app, files, new Map(), '', change.oldProp);
+        new Notice(`Removed "${change.oldProp}" from ${res.updated} note(s).`);
+      } else if (change.action === 'rename' && change.oldProp && change.newProp) {
         const preview = await previewCohortFrontmatterPropertyUpdates(
           this.app,
           files,
           vals,
-          newProp,
-          oldProp,
+          change.newProp,
+          change.oldProp,
         );
         if (preview.wouldUpdate === 0) continue;
 
         const ok = await new ConfirmModal(
           this.app,
           'Rename cohort property?',
-          `Rename frontmatter property "${oldProp}" to "${newProp}" on ${preview.wouldUpdate} note(s) in this cohort?`,
+          `Rename frontmatter property "${change.oldProp}" to "${change.newProp}" on ${preview.wouldUpdate} note(s) in this cohort?`,
           'Rename',
         ).openAndConfirm();
         if (!ok) continue;
 
-        const res = await updateCohortFrontmatterProperties(this.app, files, vals, newProp, oldProp);
+        const res = await updateCohortFrontmatterProperties(this.app, files, vals, change.newProp, change.oldProp);
         new Notice(`Updated ${res.updated} note(s).`);
+      } else if (change.action === 'upsert' && change.newProp) {
+        const preview = await previewCohortFrontmatterPropertyUpdates(
+          this.app,
+          files,
+          vals,
+          change.newProp,
+        );
+        if (preview.wouldUpdate === 0) continue;
+
+        const ok = await new ConfirmModal(
+          this.app,
+          'Write cohort property?',
+          `Write frontmatter property "${change.newProp}" to ${preview.wouldUpdate} note(s) in this cohort?`,
+          'Write',
+        ).openAndConfirm();
+        if (!ok) continue;
+    
+        const res = await updateCohortFrontmatterProperties(this.app, files, vals, change.newProp);
+        new Notice(`Wrote "${change.newProp}" on ${res.updated} note(s).`);
       }
     }
   }
