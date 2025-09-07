@@ -22,6 +22,7 @@ Primary roadmap item: Bases will be supported as another cohort type. If you use
 
 ### Start a session
 ![cohort_creator](docs/images/cohort_creator.webp)
+
 - Click the trophy icon in the left ribbon, or run the command "Start rating session".
 - Create a cohort in the picker:
   - Vault: All notes
@@ -32,6 +33,7 @@ Primary roadmap item: Bases will be supported as another cohort type. If you use
 
 ### Compare two notes
 ![arena](docs/images/arena.webp)
+
 Two notes open side-by-side in Reading mode for you to compare. Use the arrow keys on your keyboard or the buttons on the session bar to choose a winner.
 - Left Arrow: choose left
 - Right Arrow: choose right
@@ -46,6 +48,7 @@ Press Escape or run "End current session". If you've enabled a Rank property for
 
 ### Configurable Frontmatter Output
 ![cohort_options](docs/images/cohort_options.webp)
+
 Use the values computed by the plugin however you want. Choose which values get written to frontmatter and what their property names are.
 
 ## What's a cohort?
