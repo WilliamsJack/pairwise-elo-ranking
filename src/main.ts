@@ -21,13 +21,13 @@ export default class EloPlugin extends Plugin {
     await this.dataStore.load();
     this.settings = this.dataStore.settings;
 
-    this.addRibbonIcon('trophy', 'Elo: Start rating session...', async () => {
+    this.addRibbonIcon('trophy', 'Start Elo rating session', async () => {
       await this.selectCohortAndStart();
     });
 
     this.addCommand({
       id: 'elo-start-session',
-      name: 'Elo: Start rating session...',
+      name: 'Start rating session',
       callback: async () => {
         await this.selectCohortAndStart();
       },
@@ -35,7 +35,7 @@ export default class EloPlugin extends Plugin {
 
     this.addCommand({
       id: 'elo-end-session',
-      name: 'Elo: End current session',
+      name: 'End current session',
       checkCallback: (checking) => {
         const has = !!this.currentSession;
         if (!checking && has) this.endSession();

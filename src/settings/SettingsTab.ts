@@ -4,7 +4,7 @@ import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFr
 import { labelForDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 
 import type { CohortData } from '../types';
-import { CohortFrontmatterOptionsModal } from '../ui/CohortFrontmatterOptionsModal';
+import { CohortOptionsModal } from '../ui/CohortOptionsModal';
 import type EloPlugin from '../main';
 
 type PropKey = keyof FrontmatterPropertiesSettings;
@@ -213,7 +213,6 @@ export default class EloSettingsTab extends PluginSettingTab {
       for (const def of defs) {
         const s = new Setting(containerEl)
           .setName(labelForDefinition(def))
-          .setDesc('Configure frontmatter properties for this cohort.')
           .addButton((b) =>
             b
               .setButtonText('Configure...')
@@ -229,21 +228,28 @@ export default class EloSettingsTab extends PluginSettingTab {
     const def = this.plugin.dataStore.getCohortDef(cohortKey);
     if (!def) return;
 
-    const overrides = await new CohortFrontmatterOptionsModal(this.app, this.plugin, {
+    const res = await new CohortOptionsModal(this.app, this.plugin, {
       mode: 'edit',
       initial: def.frontmatterOverrides,
-    }).openAndGetOverrides();
+      initialName: def.label ?? '',
+    }).openAndGetOptions();
 
-    if (!overrides) return;
+    if (!res) return;
 
-    // Compute old vs new effective config, then save new overrides
+    const overrides = res.overrides ?? {};
+
+    // Compute old vs new effective config, then save new overrides and name
     const base = this.plugin.settings.frontmatterProperties;
     const oldEffective = effectiveFrontmatterProperties(base, def.frontmatterOverrides);
     const newEffective = effectiveFrontmatterProperties(base, overrides);
 
-    // Persist: if overrides ended up empty (no keys), clear from def
+    // Persist overrides (clear if no keys) and label (name)
     const hasKeys = Object.keys(overrides).length > 0;
     def.frontmatterOverrides = hasKeys ? overrides : undefined;
+
+    const newName = (res.name ?? '').trim();
+    def.label = newName.length > 0 ? newName : undefined;
+
     this.plugin.dataStore.upsertCohortDef(def);
     await this.plugin.dataStore.saveStore();
     this.display(); // refresh UI

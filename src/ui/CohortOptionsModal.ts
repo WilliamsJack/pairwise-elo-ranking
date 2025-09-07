@@ -14,23 +14,37 @@ type RowState = {
   overridden: boolean;
 };
 
-export class CohortFrontmatterOptionsModal extends Modal {
+export type CohortOptionsResult = {
+  overrides: Partial<FrontmatterPropertiesSettings>;
+  name?: string;
+};
+
+export class CohortOptionsModal extends Modal {
   private plugin: EloPlugin;
-  private resolver?: (overrides?: Partial<FrontmatterPropertiesSettings>) => void;
+  private resolver?: (res?: CohortOptionsResult) => void;
   private resolved = false;
 
   private mode: Mode;
   private base: FrontmatterPropertiesSettings;
   private initial?: Partial<FrontmatterPropertiesSettings>;
+  private initialName?: string;
+
+  private nameWorking: string = '';
 
   private working: Record<Key, RowState>;
 
-  constructor(app: App, plugin: EloPlugin, opts?: { mode?: Mode; initial?: Partial<FrontmatterPropertiesSettings> }) {
+  constructor(
+    app: App,
+    plugin: EloPlugin,
+    opts?: { mode?: Mode; initial?: Partial<FrontmatterPropertiesSettings>; initialName?: string },
+  ) {
     super(app);
     this.plugin = plugin;
     this.mode = opts?.mode ?? 'create';
     this.base = plugin.settings.frontmatterProperties;
     this.initial = opts?.initial;
+    this.initialName = (opts?.initialName ?? '').trim();
+    this.nameWorking = this.initialName ?? '';
 
     const mk = (k: Key): RowState => {
       const baseCfg = this.base[k];
@@ -52,7 +66,7 @@ export class CohortFrontmatterOptionsModal extends Modal {
     };
   }
 
-  async openAndGetOverrides(): Promise<Partial<FrontmatterPropertiesSettings> | undefined> {
+  async openAndGetOptions(): Promise<CohortOptionsResult | undefined> {
     return new Promise((resolve) => {
       this.resolver = resolve;
       this.open();
@@ -73,7 +87,7 @@ export class CohortFrontmatterOptionsModal extends Modal {
 
   private updateOverriddenFlag(row: RowState) {
     const baseCfg = this.base[row.key];
-    row.overridden = (row.enabled !== baseCfg.enabled) || (row.property !== baseCfg.property);
+    row.overridden = row.enabled !== baseCfg.enabled || row.property !== baseCfg.property;
   }
 
   private buildOverridesPayload(): Partial<FrontmatterPropertiesSettings> {
@@ -92,13 +106,25 @@ export class CohortFrontmatterOptionsModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    const header = this.mode === 'create' ? 'Cohort options' : 'Configure cohort properties';
-    const desc = this.mode === 'create'
-      ? 'Configure which Elo statistics to write into frontmatter for this cohort and the property names to use. These defaults are prefilled from the plugin settings.'
-      : 'Adjust which Elo statistics to write into frontmatter for this cohort and the property names. Use Reset to revert an individual property to the global default.';
+    const desc =
+      this.mode === 'create'
+        ? 'Set an optional name and configure which Elo statistics to write into frontmatter for this cohort. Global defaults are prefilled.'
+        : 'Rename the cohort and adjust which Elo statistics to write into frontmatter. Use Reset to revert a property to the global default.';
 
-    contentEl.createEl('h3', { text: header });
+    contentEl.createEl('h3', { text: 'Cohort options' });
     contentEl.createEl('p', { text: desc });
+
+    new Setting(contentEl)
+      .setName('Cohort name')
+      .setDesc('Shown in menus. Optional — leave blank to use an automatic description.')
+      .addText((t) =>
+        t
+          .setPlaceholder('e.g. My Reading List')
+          .setValue(this.nameWorking)
+          .onChange((v) => {
+            this.nameWorking = (v ?? '').trim();
+          }),
+      );
 
     const addRow = (key: Key, label: string, help: string) => {
       const row = this.working[key];
@@ -127,14 +153,12 @@ export class CohortFrontmatterOptionsModal extends Modal {
             });
         });
 
-      if (this.mode === 'edit') {
-        s.addButton((b: ButtonComponent) =>
-          b
-            .setButtonText('Reset')
-            .setTooltip('Reset to global default')
-            .onClick(() => this.resetRowToDefault(row, textRef, toggleRef)),
-        );
-      }
+      s.addButton((b: ButtonComponent) =>
+        b
+          .setButtonText('Reset')
+          .setTooltip('Reset to global default')
+          .onClick(() => this.resetRowToDefault(row, textRef, toggleRef)),
+      );
     };
 
     addRow('rating', 'Rating', 'Write the current Elo rating to this property.');
@@ -159,11 +183,14 @@ export class CohortFrontmatterOptionsModal extends Modal {
         .setButtonText(this.mode === 'create' ? 'Create cohort' : 'Save changes')
         .onClick(() => {
           if (this.resolved) return;
-          const overrides = this.buildOverridesPayload();
+          const result: CohortOptionsResult = {
+            overrides: this.buildOverridesPayload(),
+            name: this.nameWorking || undefined,
+          };
           this.resolved = true;
           const r = this.resolver;
           this.resolver = undefined;
-          r?.(overrides);
+          r?.(result);
           this.close();
         }),
     );

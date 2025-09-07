@@ -2,7 +2,7 @@ import { App, ButtonComponent, FuzzySuggestModal, Modal, Notice, Setting, TFolde
 import { allFolderChoices, createDefinition, labelForDefinition, parseCohortKey } from '../domain/cohort/CohortResolver';
 
 import { CohortDefinition } from '../types';
-import { CohortFrontmatterOptionsModal } from './CohortFrontmatterOptionsModal';
+import { CohortOptionsModal } from './CohortOptionsModal';
 import type EloPlugin from '../../main';
 import type { FrontmatterPropertiesSettings } from '../settings/settings';
 
@@ -110,11 +110,11 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     return await this.runChild(() => new TagCohortModal(this.app).openAndGetDefinition());
   }
 
-  private async chooseFrontmatterOverrides(): Promise<Partial<FrontmatterPropertiesSettings> | undefined> {
+  private async chooseFrontmatterOverrides(): Promise<{ overrides?: Partial<FrontmatterPropertiesSettings>; name?: string } | undefined> {
     return await this.runChild(() =>
-      new CohortFrontmatterOptionsModal(this.app, this.plugin, {
+      new CohortOptionsModal(this.app, this.plugin, {
         mode: 'create',
-      }).openAndGetOverrides()
+      }).openAndGetOptions(),
     );
   }
 
@@ -122,9 +122,16 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     if (!def) return undefined;
     if (!this.plugin.settings.askForOverridesOnCohortCreation) return def;
 
-    const overrides = await this.chooseFrontmatterOverrides();
-    if (!overrides) return undefined;
-    def.frontmatterOverrides = overrides;
+    const res = await this.chooseFrontmatterOverrides();
+    if (!res) return undefined;
+
+    const overrides = res.overrides ?? {};
+    const hasKeys = Object.keys(overrides).length > 0;
+    def.frontmatterOverrides = hasKeys ? overrides : undefined;
+
+    const newName = (res.name ?? '').trim();
+    if (newName.length > 0) def.label = newName;
+
     return def;
   }
 
