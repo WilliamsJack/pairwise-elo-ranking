@@ -116,7 +116,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           });
       });
     
-    // Advanced heuristics accordion
+    // Advanced Elo K heuristics accordion
     const hs = this.plugin.settings.heuristics;
     const defaults = DEFAULT_SETTINGS.heuristics;
 
@@ -340,6 +340,154 @@ export default class EloSettingsTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
           .setDisabled(!hs.drawGapBoost.enabled);
+      });
+
+    // Matchmaking heuristics accordion
+    containerEl.createEl('h4', { text: 'Matchmaking: Pair selection' });
+
+    const mm = this.plugin.settings.matchmaking;
+    const mmDefaults = DEFAULT_SETTINGS.matchmaking;
+
+    const mmAcc = containerEl.createEl('details', { cls: 'elo-matchmaking-accordion' });
+    mmAcc.open = false;
+    mmAcc.createEl('summary', { text: 'Matchmaking heuristics' });
+    mmAcc.createEl('p', {
+      text:
+        'Control how pairs are chosen. These heuristics can speed up convergence by focusing on informative comparisons.',
+    });
+    const mmBody = mmAcc.createEl('div', { cls: 'elo-matchmaking-body' });
+
+    // Top-level enable
+    new Setting(mmBody)
+      .setName('Enable matchmaking heuristics')
+      .setDesc(`Globally enable the pair selection heuristics. Default: ${mmDefaults.enabled ? 'On' : 'Off'}.`)
+      .addToggle((t) =>
+        t.setValue(mm.enabled).onChange(async (v) => {
+          mm.enabled = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    // Similar ratings
+    mmBody.createEl('h5', { text: 'Prefer similar ratings' });
+    mmBody.createEl('p', {
+      text:
+        'When choosing an opponent, sample several candidates and pick the closest rating to the anchor note.',
+    });
+
+    let sampleSlider: any;
+
+    new Setting(mmBody)
+      .setName('Enable similar-ratings selection')
+      .setDesc(`Default: ${mmDefaults.similarRatings.enabled ? 'On' : 'Off'}.`)
+      .addToggle((t) =>
+        t.setValue(mm.similarRatings.enabled).onChange(async (v) => {
+          mm.similarRatings.enabled = v;
+          await this.plugin.saveSettings();
+          sampleSlider?.setDisabled(!v);
+        }),
+      );
+
+    new Setting(mmBody)
+      .setName('Opponent sample size')
+      .setDesc(`How many candidates to consider when picking the closest rating. Default: ${mmDefaults.similarRatings.sampleSize}.`)
+      .addSlider((sl) => {
+        sampleSlider = sl;
+        sl.setLimits(5, 50, 1)
+          .setValue(Math.max(5, Math.min(50, mm.similarRatings.sampleSize)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            mm.similarRatings.sampleSize = Math.round(value);
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!mm.similarRatings.enabled);
+      });
+
+    // Low matches bias
+    mmBody.createEl('h5', { text: 'Bias towards fewer matches' });
+    mmBody.createEl('p', {
+      text:
+        'Prefer notes with fewer matches as the anchor. Weight ≈ 1 / (1 + matches)^strength.',
+    });
+
+    let exponentSlider: any;
+
+    new Setting(mmBody)
+      .setName('Enable low-matches bias')
+      .setDesc(`Default: ${mmDefaults.lowMatchesBias.enabled ? 'On' : 'Off'}.`)
+      .addToggle((t) =>
+        t.setValue(mm.lowMatchesBias.enabled).onChange(async (v) => {
+          mm.lowMatchesBias.enabled = v;
+          await this.plugin.saveSettings();
+          exponentSlider?.setDisabled(!v);
+        }),
+      );
+
+    new Setting(mmBody)
+      .setName('Bias strength')
+      .setDesc(`Higher values emphasise low-match notes more strongly. Default: ${mmDefaults.lowMatchesBias.exponent}.`)
+      .addSlider((sl) => {
+        exponentSlider = sl;
+        sl.setLimits(0, 3, 0.1)
+          .setValue(Math.max(0, Math.min(3, mm.lowMatchesBias.exponent)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            mm.lowMatchesBias.exponent = Math.max(0, Math.min(3, value));
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!mm.lowMatchesBias.enabled);
+      });
+
+    // Upset probes
+    mmBody.createEl('h5', { text: 'Occasional upset probes' });
+    mmBody.createEl('p', {
+      text:
+        'Every so often, schedule a high-gap pair to detect surprises earlier.',
+    });
+
+    let probeProbSlider: any;
+    let probeGapSlider: any;
+
+    new Setting(mmBody)
+      .setName('Enable upset probes')
+      .setDesc(`Default: ${mmDefaults.upsetProbes.enabled ? 'On' : 'Off'}.`)
+      .addToggle((t) =>
+        t.setValue(mm.upsetProbes.enabled).onChange(async (v) => {
+          mm.upsetProbes.enabled = v;
+          await this.plugin.saveSettings();
+          probeProbSlider?.setDisabled(!v);
+          probeGapSlider?.setDisabled(!v);
+        }),
+      );
+
+    new Setting(mmBody)
+      .setName('Probe probability')
+      .setDesc(`Chance of picking a high-gap opponent instead of a similar one. Default: ${(mmDefaults.upsetProbes.probability * 100).toFixed(0)}%.`)
+      .addSlider((sl) => {
+        probeProbSlider = sl;
+        sl.setLimits(0, 50, 1)
+          .setValue(Math.round(Math.max(0, Math.min(50, mm.upsetProbes.probability * 100))))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            mm.upsetProbes.probability = Math.max(0, Math.min(50, value)) / 100;
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!mm.upsetProbes.enabled);
+      });
+
+    new Setting(mmBody)
+      .setName('Minimum gap (rating)')
+      .setDesc(`Only consider an upset probe if the candidate gap is at least this large. Default: ${mmDefaults.upsetProbes.minGap}.`)
+      .addSlider((sl) => {
+        probeGapSlider = sl;
+        sl.setLimits(100, 800, 25)
+          .setValue(Math.max(0, Math.min(800, mm.upsetProbes.minGap)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            mm.upsetProbes.minGap = Math.round(value);
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(!mm.upsetProbes.enabled);
       });
 
     // Frontmatter properties (global defaults)

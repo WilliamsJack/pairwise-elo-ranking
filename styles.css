@@ -32,28 +32,32 @@
   padding: 4px 8px;
 }
 
-.elo-advanced-accordion {
+.elo-advanced-accordion,
+.elo-matchmaking-accordion {
   margin-top: 12px;
 }
 
-.elo-advanced-accordion > summary {
+.elo-advanced-accordion > summary,
+.elo-matchmaking-accordion > summary {
   cursor: pointer;
   font-weight: 600;
   margin-bottom: 6px;
 }
 
-.elo-advanced-accordion .elo-advanced-body {
+.elo-advanced-accordion .elo-advanced-body,
+.elo-matchmaking-accordion .elo-matchmaking-body {
   margin-left: 6px;
   padding-left: 12px;
   border-left: 2px solid var(--background-modifier-border);
 }
 
-.elo-advanced-accordion h5 {
+.elo-advanced-accordion h5,
+.elo-matchmaking-accordion h5 {
   margin: 12px 0 6px;
 }
 
-.elo-advanced-accordion p.help {
+.elo-advanced-accordion p.help,
+.elo-matchmaking-accordion p.help {
   margin: 4px 0 8px;
   opacity: 0.75;
 }
-

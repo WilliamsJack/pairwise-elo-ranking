@@ -328,40 +328,151 @@ export default class ArenaSession {
     return undefined;
   }
 
+  // ---- Matchmaking helpers ----
+
+  private getStatsForFile(file: TFile): { rating: number; matches: number } {
+    const id = this.idByPath.get(file.path);
+    const cohort = this.plugin.dataStore.store.cohorts[this.cohortKey];
+    if (id && cohort) {
+      const p = cohort.players[id];
+      if (p) return { rating: p.rating, matches: p.matches };
+    }
+    // Unknown notes are treated as fresh
+    return { rating: 1500, matches: 0 };
+  }
+
+  private weightedRandomIndex(weights: number[]): number {
+    let sum = 0;
+    for (const w of weights) sum += Math.max(0, w);
+    if (sum <= 0) {
+      return Math.floor(Math.random() * weights.length);
+    }
+    let r = Math.random() * sum;
+    for (let i = 0; i < weights.length; i++) {
+      r -= Math.max(0, weights[i]);
+      if (r <= 0) return i;
+    }
+    return weights.length - 1;
+  }
+
+  private pickAnchorIndex(): number {
+    const mm = this.plugin.settings.matchmaking;
+    if (!mm?.enabled || !mm.lowMatchesBias.enabled) {
+      return Math.floor(Math.random() * this.files.length);
+    }
+    const exp = Math.max(0, Math.min(3, mm.lowMatchesBias.exponent));
+    const weights = this.files.map((f) => {
+      const s = this.getStatsForFile(f);
+      return 1 / Math.pow(1 + Math.max(0, s.matches), Math.max(0.0001, exp));
+    });
+    return this.weightedRandomIndex(weights);
+  }
+
+  private pickOpponentIndex(anchorIdx: number): number {
+    const n = this.files.length;
+    let indices: number[] = [];
+    for (let i = 0; i < n; i++) if (i !== anchorIdx) indices.push(i);
+
+    const mm = this.plugin.settings.matchmaking;
+
+    // If disabled, uniform random opponent (with a tiny guard for repeats below)
+    if (!mm?.enabled) {
+      return indices[Math.floor(Math.random() * indices.length)];
+    }
+
+    const anchorStats = this.getStatsForFile(this.files[anchorIdx]);
+
+    // Choose a sample of candidates
+    const sampleSize = mm.similarRatings.enabled
+      ? Math.max(2, Math.min(mm.similarRatings.sampleSize || 12, indices.length))
+      : Math.max(1, Math.min(12, indices.length));
+    // Reservoir/sample style random pick without allocation costs
+    const sample: number[] = [];
+    let seen = 0;
+    for (const idx of indices) {
+      seen++;
+      if (sample.length < sampleSize) {
+        sample.push(idx);
+      } else {
+        const j = Math.floor(Math.random() * seen);
+        if (j < sampleSize) sample[j] = idx;
+      }
+    }
+
+    // Upset probe path: sometimes pick the largest gap above minGap
+    if (mm.upsetProbes.enabled && Math.random() < Math.max(0, Math.min(1, mm.upsetProbes.probability))) {
+      const minGap = Math.max(0, Math.round(mm.upsetProbes.minGap || 0));
+      let bestIdx = -1;
+      let bestGap = -1;
+      for (const j of sample) {
+        const s = this.getStatsForFile(this.files[j]);
+        const gap = Math.abs(s.rating - anchorStats.rating);
+        if (gap >= minGap && gap > bestGap) {
+          bestGap = gap;
+          bestIdx = j;
+        }
+      }
+      // Fall through to similar-ratings if no candidate met min gap
+      if (bestIdx >= 0) return bestIdx;
+    }
+
+    // Similar-ratings path: pick the minimal rating difference (tie-break: fewer matches)
+    if (mm.similarRatings.enabled) {
+      let bestIdx = sample[0];
+      let bestGap = Number.POSITIVE_INFINITY;
+      let bestMatches = Number.POSITIVE_INFINITY;
+      for (const j of sample) {
+        const s = this.getStatsForFile(this.files[j]);
+        const gap = Math.abs(s.rating - anchorStats.rating);
+        if (gap < bestGap) {
+          bestGap = gap;
+          bestIdx = j;
+          bestMatches = s.matches;
+        } else if (gap === bestGap && s.matches < bestMatches) {
+          bestIdx = j;
+          bestMatches = s.matches;
+        }
+      }
+      return bestIdx;
+    }
+
+    // Default fallback: random from the sample
+    return sample[Math.floor(Math.random() * sample.length)];
+  }
+
   private pickNextPair() {
     if (this.files.length < 2) {
       this.leftFile = this.rightFile = undefined;
       return;
     }
-
-    let aIdx = Math.floor(Math.random() * this.files.length);
-    let bIdx = Math.floor(Math.random() * this.files.length);
-    let guard = 0;
-    while (aIdx === bIdx && guard++ < 10) {
-      bIdx = Math.floor(Math.random() * this.files.length);
-    }
-
-    let a = this.files[aIdx];
-    let b = this.files[bIdx];
-
-    const sig = pairSig(a.path, b.path);
-    if (this.lastPairSig === sig && this.files.length >= 3) {
-      guard = 0;
+  
+    // Always use the helpers; they internally handle the "disabled = random" cases.
+    let aIdx = this.pickAnchorIndex();
+    let bIdx = this.pickOpponentIndex(aIdx);
+  
+    // Avoid repeating the exact same pair if possible
+    const currentSig = pairSig(this.files[aIdx].path, this.files[bIdx].path);
+    if (this.lastPairSig === currentSig && this.files.length >= 3) {
+      let guard = 0;
       while (guard++ < 10) {
-        const idx = Math.floor(Math.random() * this.files.length);
-        if (idx !== aIdx && pairSig(a.path, this.files[idx].path) !== this.lastPairSig) {
-          b = this.files[idx];
-          break;
+        const alt = this.pickOpponentIndex(aIdx);
+        if (alt !== bIdx) {
+          const altSig = pairSig(this.files[aIdx].path, this.files[alt].path);
+          if (altSig !== this.lastPairSig) {
+            bIdx = alt;
+            break;
+          }
         }
       }
     }
-
+  
+    // Randomise left/right for balance
     if (Math.random() < 0.5) {
-      this.leftFile = a;
-      this.rightFile = b;
+      this.leftFile = this.files[aIdx];
+      this.rightFile = this.files[bIdx];
     } else {
-      this.leftFile = b;
-      this.rightFile = a;
+      this.leftFile = this.files[bIdx];
+      this.rightFile = this.files[aIdx];
     }
     this.lastPairSig = pairSig(this.leftFile.path, this.rightFile.path);
   }
