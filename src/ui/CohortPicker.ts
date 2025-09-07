@@ -147,6 +147,18 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     }
   }
 
+  // If a cohort with the same key already exists, use it and notify the user.
+  private useExistingIfDuplicate(def: CohortDefinition | undefined): CohortDefinition | undefined {
+    if (!def) return undefined;
+    const existing = this.plugin.dataStore.getCohortDef(def.key);
+    if (existing) {
+      const lbl = labelForDefinition(existing);
+      new Notice(`Cohort already exists. Using existing cohort: ${lbl}`);
+      return existing;
+    }
+    return def;
+  }
+
   async onChooseItem(item: Choice): Promise<void> {
     if (item.kind === 'saved') {
       const def = item.def ?? parseCohortKey(item.key);
@@ -155,6 +167,19 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     }
 
     const baseDef = await this.buildDefinitionForAction(item.action);
+
+    // If a cohort with this key already exists, use it and skip any overrides prompt
+    const deduped = this.useExistingIfDuplicate(baseDef);
+    if (!deduped) {
+      this.complete(undefined);
+      return;
+    }
+    if (deduped !== baseDef) {
+      this.complete(deduped);
+      return;
+    }
+
+    // It's a new cohort; optionally ask for overrides
     const finalDef = await this.applyFrontmatterOverrides(baseDef);
     this.complete(finalDef);
   }
