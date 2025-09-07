@@ -32,3 +32,16 @@ export const DEFAULT_SETTINGS: EloSettings = {
   },
   askForOverridesOnCohortCreation: true,
 };
+
+// Merge global defaults with optional overrides (per-property)
+export function effectiveFrontmatterProperties(
+  base: FrontmatterPropertiesSettings,
+  overrides?: Partial<FrontmatterPropertiesSettings>,
+): FrontmatterPropertiesSettings {
+  return {
+    rating: overrides?.rating ?? base.rating,
+    rank: overrides?.rank ?? base.rank,
+    matches: overrides?.matches ?? base.matches,
+    wins: overrides?.wins ?? base.wins,
+  };
+}

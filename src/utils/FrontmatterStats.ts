@@ -21,7 +21,7 @@ function anyEnabled(fm: FrontmatterPropertiesSettings): boolean {
 }
 
 // Standard competition ranking ("1224" style)
-function computeRankMap(cohort: CohortData): Map<string, number> {
+export function computeRankMap(cohort: CohortData): Map<string, number> {
   const entries = Object.entries(cohort.players);
   entries.sort((a, b) => b[1].rating - a[1].rating);
 
@@ -113,8 +113,66 @@ export async function writeFrontmatterStatsForPair(
   await Promise.all(tasks);
 }
 
+// Compute how many files would be updated by a rename/remove operation.
+export async function previewCohortFrontmatterPropertyUpdates(
+  app: App,
+  files: TFile[],
+  valuesById: Map<string, number>,
+  newPropName: string,
+  oldPropName?: string,
+): Promise<{ wouldUpdate: number; totalWithId: number }> {
+  const prop = (newPropName ?? '').trim();
+  const oldProp = (oldPropName ?? '').trim();
+
+  let wouldUpdate = 0;
+  let totalWithId = 0;
+
+  for (const file of files) {
+    let id: string | undefined;
+    try {
+      id = await getEloId(app, file);
+    } catch {
+      id = undefined;
+    }
+    if (!id) continue;
+    totalWithId += 1;
+
+    const fmCache = app.metadataCache.getFileCache(file)?.frontmatter;
+
+    if (!prop && oldProp) {
+      const hasOld = typeof fmCache?.[oldProp] !== 'undefined';
+      if (hasOld) wouldUpdate += 1;
+      continue;
+    }
+
+    if (!prop) continue;
+
+    const newVal = valuesById.get(id);
+    if (typeof newVal === 'undefined') continue;
+
+    const curNewRaw = fmCache?.[prop];
+    const curNew =
+      typeof curNewRaw === 'number'
+        ? curNewRaw
+        : typeof curNewRaw === 'string'
+        ? parseInt(curNewRaw, 10)
+        : undefined;
+
+    const hasOld = !!oldProp && oldProp !== prop && typeof fmCache?.[oldProp] !== 'undefined';
+    const needSet = curNew !== newVal;
+    const needRemoveOld = hasOld;
+
+    if (needSet || needRemoveOld) {
+      wouldUpdate += 1;
+    }
+  }
+
+  return { wouldUpdate, totalWithId };
+}
+
 // Generic bulk updater for frontmatter properties based on a values map.
 // If oldPropName is provided, it will be removed if present (rename).
+// If newPropName is empty and oldPropName is provided, performs removal only.
 export async function updateCohortFrontmatterProperties(
   app: App,
   files: TFile[],
@@ -124,6 +182,33 @@ export async function updateCohortFrontmatterProperties(
 ): Promise<{ updated: number; totalConsidered: number }> {
   const prop = (newPropName ?? '').trim();
   const oldProp = (oldPropName ?? '').trim();
+
+  // Removal-only mode
+  if (!prop && oldProp) {
+    let updated = 0;
+    let totalConsidered = 0;
+    for (const file of files) {
+      let id: string | undefined;
+      try {
+        id = await getEloId(app, file);
+      } catch {
+        id = undefined;
+      }
+      if (!id) continue;
+
+      const fmCache = app.metadataCache.getFileCache(file)?.frontmatter;
+      const hasOld = typeof fmCache?.[oldProp] !== 'undefined';
+      if (!hasOld) continue;
+
+      totalConsidered += 1;
+      await app.fileManager.processFrontMatter(file, (yaml) => {
+        delete (yaml as any)[oldProp];
+      });
+      updated += 1;
+    }
+    return { updated, totalConsidered };
+  }
+
   if (!prop) return { updated: 0, totalConsidered: 0 };
 
   let updated = 0;
@@ -162,8 +247,8 @@ export async function updateCohortFrontmatterProperties(
     if (!needSet && !needRemoveOld) continue;
 
     await app.fileManager.processFrontMatter(file, (yaml) => {
-      if (needSet) yaml[prop] = newVal;
-      if (needRemoveOld) delete yaml[oldProp];
+      if (needSet) (yaml as any)[prop] = newVal;
+      if (needRemoveOld) delete (yaml as any)[oldProp];
     });
     updated += 1;
   }

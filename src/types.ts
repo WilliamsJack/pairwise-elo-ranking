@@ -34,7 +34,7 @@ export interface CohortDefinition {
   // - manual { paths: string[] }
   // - base { baseId: string; view?: string }
   params: any;
-  frontmatterOverrides?: FrontmatterPropertiesSettings;
+  frontmatterOverrides?: Partial<FrontmatterPropertiesSettings>;
   createdAt: number;
   updatedAt: number;
 }

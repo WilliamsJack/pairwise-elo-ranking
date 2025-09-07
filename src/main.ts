@@ -1,9 +1,9 @@
+import { EloSettings, effectiveFrontmatterProperties } from './settings/settings';
 import { Notice, Plugin, TAbstractFile, TFile } from 'obsidian';
 
 import ArenaSession from './ui/ArenaSession';
 import { CohortDefinition } from './types';
 import { CohortPicker } from './ui/CohortPicker';
-import { EloSettings } from './settings/settings';
 import EloSettingsTab from './settings/SettingsTab';
 import { PluginDataStore } from './storage/PluginDataStore';
 import { reconcileCohortPlayersWithFiles } from './domain/cohort/CohortIntegrity';
@@ -112,7 +112,10 @@ export default class EloPlugin extends Plugin {
     const cohort = this.dataStore.store.cohorts[cohortKey];
     if (!def || !cohort) return;
 
-    const fm = def.frontmatterOverrides ?? this.settings.frontmatterProperties;
+    const fm = effectiveFrontmatterProperties(
+      this.settings.frontmatterProperties,
+      def.frontmatterOverrides,
+    );
     const rankCfg = fm?.rank;
     if (!rankCfg?.enabled || !rankCfg.property) return;
 

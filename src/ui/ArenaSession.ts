@@ -4,6 +4,7 @@ import { ensureEloId, getEloId } from '../utils/NoteIds';
 
 import type EloPlugin from '../../main';
 import type { FrontmatterPropertiesSettings } from '../settings/settings';
+import { effectiveFrontmatterProperties } from '../settings/settings';
 import { pairSig } from '../utils/pair';
 import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
 
@@ -230,7 +231,10 @@ export default class ArenaSession {
 
   private getEffectiveFrontmatter(): FrontmatterPropertiesSettings {
     const def = this.plugin.dataStore.getCohortDef(this.cohortKey);
-    return def?.frontmatterOverrides ?? this.plugin.settings.frontmatterProperties;
+    return effectiveFrontmatterProperties(
+      this.plugin.settings.frontmatterProperties,
+      def?.frontmatterOverrides,
+    );
   }
 
   private async choose(result: MatchResult) {

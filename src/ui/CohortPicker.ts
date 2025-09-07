@@ -2,6 +2,7 @@ import { App, ButtonComponent, FuzzySuggestModal, Modal, Notice, Setting, TFolde
 import { allFolderChoices, createDefinition, labelForDefinition, parseCohortKey } from '../domain/cohort/CohortResolver';
 
 import { CohortDefinition } from '../types';
+import { CohortFrontmatterOptionsModal } from './CohortFrontmatterOptionsModal';
 import type EloPlugin from '../../main';
 import type { FrontmatterPropertiesSettings } from '../settings/settings';
 
@@ -109,9 +110,11 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     return await this.runChild(() => new TagCohortModal(this.app).openAndGetDefinition());
   }
 
-  private async chooseFrontmatterOverrides(): Promise<FrontmatterPropertiesSettings | undefined> {
+  private async chooseFrontmatterOverrides(): Promise<Partial<FrontmatterPropertiesSettings> | undefined> {
     return await this.runChild(() =>
-      new CohortFrontmatterOptionsModal(this.app, this.plugin).openAndGetOverrides()
+      new CohortFrontmatterOptionsModal(this.app, this.plugin, {
+        mode: 'create',
+      }).openAndGetOverrides()
     );
   }
 
@@ -493,115 +496,6 @@ class TagCohortModal extends Modal {
       this.updateCreateDisabled();
       return this.createBtn;
     });
-  }
-
-  onClose(): void {
-    if (!this.resolved) {
-      this.resolved = true;
-      const r = this.resolver;
-      this.resolver = undefined;
-      r?.(undefined);
-    }
-  }
-}
-
-class CohortFrontmatterOptionsModal extends Modal {
-  private plugin: EloPlugin;
-  private resolver?: (overrides?: FrontmatterPropertiesSettings) => void;
-  private resolved = false;
-
-  private working: FrontmatterPropertiesSettings;
-
-  constructor(app: App, plugin: EloPlugin) {
-    super(app);
-    this.plugin = plugin;
-    const d = plugin.settings.frontmatterProperties;
-    this.working = {
-      rating: { property: d.rating.property, enabled: d.rating.enabled },
-      rank: { property: d.rank.property, enabled: d.rank.enabled },
-      matches: { property: d.matches.property, enabled: d.matches.enabled },
-      wins: { property: d.wins.property, enabled: d.wins.enabled },
-    };
-  }
-
-  async openAndGetOverrides(): Promise<FrontmatterPropertiesSettings | undefined> {
-    return new Promise((resolve) => {
-      this.resolver = resolve;
-      this.open();
-    });
-  }
-
-  onOpen(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-
-    contentEl.createEl('h3', { text: 'Cohort options' });
-    contentEl.createEl('p', {
-      text:
-        'Configure which Elo statistics to write into frontmatter for this cohort and the property names to use. ' +
-        'These defaults are prefilled from the plugin settings.',
-    });
-
-    const defaults = this.plugin.settings.frontmatterProperties;
-
-    const addRow = (
-      key: keyof FrontmatterPropertiesSettings,
-      label: string,
-      desc: string,
-      placeholder: string,
-    ) => {
-      const cfg = this.working[key];
-      let textRef: TextComponent;
-
-      new Setting(contentEl)
-        .setName(label)
-        .setDesc(desc)
-        .addToggle((t: ToggleComponent) =>
-          t
-            .setValue(Boolean(cfg.enabled))
-            .onChange((val) => {
-              cfg.enabled = val;
-              if (textRef) textRef.setDisabled(!val);
-            }),
-        )
-        .addText((t) => {
-          textRef = t;
-          t.setPlaceholder(placeholder)
-            .setValue(cfg.property)
-            .setDisabled(!cfg.enabled)
-            .onChange((v) => {
-              const trimmed = (v ?? '').trim();
-              cfg.property = trimmed.length > 0 ? trimmed : placeholder;
-            });
-        });
-    };
-
-    addRow('rating', 'Rating', 'Write the current Elo rating to this property.', defaults.rating.property || 'eloRating');
-    addRow('rank', 'Rank', 'Write the cohort rank (1 = highest) to this property.', defaults.rank.property || 'eloRank');
-    addRow('matches', 'Matches', 'Write the number of matches to this property.', defaults.matches.property || 'eloMatches');
-    addRow('wins', 'Wins', 'Write the number of wins to this property.', defaults.wins.property || 'eloWins');
-
-    const btns = new Setting(contentEl);
-    btns.addButton((b) =>
-      b.setButtonText('Cancel').onClick(() => {
-        if (this.resolved) return;
-        this.resolved = true;
-        const r = this.resolver;
-        this.resolver = undefined;
-        r?.(undefined);
-        this.close();
-      }),
-    );
-    btns.addButton((b) =>
-      b.setCta().setButtonText('Create cohort').onClick(() => {
-        if (this.resolved) return;
-        this.resolved = true;
-        const r = this.resolver;
-        this.resolver = undefined;
-        r?.(this.working);
-        this.close();
-      }),
-    );
   }
 
   onClose(): void {

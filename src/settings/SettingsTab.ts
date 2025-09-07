@@ -1,6 +1,60 @@
-import { App, PluginSettingTab, Setting, TextComponent } from 'obsidian';
+import { App, ButtonComponent, Modal, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
+import { FrontmatterPropertiesSettings, effectiveFrontmatterProperties } from './settings';
+import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFrontmatterProperties } from '../utils/FrontmatterStats';
+import { labelForDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 
+import type { CohortData } from '../types';
+import { CohortFrontmatterOptionsModal } from '../ui/CohortFrontmatterOptionsModal';
 import type EloPlugin from '../main';
+
+type PropKey = keyof FrontmatterPropertiesSettings;
+
+class ConfirmModal extends Modal {
+  private titleText: string;
+  private message: string;
+  private ctaText: string;
+  private resolver?: (ok: boolean) => void;
+  private resolved = false;
+
+  constructor(app: App, titleText: string, message: string, ctaText: string) {
+    super(app);
+    this.titleText = titleText;
+    this.message = message;
+    this.ctaText = ctaText;
+  }
+
+  async openAndConfirm(): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.resolver = resolve;
+      this.open();
+    });
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl('h3', { text: this.titleText });
+    const p = contentEl.createEl('p');
+    p.textContent = this.message;
+
+    const btns = new Setting(contentEl);
+    btns.addButton((b) => b.setButtonText('Cancel').onClick(() => this.finish(false)));
+    btns.addButton((b) => b.setCta().setButtonText(this.ctaText).onClick(() => this.finish(true)));
+  }
+
+  private finish(ok: boolean) {
+    if (this.resolved) return;
+    this.resolved = true;
+    const r = this.resolver;
+    this.resolver = undefined;
+    r?.(ok);
+    this.close();
+  }
+
+  onClose(): void {
+    if (!this.resolved) this.finish(false);
+  }
+}
 
 export default class EloSettingsTab extends PluginSettingTab {
   plugin: EloPlugin;
@@ -16,25 +70,25 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     containerEl.createEl('h3', { text: 'Pairwise Elo Ranking' });
 
-      const minK = 8;
-      const maxK = 64;
-      const stepK = 1;
-      let initialK = this.plugin.settings.kFactor;
-      if (!Number.isFinite(initialK)) initialK = 24;
-      initialK = Math.min(maxK, Math.max(minK, Math.round(initialK)));
+    const minK = 8;
+    const maxK = 64;
+    const stepK = 1;
+    let initialK = this.plugin.settings.kFactor;
+    if (!Number.isFinite(initialK)) initialK = 24;
+    initialK = Math.min(maxK, Math.max(minK, Math.round(initialK)));
 
-      new Setting(containerEl)
-        .setName('K-factor')
-        .setDesc('Adjusts how quickly ratings move. Typical values are 16–40.')
-        .addSlider((s) => {
-          s.setLimits(minK, maxK, stepK)
-            .setValue(initialK)
-            .setDynamicTooltip()
-            .onChange(async (value) => {
-              this.plugin.settings.kFactor = value;
-              await this.plugin.saveSettings();
-            });
-        });
+    new Setting(containerEl)
+      .setName('K-factor')
+      .setDesc('Adjusts how quickly ratings move. Typical values are 16–40.')
+      .addSlider((s) => {
+        s.setLimits(minK, maxK, stepK)
+          .setValue(initialK)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.kFactor = value;
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName('Show win/draw notices')
@@ -62,8 +116,8 @@ export default class EloSettingsTab extends PluginSettingTab {
           });
       });
 
-    // Frontmatter properties
-    containerEl.createEl('h4', { text: 'Frontmatter properties' });
+    // Frontmatter properties (global defaults)
+    containerEl.createEl('h4', { text: 'Default Frontmatter properties' });
 
     new Setting(containerEl)
       .setName('Ask for per-cohort overrides on creation')
@@ -143,5 +197,149 @@ export default class EloSettingsTab extends PluginSettingTab {
       'Write the number of wins to this frontmatter property.',
       'eloWins',
     );
+
+    // Cohort configuration section
+    containerEl.createEl('h4', { text: 'Cohorts' });
+    containerEl.createEl('p', {
+      text: 'Configure existing cohorts\' frontmatter properties.',
+    });
+
+    const defs = this.plugin.dataStore.listCohortDefs();
+    if (defs.length === 0) {
+      const hint = containerEl.createEl('div');
+      hint.textContent = 'No cohorts saved yet. Start a session to create one, or use the Command Palette.';
+      hint.style.opacity = '0.7';
+    } else {
+      for (const def of defs) {
+        const s = new Setting(containerEl)
+          .setName(labelForDefinition(def))
+          .setDesc('Configure frontmatter properties for this cohort.')
+          .addButton((b) =>
+            b
+              .setButtonText('Configure…')
+              .onClick(async () => {
+                await this.configureCohort(def.key);
+              }),
+          );
+      }
+    }
+  }
+
+  private async configureCohort(cohortKey: string): Promise<void> {
+    const def = this.plugin.dataStore.getCohortDef(cohortKey);
+    if (!def) return;
+
+    const overrides = await new CohortFrontmatterOptionsModal(this.app, this.plugin, {
+      mode: 'edit',
+      initial: def.frontmatterOverrides,
+    }).openAndGetOverrides();
+
+    if (!overrides) return;
+
+    // Compute old vs new effective config, then save new overrides
+    const base = this.plugin.settings.frontmatterProperties;
+    const oldEffective = effectiveFrontmatterProperties(base, def.frontmatterOverrides);
+    const newEffective = effectiveFrontmatterProperties(base, overrides);
+
+    // Persist: if overrides ended up empty (no keys), clear from def
+    const hasKeys = Object.keys(overrides).length > 0;
+    def.frontmatterOverrides = hasKeys ? overrides : undefined;
+    this.plugin.dataStore.upsertCohortDef(def);
+    await this.plugin.dataStore.saveStore();
+    this.display(); // refresh UI
+
+    // Determine changes that require optional bulk updates
+    const changed: Array<{
+      key: PropKey;
+      action: 'rename' | 'remove';
+      oldProp: string;
+      newProp?: string;
+    }> = [];
+
+    const keys: PropKey[] = ['rating', 'rank', 'matches', 'wins'];
+    for (const key of keys) {
+      const oldCfg = oldEffective[key];
+      const newCfg = newEffective[key];
+
+      if (oldCfg.enabled && !newCfg.enabled) {
+        changed.push({ key, action: 'remove', oldProp: oldCfg.property });
+        continue;
+      }
+      if (newCfg.enabled && oldCfg.enabled && oldCfg.property !== newCfg.property) {
+        changed.push({ key, action: 'rename', oldProp: oldCfg.property, newProp: newCfg.property });
+        continue;
+      }
+    }
+
+    if (changed.length === 0) return;
+
+    const files = resolveFilesForCohort(this.app, def);
+    if (files.length === 0) return;
+
+    const cohort: CohortData | undefined = this.plugin.dataStore.store.cohorts[cohortKey];
+    const valuesFor = (key: PropKey): Map<string, number> => {
+      const map = new Map<string, number>();
+      if (!cohort) return map;
+      if (key === 'rank') {
+        const rankMap = computeRankMap(cohort);
+        for (const [id, rank] of rankMap) map.set(id, rank);
+      } else if (key === 'rating') {
+        for (const [id, p] of Object.entries(cohort.players)) map.set(id, Math.round(p.rating));
+      } else if (key === 'matches') {
+        for (const [id, p] of Object.entries(cohort.players)) map.set(id, p.matches);
+      } else if (key === 'wins') {
+        for (const [id, p] of Object.entries(cohort.players)) map.set(id, p.wins);
+      }
+      return map;
+    };
+
+    // Run prompts sequentially
+    for (const change of changed) {
+      const key = change.key;
+      const oldProp = change.oldProp;
+      if (change.action === 'remove') {
+        const preview = await previewCohortFrontmatterPropertyUpdates(
+          this.app,
+          files,
+          new Map(),
+          '',
+          oldProp,
+        );
+        if (preview.wouldUpdate === 0) continue;
+
+        const ok = await new ConfirmModal(
+          this.app,
+          'Remove cohort property?',
+          `Remove frontmatter property "${oldProp}" from ${preview.wouldUpdate} note(s) in this cohort?`,
+          'Remove',
+        ).openAndConfirm();
+        if (!ok) continue;
+
+        const res = await updateCohortFrontmatterProperties(this.app, files, new Map(), '', oldProp);
+        new Notice(`Removed "${oldProp}" from ${res.updated} note(s).`);
+      } else if (change.action === 'rename' && change.newProp) {
+        const newProp = change.newProp;
+        const vals = valuesFor(key);
+        const preview = await previewCohortFrontmatterPropertyUpdates(
+          this.app,
+          files,
+          vals,
+          newProp,
+          oldProp,
+        );
+        if (preview.wouldUpdate === 0) continue;
+
+        const ok = await new ConfirmModal(
+          this.app,
+          'Rename cohort property?',
+          `Rename frontmatter property "${oldProp}" to "${newProp}" on ${preview.wouldUpdate} note(s) in this cohort?`,
+          'Rename',
+        ).openAndConfirm();
+        if (!ok) continue;
+
+        const res = await updateCohortFrontmatterProperties(this.app, files, vals, newProp, oldProp);
+        new Notice(`Updated ${res.updated} note(s).`);
+      }
+    }
   }
 }
