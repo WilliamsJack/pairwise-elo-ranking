@@ -7,6 +7,7 @@ import { CohortPicker } from './ui/CohortPicker';
 import { EloSettings } from './settings/settings';
 import EloSettingsTab from './settings/SettingsTab';
 import { PluginDataStore } from './storage/PluginDataStore';
+import { reconcileCohortPlayersWithFiles } from './domain/cohort/CohortIntegrity';
 
 export default class EloPlugin extends Plugin {
   dataStore: PluginDataStore;
@@ -41,7 +42,6 @@ export default class EloPlugin extends Plugin {
       },
     });
 
-    // Keep the session UI in sync with renames
     this.registerEvent(
       this.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
         if (file instanceof TFile && file.extension === 'md') {
@@ -55,6 +55,7 @@ export default class EloPlugin extends Plugin {
 
   onunload(): void {
     this.endSession();
+    void this.dataStore.saveAllImmediate?.();
   }
 
   async saveSettings() {
@@ -72,25 +73,28 @@ export default class EloPlugin extends Plugin {
       return;
     }
 
-    // Save this definition if it's not already saved (only for non-ephemeral types)
     if (!this.dataStore.getCohortDef(def.key)) {
       this.dataStore.upsertCohortDef(def);
       await this.dataStore.saveStore();
     }
 
-    this.startSessionForCohort(def, files, { saveDef: false });
+    await this.startSessionForCohort(def, files, { saveDef: false });
   }
 
-  private startSessionForCohort(def: CohortDefinition, files: TFile[], opts?: { saveDef?: boolean }) {
-    // End any existing session first
+  private async startSessionForCohort(def: CohortDefinition, files: TFile[], _opts?: { saveDef?: boolean }) {
     this.endSession();
 
     this.currentSession = new ArenaSession(this.app, this, def.key, files);
     this.register(() => this.endSession());
-    this.currentSession.start();
+
+    // Await the UI start so the currently displayed notes have IDs if needed
+    await this.currentSession.start();
 
     this.dataStore.setLastUsedCohortKey(def.key);
     void this.dataStore.saveStore();
+
+    // Run cohort integrity scan after start()
+    void reconcileCohortPlayersWithFiles(this.app, this.dataStore, def.key, files).catch(() => {});
   }
 
   public endSession() {

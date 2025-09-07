@@ -30,6 +30,12 @@ export class PluginDataStore {
   settings: EloSettings = { ...DEFAULT_SETTINGS };
   store: EloStore = { ...DEFAULT_STORE };
 
+  private _saveQueue: Promise<void> = Promise.resolve();
+  private _debounceMs = 300;
+  private _saveTimerId: number | null = null;
+  private _pendingDebouncePromise: Promise<void> | null = null;
+  private _pendingDebounceResolve: (() => void) | null = null;
+
   constructor(plugin: Plugin) {
     this.plugin = plugin;
   }
@@ -41,11 +47,12 @@ export class PluginDataStore {
     this.store = raw?.store ?? { ...DEFAULT_STORE };
 
     if (!raw?.settings || !raw?.store) {
-      await this.saveAll();
+      await this.saveAllImmediate();
     }
   }
 
-  async saveAll(): Promise<void> {
+  // Internal: write the current snapshot to disk
+  private async writePersisted(): Promise<void> {
     const payload: PersistedData = {
       version: 1,
       settings: this.settings,
@@ -54,12 +61,66 @@ export class PluginDataStore {
     await this.plugin.saveData(payload);
   }
 
+  // Internal: ensure writes happen one after another
+  private enqueueWrite(): Promise<void> {
+    this._saveQueue = this._saveQueue
+      .then(() => this.writePersisted())
+      .catch((e) => {
+        try { console.error('[Elo] Failed to save data', e); } catch {}
+      });
+    return this._saveQueue;
+  }
+
+  private scheduleDebouncedSave(): Promise<void> {
+    if (this._pendingDebouncePromise) {
+      if (this._saveTimerId !== null) window.clearTimeout(this._saveTimerId);
+    } else {
+      this._pendingDebouncePromise = new Promise<void>((resolve) => {
+        this._pendingDebounceResolve = resolve;
+      });
+    }
+
+    this._saveTimerId = window.setTimeout(async () => {
+      this._saveTimerId = null;
+      const resolve = this._pendingDebounceResolve;
+      this._pendingDebounceResolve = null;
+
+      try {
+        await this.enqueueWrite();
+      } finally {
+        resolve?.();
+        this._pendingDebouncePromise = null;
+      }
+    }, this._debounceMs);
+
+    return this._pendingDebouncePromise!;
+  }
+
+  // Public: debounced saves
   async saveSettings(): Promise<void> {
-    await this.saveAll();
+    await this.scheduleDebouncedSave();
   }
 
   async saveStore(): Promise<void> {
-    await this.saveAll();
+    await this.scheduleDebouncedSave();
+  }
+
+  // Public: immediate save (flush any pending debounce)
+  async saveAllImmediate(): Promise<void> {
+    if (this._saveTimerId !== null) {
+      window.clearTimeout(this._saveTimerId);
+      this._saveTimerId = null;
+    }
+    const pending = this._pendingDebouncePromise;
+    const resolvePending = this._pendingDebounceResolve;
+    this._pendingDebouncePromise = null;
+    this._pendingDebounceResolve = null;
+
+    const p = this.enqueueWrite();
+    if (pending && resolvePending) {
+      p.finally(() => resolvePending());
+    }
+    await p;
   }
 
   ensurePlayer(cohortKey: string, id: string) {
