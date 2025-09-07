@@ -197,6 +197,42 @@ export class PluginDataStore {
   setLastUsedCohortKey(key: string | undefined): void {
     this.store.lastUsedCohortKey = key;
   }
+
+  renameCohortKey(oldKey: string, newDef: CohortDefinition): void {
+    const newKey = newDef.key;
+    if (!newKey || newKey === oldKey) {
+      // Nothing to do - just ensure def is saved
+      this.upsertCohortDef(newDef);
+      return;
+    }
+
+    // Migrate cohort data if present
+    const oldCohort = this.store.cohorts[oldKey];
+    if (oldCohort) {
+      const existing = this.store.cohorts[newKey];
+      if (!existing) {
+        this.store.cohorts[newKey] = oldCohort;
+      } else {
+        // Merge conservatively: keep existing; add any missing players from old
+        for (const [id, player] of Object.entries(oldCohort.players)) {
+          if (!existing.players[id]) existing.players[id] = player;
+        }
+        this.store.cohorts[newKey] = existing;
+      }
+      delete this.store.cohorts[oldKey];
+    }
+
+    // Update cohort defs
+    const defs = (this.store.cohortDefs ??= {});
+    newDef.updatedAt = Date.now();
+    defs[newKey] = newDef;
+    if (defs[oldKey]) delete defs[oldKey];
+
+    // Update last used
+    if (this.store.lastUsedCohortKey === oldKey) {
+      this.store.lastUsedCohortKey = newKey;
+    }
+  }
 }
 
 function snapshot(id: string, rating: number, matches: number, wins: number): PlayerSnapshot {

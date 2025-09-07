@@ -7,6 +7,7 @@ import { CohortDefinition } from './types';
 import { CohortPicker } from './ui/CohortPicker';
 import EloSettingsTab from './settings/SettingsTab';
 import { PluginDataStore } from './storage/PluginDataStore';
+import { ensureFolderCohortPath } from './utils/EnsureFolderCohort';
 import { reconcileCohortPlayersWithFiles } from './domain/cohort/CohortIntegrity';
 import { resolveFilesForCohort } from './domain/cohort/CohortResolver';
 
@@ -65,7 +66,11 @@ export default class EloPlugin extends Plugin {
 
   private async selectCohortAndStart() {
     const picker = new CohortPicker(this.app, this);
-    const def = await picker.openAndGetSelection();
+    let def = await picker.openAndGetSelection();
+    if (!def) return;
+
+    // Recover folder for folder-based cohorts if missing
+    def = await ensureFolderCohortPath(this.app, this.dataStore, def);
     if (!def) return;
 
     const files = resolveFilesForCohort(this.app, def);

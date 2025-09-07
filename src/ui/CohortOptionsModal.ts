@@ -116,7 +116,7 @@ export class CohortOptionsModal extends Modal {
 
     new Setting(contentEl)
       .setName('Cohort name')
-      .setDesc('Shown in menus. Optional — leave blank to use an automatic description.')
+      .setDesc('Shown in menus. Optional - leave blank to use an automatic description.')
       .addText((t) =>
         t
           .setPlaceholder('e.g. My Reading List')

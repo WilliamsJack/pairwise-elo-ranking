@@ -1,9 +1,10 @@
-import { App, ButtonComponent, FuzzySuggestModal, Modal, Notice, Setting, TFolder, TextComponent, ToggleComponent } from 'obsidian';
-import { allFolderChoices, createDefinition, labelForDefinition, parseCohortKey } from '../domain/cohort/CohortResolver';
+import { App, ButtonComponent, FuzzySuggestModal, Modal, Notice, Setting, TextComponent, ToggleComponent } from 'obsidian';
+import { createDefinition, labelForDefinition, parseCohortKey } from '../domain/cohort/CohortResolver';
 
 import { CohortDefinition } from '../types';
 import { CohortOptionsModal } from './CohortOptionsModal';
 import type EloPlugin from '../../main';
+import { FolderSelectModal } from './FolderPicker';
 import type { FrontmatterPropertiesSettings } from '../settings/settings';
 
 type Choice =
@@ -198,53 +199,6 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     setTimeout(() => {
       if (!this.resolved && !this.awaitingChild) {
         this.emit(undefined);
-      }
-    }, 0);
-  }
-}
-
-class FolderSelectModal extends FuzzySuggestModal<TFolder> {
-  private resolver?: (f?: TFolder) => void;
-  private resolved = false;
-  private folders: TFolder[];
-
-  constructor(app: App) {
-    super(app);
-    this.folders = allFolderChoices(app);
-    this.setPlaceholder('Pick a folder...');
-  }
-
-  async openAndGetSelection(): Promise<TFolder | undefined> {
-    return new Promise((resolve) => {
-      this.resolver = resolve;
-      this.open();
-    });
-  }
-
-  getItems(): TFolder[] {
-    return this.folders;
-  }
-
-  getItemText(item: TFolder): string {
-    return item.path || '/';
-  }
-
-  onChooseItem(item: TFolder): void {
-    if (this.resolved) return;
-    this.resolved = true;
-    const r = this.resolver;
-    this.resolver = undefined;
-    r?.(item);
-    this.close();
-  }
-
-  onClose(): void {
-    setTimeout(() => {
-      if (!this.resolved) {
-        this.resolved = true;
-        const r = this.resolver;
-        this.resolver = undefined;
-        r?.(undefined);
       }
     }, 0);
   }
@@ -489,7 +443,7 @@ class TagCohortModal extends Modal {
     );
     btns.addButton((b) => {
       this.createBtn = b.setCta().setButtonText('Create').onClick(() => {
-        if (this.selectedTags.size === 0) return; // require at least one tag
+        if (this.selectedTags.size === 0) return;
         const tags = Array.from(this.selectedTags).sort();
         const kind = this.mode === 'all' ? 'tag:all' : 'tag:any';
         const def = createDefinition(kind, { tags });
