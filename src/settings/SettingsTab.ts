@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting, SliderComponent, TextComponent } from 'obsidian';
 import { DEFAULT_SETTINGS, FrontmatterPropertiesSettings, effectiveFrontmatterProperties } from './settings';
 import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFrontmatter } from '../utils/FrontmatterStats';
 import { labelForDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
@@ -64,22 +64,34 @@ export default class EloSettingsTab extends PluginSettingTab {
     initialK = Math.min(maxK, Math.max(minK, Math.round(initialK)));
 
     new Setting(containerEl)
-  .setName('K-factor')
-  .setDesc(`Adjusts how quickly ratings move (larger K = faster changes). Typical values 16–40. Default: ${DEFAULT_SETTINGS.kFactor}.`)
-  .addSlider((s) => {
+      .setName('K-factor')
+      .setDesc(`Adjusts how quickly ratings move (larger K = faster changes). Typical values 16–40. Default: ${DEFAULT_SETTINGS.kFactor}.`)
+      .addSlider((s) => {
         s.setLimits(minK, maxK, stepK)
           .setValue(initialK)
           .setDynamicTooltip()
           .onChange(async (value) => {
             this.plugin.settings.kFactor = value;
+
+            // UI-level: clamp the "Minimum K" slider's max to the current base K
+            // and clamp the stored minK if it now exceeds base K.
+            const dec = this.plugin.settings.heuristics.decay;
+            if (minKSlider) {
+              minKSlider.setLimits(4, value, 1);
+              if (dec.minK > value) {
+                dec.minK = value;
+                try { minKSlider.setValue(value); } catch {}
+              }
+            }
+
             await this.plugin.saveSettings();
           });
       });
 
     new Setting(containerEl)
-  .setName('Show win/draw notices')
-  .setDesc(`Show a toast with the winner after each comparison. Default: ${DEFAULT_SETTINGS.showToasts ? 'On' : 'Off'}.`)
-  .addToggle((t) =>
+      .setName('Show win/draw notices')
+      .setDesc(`Show a toast with the winner after each comparison. Default: ${DEFAULT_SETTINGS.showToasts ? 'On' : 'Off'}.`)
+      .addToggle((t) =>
         t.setValue(this.plugin.settings.showToasts).onChange(async (v) => {
           this.plugin.settings.showToasts = v;
           await this.plugin.saveSettings();
@@ -124,8 +136,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         'This is applied per note, per cohort.',
     });
 
-    let provMatchesSlider: any;
-    let provMultSlider: any;
+    let provMatchesSlider: SliderComponent;
+    let provMultSlider: SliderComponent;
 
     new Setting(advBody)
       .setName('Enable provisional boost')
@@ -177,8 +189,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         'Effective K follows k = baseK / (1 + matches / halfLife).',
     });
 
-    let halfSlider: any;
-    let minKSlider: any;
+    let halfSlider: SliderComponent;
+    let minKSlider: SliderComponent;
 
     new Setting(advBody)
       .setName('Enable K decay')
@@ -212,11 +224,20 @@ export default class EloSettingsTab extends PluginSettingTab {
       .setDesc(`Lower bound on K for very experienced notes. Tip: keep this ≤ your base K (currently ${this.plugin.settings.kFactor}). Default: ${defaults.decay.minK}.`)
       .addSlider((sl) => {
         minKSlider = sl;
-        sl.setLimits(4, 64, 1)
-          .setValue(Math.max(1, Math.min(64, hs.decay.minK)))
+        // UI-level: clamp the slider's max to the current base K
+        const baseKNow = this.plugin.settings.kFactor;
+        sl.setLimits(4, baseKNow, 1)
+          .setValue(Math.max(4, Math.min(baseKNow, hs.decay.minK)))
           .setDynamicTooltip()
           .onChange(async (value) => {
-            hs.decay.minK = Math.round(value);
+            // Clamp to current base K at UI level
+            const baseK = this.plugin.settings.kFactor;
+            const v = Math.round(value);
+            const clamped = Math.max(4, Math.min(baseK, v));
+            if (clamped !== v) {
+              try { minKSlider.setValue(clamped); } catch {}
+            }
+            hs.decay.minK = clamped;
             await this.plugin.saveSettings();
           })
           .setDisabled(!hs.decay.enabled);
@@ -230,8 +251,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         'Both sides receive the multiplier for the qualifying match.',
     });
 
-    let upsetGapSlider: any;
-    let upsetMultSlider: any;
+    let upsetGapSlider: SliderComponent;
+    let upsetMultSlider: SliderComponent;
 
     new Setting(advBody)
       .setName('Enable upset boost')
@@ -269,7 +290,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           .setValue(Math.max(1.0, Math.min(3, hs.upsetBoost.multiplier)))
           .setDynamicTooltip()
           .onChange(async (value) => {
-            hs.upsetBoost.multiplier = Math.max(1.0, Math.min(2.5, value));
+            hs.upsetBoost.multiplier = Math.max(1.0, Math.min(3.0, value));
             await this.plugin.saveSettings();
           })
           .setDisabled(!hs.upsetBoost.enabled);
@@ -283,8 +304,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         'Both sides receive the multiplier for the qualifying draw.',
     });
 
-    let drawGapSlider: any;
-    let drawMultSlider: any;
+    let drawGapSlider: SliderComponent;
+    let drawMultSlider: SliderComponent;
 
     new Setting(advBody)
       .setName('Enable big-gap draw boost')
@@ -361,7 +382,7 @@ export default class EloSettingsTab extends PluginSettingTab {
         'When choosing an opponent, sample several candidates and pick the closest rating to the anchor note.',
     });
 
-    let sampleSlider: any;
+    let sampleSlider: SliderComponent;
 
     new Setting(mmBody)
       .setName('Enable similar-ratings selection')
@@ -396,7 +417,7 @@ export default class EloSettingsTab extends PluginSettingTab {
         'Prefer notes with fewer matches as the anchor. Weight ≈ 1 / (1 + matches)^strength.',
     });
 
-    let exponentSlider: any;
+    let exponentSlider: SliderComponent;
 
     new Setting(mmBody)
       .setName('Enable low-matches bias')
@@ -431,8 +452,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         'Every so often, schedule a high-gap pair to detect surprises earlier.',
     });
 
-    let probeProbSlider: any;
-    let probeGapSlider: any;
+    let probeProbSlider: SliderComponent;
+    let probeGapSlider: SliderComponent;
 
     new Setting(mmBody)
       .setName('Enable upset probes')
@@ -573,7 +594,7 @@ export default class EloSettingsTab extends PluginSettingTab {
       hint.style.opacity = '0.7';
     } else {
       for (const def of defs) {
-        const s = new Setting(containerEl)
+        new Setting(containerEl)
           .setName(labelForDefinition(def))
           .addButton((b) =>
             b
