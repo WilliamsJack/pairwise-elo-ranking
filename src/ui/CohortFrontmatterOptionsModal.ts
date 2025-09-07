@@ -59,11 +59,12 @@ export class CohortFrontmatterOptionsModal extends Modal {
     });
   }
 
-  private resetRowToDefault(row: RowState, textRef?: TextComponent) {
+  private resetRowToDefault(row: RowState, textRef?: TextComponent, toggleRef?: ToggleComponent) {
     const baseCfg = this.base[row.key];
     row.enabled = baseCfg.enabled;
     row.property = baseCfg.property;
     row.overridden = false;
+    if (toggleRef) toggleRef.setValue(row.enabled);
     if (textRef) {
       textRef.setValue(row.property);
       textRef.setDisabled(!row.enabled);
@@ -102,19 +103,19 @@ export class CohortFrontmatterOptionsModal extends Modal {
     const addRow = (key: Key, label: string, help: string) => {
       const row = this.working[key];
       let textRef: TextComponent | undefined;
+      let toggleRef: ToggleComponent | undefined;
 
       const s = new Setting(contentEl)
         .setName(label)
         .setDesc(help)
-        .addToggle((t: ToggleComponent) =>
-          t
-            .setValue(Boolean(row.enabled))
-            .onChange((val) => {
-              row.enabled = val;
-              if (textRef) textRef.setDisabled(!val);
-              this.updateOverriddenFlag(row);
-            }),
-        )
+        .addToggle((t: ToggleComponent) => {
+          toggleRef = t;
+          t.setValue(Boolean(row.enabled)).onChange((val) => {
+            row.enabled = val;
+            if (textRef) textRef.setDisabled(!val);
+            this.updateOverriddenFlag(row);
+          });
+        })
         .addText((t) => {
           textRef = t;
           t.setPlaceholder(this.base[key].property || '')
@@ -131,7 +132,7 @@ export class CohortFrontmatterOptionsModal extends Modal {
           b
             .setButtonText('Reset')
             .setTooltip('Reset to global default')
-            .onClick(() => this.resetRowToDefault(row, textRef)),
+            .onClick(() => this.resetRowToDefault(row, textRef, toggleRef)),
         );
       }
     };
