@@ -370,7 +370,7 @@ export default class ArenaSession {
 
   private pickOpponentIndex(anchorIdx: number): number {
     const n = this.files.length;
-    let indices: number[] = [];
+    const indices: number[] = [];
     for (let i = 0; i < n; i++) if (i !== anchorIdx) indices.push(i);
 
     const mm = this.plugin.settings.matchmaking;
@@ -447,7 +447,7 @@ export default class ArenaSession {
     }
   
     // Always use the helpers; they internally handle the "disabled = random" cases.
-    let aIdx = this.pickAnchorIndex();
+    const aIdx = this.pickAnchorIndex();
     let bIdx = this.pickOpponentIndex(aIdx);
   
     // Avoid repeating the exact same pair if possible

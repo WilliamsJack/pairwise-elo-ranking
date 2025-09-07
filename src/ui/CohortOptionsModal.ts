@@ -28,7 +28,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
   private initial?: Partial<FrontmatterPropertiesSettings>;
   private initialName?: string;
 
-  private nameWorking: string = '';
+  private nameWorking = '';
 
   private working: Record<Key, RowState>;
 
