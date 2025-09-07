@@ -1,5 +1,6 @@
 import { EloSettings, effectiveFrontmatterProperties } from './settings/settings';
 import { Notice, Plugin, TAbstractFile, TFile } from 'obsidian';
+import { computeRankMap, updateCohortFrontmatter } from './utils/FrontmatterStats';
 
 import ArenaSession from './ui/ArenaSession';
 import { CohortDefinition } from './types';
@@ -8,7 +9,6 @@ import EloSettingsTab from './settings/SettingsTab';
 import { PluginDataStore } from './storage/PluginDataStore';
 import { reconcileCohortPlayersWithFiles } from './domain/cohort/CohortIntegrity';
 import { resolveFilesForCohort } from './domain/cohort/CohortResolver';
-import { updateCohortRanksInFrontmatter } from './utils/FrontmatterStats';
 
 export default class EloPlugin extends Plugin {
   dataStore: PluginDataStore;
@@ -21,13 +21,13 @@ export default class EloPlugin extends Plugin {
     await this.dataStore.load();
     this.settings = this.dataStore.settings;
 
-    this.addRibbonIcon('trophy', 'Elo: Start rating session…', async () => {
+    this.addRibbonIcon('trophy', 'Elo: Start rating session...', async () => {
       await this.selectCohortAndStart();
     });
 
     this.addCommand({
       id: 'elo-start-session',
-      name: 'Elo: Start rating session…',
+      name: 'Elo: Start rating session...',
       callback: async () => {
         await this.selectCohortAndStart();
       },
@@ -122,14 +122,11 @@ export default class EloPlugin extends Plugin {
     const files = resolveFilesForCohort(this.app, def);
     if (files.length === 0) return;
 
-    const workingNotice = new Notice('Updating ranks in frontmatter…', 0);
+    const rankMap = computeRankMap(cohort);
 
-    updateCohortRanksInFrontmatter(this.app, cohort, files, rankCfg.property)
+    updateCohortFrontmatter(this.app, files, rankMap, rankCfg.property, undefined, 'Updating ranks in frontmatter...')
       .catch((e) => {
         try { console.error('[Elo] Failed to update ranks in frontmatter', e); } catch {}
-      })
-      .finally(() => {
-        try { workingNotice.hide(); } catch {}
       });
   }
 }

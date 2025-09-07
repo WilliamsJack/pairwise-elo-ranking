@@ -1,4 +1,4 @@
-import { App, TFile } from 'obsidian';
+import { App, Notice, TFile } from 'obsidian';
 
 import { CohortData } from '../types';
 import type { FrontmatterPropertiesSettings } from '../settings/settings';
@@ -254,6 +254,26 @@ export async function updateCohortFrontmatterProperties(
   }
 
   return { updated, totalConsidered };
+}
+
+/**
+ * Convenience wrapper around updateCohortFrontmatterProperties that shows a working
+ * notice while the update runs. Allows custom notice text.
+ */
+export async function updateCohortFrontmatter(
+  app: App,
+  files: TFile[],
+  valuesById: Map<string, number>,
+  newPropName: string,
+  oldPropName?: string,
+  noticeMessage?: string,
+): Promise<{ updated: number; totalConsidered: number }> {
+  const working = new Notice(noticeMessage ?? 'Updating frontmatter...', 0);
+  try {
+    return await updateCohortFrontmatterProperties(app, files, valuesById, newPropName, oldPropName);
+  } finally {
+    try { working.hide(); } catch {}
+  }
 }
 
 export async function updateCohortRanksInFrontmatter(

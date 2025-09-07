@@ -1,6 +1,6 @@
 import { App, ButtonComponent, Modal, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
 import { FrontmatterPropertiesSettings, effectiveFrontmatterProperties } from './settings';
-import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFrontmatterProperties } from '../utils/FrontmatterStats';
+import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFrontmatter } from '../utils/FrontmatterStats';
 import { labelForDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 
 import type { CohortData } from '../types';
@@ -216,7 +216,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           .setDesc('Configure frontmatter properties for this cohort.')
           .addButton((b) =>
             b
-              .setButtonText('Configure…')
+              .setButtonText('Configure...')
               .onClick(async () => {
                 await this.configureCohort(def.key);
               }),
@@ -320,7 +320,14 @@ export default class EloSettingsTab extends PluginSettingTab {
         ).openAndConfirm();
         if (!ok) continue;
 
-        const res = await updateCohortFrontmatterProperties(this.app, files, new Map(), '', change.oldProp);
+        const res = await updateCohortFrontmatter(
+          this.app,
+          files,
+          new Map(),
+          '',
+          change.oldProp,
+          `Removing "${change.oldProp}" from ${preview.wouldUpdate} note(s)...`,
+        );
         new Notice(`Removed "${change.oldProp}" from ${res.updated} note(s).`);
       } else if (change.action === 'rename' && change.oldProp && change.newProp) {
         const preview = await previewCohortFrontmatterPropertyUpdates(
@@ -340,7 +347,14 @@ export default class EloSettingsTab extends PluginSettingTab {
         ).openAndConfirm();
         if (!ok) continue;
 
-        const res = await updateCohortFrontmatterProperties(this.app, files, vals, change.newProp, change.oldProp);
+        const res = await updateCohortFrontmatter(
+          this.app,
+          files,
+          vals,
+          change.newProp,
+          change.oldProp,
+          `Renaming "${change.oldProp}" to "${change.newProp}" on ${preview.wouldUpdate} note(s)...`,
+        );
         new Notice(`Updated ${res.updated} note(s).`);
       } else if (change.action === 'upsert' && change.newProp) {
         const preview = await previewCohortFrontmatterPropertyUpdates(
@@ -359,7 +373,14 @@ export default class EloSettingsTab extends PluginSettingTab {
         ).openAndConfirm();
         if (!ok) continue;
     
-        const res = await updateCohortFrontmatterProperties(this.app, files, vals, change.newProp);
+        const res = await updateCohortFrontmatter(
+          this.app,
+          files,
+          vals,
+          change.newProp,
+          undefined,
+          `Writing "${change.newProp}" to ${preview.wouldUpdate} note(s)...`,
+        );
         new Notice(`Wrote "${change.newProp}" on ${res.updated} note(s).`);
       }
     }

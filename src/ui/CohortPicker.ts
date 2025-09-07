@@ -19,7 +19,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
   constructor(app: App, plugin: EloPlugin) {
     super(app);
     this.plugin = plugin;
-    this.setPlaceholder('Choose a cohort or create a new one…');
+    this.setPlaceholder('Choose a cohort or create a new one...');
   }
 
   async openAndGetSelection(): Promise<CohortDefinition | undefined> {
@@ -54,8 +54,8 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
 
     // Creation actions
     items.push({ kind: 'action', action: 'active-folder', label: 'New: Active folder' });
-    items.push({ kind: 'action', action: 'pick-folder', label: 'New: Pick a folder…' });
-    items.push({ kind: 'action', action: 'tag-dialog', label: 'New: Tag cohort (any/all)…' });
+    items.push({ kind: 'action', action: 'pick-folder', label: 'New: Pick a folder...' });
+    items.push({ kind: 'action', action: 'tag-dialog', label: 'New: Tag cohort (any/all)...' });
 
     return items;
   }
@@ -204,7 +204,7 @@ class FolderSelectModal extends FuzzySuggestModal<TFolder> {
   constructor(app: App) {
     super(app);
     this.folders = allFolderChoices(app);
-    this.setPlaceholder('Pick a folder…');
+    this.setPlaceholder('Pick a folder...');
   }
 
   async openAndGetSelection(): Promise<TFolder | undefined> {
