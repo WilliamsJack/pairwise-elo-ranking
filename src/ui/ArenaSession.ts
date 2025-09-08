@@ -26,12 +26,13 @@ export default class ArenaSession {
 
   private undoStack: UndoFrame[] = [];
   private overlayEl?: HTMLElement;
-  private overlayDoc?: Document;
   private overlayWin?: Window;
   private popoutUnloadHandler?: () => void;
   private keydownHandler = (ev: KeyboardEvent) => this.onKeydown(ev);
 
   private layoutHandle?: ArenaLayoutHandle;
+
+  private liveNotices: Notice[] = [];
 
   constructor(app: App, plugin: EloPlugin, cohortKey: string, files: TFile[]) {
     this.app = app;
@@ -60,7 +61,6 @@ export default class ArenaSession {
       document;
     const win = doc.defaultView ?? this.layoutHandle.win ?? window;
 
-    this.overlayDoc = doc;
     this.overlayWin = win;
 
     // Pin both leaves during the session
@@ -83,6 +83,8 @@ export default class ArenaSession {
       try { this.overlayWin.removeEventListener('keydown', this.keydownHandler, true); } catch {}
       if (this.popoutUnloadHandler) {
         try { this.overlayWin.removeEventListener('beforeunload', this.popoutUnloadHandler); } catch {}
+        // Hide any toast we created while in the popout (so they don't reattach to the main window)
+        try { for (const n of this.liveNotices) { (n as Notice)?.hide?.(); } } catch {}
       }
     }
     this.popoutUnloadHandler = undefined;
@@ -96,7 +98,7 @@ export default class ArenaSession {
     // Delegate tidy-up to the layout manager
     try { await this.layoutHandle?.cleanup(); } catch {}
 
-    this.overlayDoc = undefined;
+    this.liveNotices = [];
     this.overlayWin = undefined;
     this.undoStack = [];
   }
@@ -225,6 +227,12 @@ export default class ArenaSession {
     }
   }
 
+  private showToast(message: string, timeout = 4000): void {
+    try {
+      this.liveNotices.push(new Notice(message, timeout));
+    } catch {}
+  }
+
   private getEffectiveFrontmatter(): FrontmatterPropertiesSettings {
     const def = this.plugin.dataStore.getCohortDef(this.cohortKey);
     return effectiveFrontmatterProperties(
@@ -250,9 +258,9 @@ export default class ArenaSession {
     this.undoStack.push(undo);
 
     if (this.plugin.settings.showToasts) {
-      if (result === 'A') new Notice(`Winner: ${this.leftFile.basename}`);
-      else if (result === 'B') new Notice(`Winner: ${this.rightFile.basename}`);
-      else new Notice('Draw');
+      if (result === 'A') this.showToast(`Winner: ${this.leftFile.basename}`);
+      else if (result === 'B') this.showToast(`Winner: ${this.rightFile.basename}`);
+      else this.showToast('Draw');
     }
     this.plugin.dataStore.saveStore();
 
@@ -291,11 +299,10 @@ export default class ArenaSession {
   private undo() {
     const frame = this.undoStack.pop();
     if (!frame) {
-      new Notice('Nothing to undo.');
+      this.showToast('Nothing to undo.');
       return;
     }
-    const ok = this.plugin.dataStore.revert(frame);
-    if (ok && this.plugin.settings.showToasts) new Notice('Undid last match.');
+    if (this.plugin.dataStore.revert(frame)) this.showToast('Undid last match.');
     this.plugin.dataStore.saveStore();
 
     // Update the two notes involved in the undone match, if we can find them
