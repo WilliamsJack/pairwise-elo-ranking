@@ -41,31 +41,22 @@
 }
 
 /* Settings accordions */
-.elo-advanced-accordion,
-.elo-matchmaking-accordion {
+.elo-settings-accordion {
   margin-top: var(--size-4-3); /* 12px */
 }
 
-.elo-advanced-accordion > summary,
-.elo-matchmaking-accordion > summary {
+.elo-settings-accordion > summary {
   cursor: pointer;
   font-weight: var(--font-semibold);
   font-size: var(--font-ui-medium);
   margin-bottom: var(--size-4-2); /* 8px */
 }
 
-.elo-advanced-accordion .elo-advanced-body,
-.elo-matchmaking-accordion .elo-matchmaking-body {
-  margin-left: var(--size-4-2); /* 8px */
+.elo-settings-accordion .elo-settings-body {
+  padding-top: var(--size-4-3); /* 12px */
+  margin-left: var(--size-4-1); /* 4px */
   padding-left: var(--size-4-3); /* 12px */
   border-left: 2px solid var(--background-modifier-border);
-}
-
-.elo-advanced-accordion h5,
-.elo-matchmaking-accordion h5 {
-  margin: var(--size-4-3) 0 var(--size-4-2); /* 12px 0 8px */
-  font-size: var(--font-ui-small);
-  font-weight: var(--font-medium);
 }
 
 /* Generic muted text helper */

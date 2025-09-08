@@ -113,90 +113,6 @@ export default class EloSettingsTab extends PluginSettingTab {
           });
       });
 
-    // Default frontmatter properties (global defaults)
-    new Setting(containerEl).setName('Default frontmatter properties').setHeading();
-
-    new Setting(containerEl)
-      .setName('Ask for per-cohort overrides on creation')
-      .setDesc(`When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults. 
-        Disabling this may cause clashes if you write frontmatter properties across multiple cohorts.
-        Default: ${DEFAULT_SETTINGS.askForOverridesOnCohortCreation ? 'On' : 'Off'}`)
-      .addToggle((t) =>
-        t
-          .setValue(this.plugin.settings.askForOverridesOnCohortCreation)
-          .onChange(async (v) => {
-            this.plugin.settings.askForOverridesOnCohortCreation = v;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    containerEl.createEl('p', {
-      text:
-        'Choose which Elo statistics to write into a note\'s frontmatter and the property names to use. ' +
-        'These are global defaults; cohort-specific overrides can be applied during creation.',
-    });
-
-    const fm = this.plugin.settings.frontmatterProperties;
-
-    const addFrontmatterSetting = (
-      key: keyof typeof fm,
-      label: string,
-      desc: string,
-      placeholder: string,
-    ) => {
-      const cfg = fm[key];
-      let textRef: TextComponent;
-
-      new Setting(containerEl)
-        .setName(label)
-        .setDesc(desc)
-        .addToggle((t) =>
-          t
-            .setValue(Boolean(cfg.enabled))
-            .onChange(async (val) => {
-              cfg.enabled = val;
-              if (textRef) textRef.setDisabled(!val);
-              await this.plugin.saveSettings();
-            }),
-        )
-        .addText((t) => {
-          textRef = t;
-          t.setPlaceholder(placeholder)
-            .setValue(cfg.property)
-            .setDisabled(!cfg.enabled)
-            .onChange(async (v) => {
-              const trimmed = v.trim();
-              cfg.property = trimmed.length > 0 ? trimmed : placeholder;
-              await this.plugin.saveSettings();
-            });
-        });
-    };
-
-    addFrontmatterSetting(
-      'rating',
-      'Rating',
-      'Write the current Elo rating to this frontmatter property.',
-      'eloRating',
-    );
-    addFrontmatterSetting(
-      'rank',
-      'Rank',
-      'Write the rank (1 = highest) within the cohort to this frontmatter property.',
-      'eloRank',
-    );
-    addFrontmatterSetting(
-      'matches',
-      'Matches',
-      'Write the total number of matches to this frontmatter property.',
-      'eloMatches',
-    );
-    addFrontmatterSetting(
-      'wins',
-      'Wins',
-      'Write the number of wins to this frontmatter property.',
-      'eloWins',
-    );
-
     // Cohort configuration
     new Setting(containerEl).setName('Cohorts').setHeading();
 
@@ -227,19 +143,110 @@ export default class EloSettingsTab extends PluginSettingTab {
     // Advanced section
     new Setting(containerEl).setName('Advanced').setHeading();
 
+    const fmAcc = containerEl.createEl('details', { cls: 'elo-settings-accordion' });
+    fmAcc.open = false;
+    fmAcc.createEl('summary', { text: 'Default frontmatter properties' });
+    const fmBody = fmAcc.createEl('div', { cls: 'elo-settings-body' });
+
+    const fm = this.plugin.settings.frontmatterProperties;
+
+    new Setting(fmBody)
+      .setName('Ask for per-cohort overrides on creation')
+      .setDesc(`When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults. 
+        Disabling this may cause clashes if you write frontmatter properties across multiple cohorts.
+        Default: ${DEFAULT_SETTINGS.askForOverridesOnCohortCreation ? 'On' : 'Off'}`)
+      .addToggle((t) =>
+        t
+          .setValue(this.plugin.settings.askForOverridesOnCohortCreation)
+          .onChange(async (v) => {
+            this.plugin.settings.askForOverridesOnCohortCreation = v;
+            await this.plugin.saveSettings();
+          }),
+      );
+    
+    fmBody.createEl('p', {
+      text:
+        'Choose which Elo statistics to write into a note\'s frontmatter and the property names to use. ' +
+        'These are global defaults; cohort-specific overrides can be applied during creation.',
+    });
+
+    const addFrontmatterSetting = (
+      parent: HTMLElement,
+      key: keyof typeof fm,
+      label: string,
+      desc: string,
+      placeholder: string,
+    ) => {
+      const cfg = fm[key];
+      let textRef: TextComponent;
+
+      new Setting(parent)
+        .setName(label)
+        .setDesc(desc)
+        .addToggle((t) =>
+          t
+            .setValue(Boolean(cfg.enabled))
+            .onChange(async (val) => {
+              cfg.enabled = val;
+              if (textRef) textRef.setDisabled(!val);
+              await this.plugin.saveSettings();
+            }),
+        )
+        .addText((t) => {
+          textRef = t;
+          t.setPlaceholder(placeholder)
+            .setValue(cfg.property)
+            .setDisabled(!cfg.enabled)
+            .onChange(async (v) => {
+              const trimmed = v.trim();
+              cfg.property = trimmed.length > 0 ? trimmed : placeholder;
+              await this.plugin.saveSettings();
+            });
+        });
+    };
+
+    addFrontmatterSetting(
+      fmBody,
+      'rating',
+      'Rating',
+      'Write the current Elo rating to this frontmatter property.',
+      'eloRating',
+    );
+    addFrontmatterSetting(
+      fmBody,
+      'rank',
+      'Rank',
+      'Write the rank (1 = highest) within the cohort to this frontmatter property.',
+      'eloRank',
+    );
+    addFrontmatterSetting(
+      fmBody,
+      'matches',
+      'Matches',
+      'Write the total number of matches to this frontmatter property.',
+      'eloMatches',
+    );
+    addFrontmatterSetting(
+      fmBody,
+      'wins',
+      'Wins',
+      'Write the number of wins to this frontmatter property.',
+      'eloWins',
+    );
+
     // Convergence heuristics accordion
     const hs = this.plugin.settings.heuristics;
     const defaults = DEFAULT_SETTINGS.heuristics;
 
-    const adv = containerEl.createEl('details', { cls: 'elo-advanced-accordion' });
+    const adv = containerEl.createEl('details', { cls: 'elo-settings-accordion' });
     adv.open = false;
 
     adv.createEl('summary', { text: 'Convergence heuristics' });
-    adv.createEl('p', {
+    const advBody = adv.createEl('div', { cls: 'elo-settings-body' });
+    advBody.createEl('p', {
       text:
         'Optional tweaks that help new notes stabilise quickly and move ratings faster when results are more informative.',
     });
-    const advBody = adv.createEl('div', { cls: 'elo-advanced-body' });
 
     // Provisional K boost
     new Setting(advBody).setName('Provisional K boost').setHeading();
@@ -457,14 +464,14 @@ export default class EloSettingsTab extends PluginSettingTab {
     const mm = this.plugin.settings.matchmaking;
     const mmDefaults = DEFAULT_SETTINGS.matchmaking;
 
-    const mmAcc = containerEl.createEl('details', { cls: 'elo-matchmaking-accordion' });
+    const mmAcc = containerEl.createEl('details', { cls: 'elo-settings-accordion' });
     mmAcc.open = false;
     mmAcc.createEl('summary', { text: 'Matchmaking heuristics' });
-    mmAcc.createEl('p', {
+    const mmBody = mmAcc.createEl('div', { cls: 'elo-settings-body' });
+    mmBody.createEl('p', {
       text:
         'Control how pairs are chosen. These heuristics can speed up convergence by focusing on informative comparisons.',
     });
-    const mmBody = mmAcc.createEl('div', { cls: 'elo-matchmaking-body' });
 
     // Top-level enable
     new Setting(mmBody)
