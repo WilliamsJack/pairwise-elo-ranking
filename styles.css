@@ -2,62 +2,97 @@
 .elo-session-bar {
   position: fixed;
   left: 50%;
-  bottom: 16px;
+  bottom: var(--size-4-4); /* 16px */
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--size-4-3); /* 12px */
   background-color: var(--background-primary);
+  color: var(--text-normal);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  padding: 8px 12px;
+  border-radius: var(--radius-m);
+  padding: var(--size-4-2) var(--size-4-3); /* 8px 12px */
   box-shadow: var(--shadow-s);
-  z-index: 9999;
+  z-index: var(--layer-notice);
   pointer-events: auto;
+
+  /* Typography for UI surface */
+  font-size: var(--font-ui-medium);
+  line-height: var(--line-height-tight);
 }
 
 .elo-session-bar .elo-side {
-  min-width: 140px;
+  min-width: 14ch;
   text-align: center;
-  font-weight: 600;
+  font-weight: var(--font-semibold);
 }
 
 .elo-session-bar .elo-controls {
   display: flex;
-  gap: 8px;
+  gap: var(--size-4-2); /* 8px */
   align-items: center;
 }
 
 .elo-session-bar button {
-  padding: 4px 8px;
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-tight);
+  padding: var(--size-4-1) var(--size-4-2); /* 4px 8px */
+  border-radius: var(--radius-s);
 }
 
+/* Settings accordions */
 .elo-advanced-accordion,
 .elo-matchmaking-accordion {
-  margin-top: 12px;
+  margin-top: var(--size-4-3); /* 12px */
 }
 
 .elo-advanced-accordion > summary,
 .elo-matchmaking-accordion > summary {
   cursor: pointer;
-  font-weight: 600;
-  margin-bottom: 6px;
+  font-weight: var(--font-semibold);
+  font-size: var(--font-ui-medium);
+  margin-bottom: var(--size-4-2); /* 8px */
 }
 
 .elo-advanced-accordion .elo-advanced-body,
 .elo-matchmaking-accordion .elo-matchmaking-body {
-  margin-left: 6px;
-  padding-left: 12px;
+  margin-left: var(--size-4-2); /* 8px */
+  padding-left: var(--size-4-3); /* 12px */
   border-left: 2px solid var(--background-modifier-border);
 }
 
 .elo-advanced-accordion h5,
 .elo-matchmaking-accordion h5 {
-  margin: 12px 0 6px;
+  margin: var(--size-4-3) 0 var(--size-4-2); /* 12px 0 8px */
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
 }
 
-.elo-advanced-accordion p.help,
-.elo-matchmaking-accordion p.help {
-  margin: 4px 0 8px;
-  opacity: 0.75;
+/* Generic muted text helper */
+.elo-muted {
+  color: var(--text-muted);
+}
+
+/* Tag cohort picker: selected tags list */
+.elo-selected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-2-3); /* 6px */
+  line-height: var(--line-height-tight);
+}
+
+.elo-tag-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.elo-tag-remove {
+  margin-left: var(--size-2-3); /* 6px */
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-tight);
+}
+
+/* Non-interactive setting row (e.g. suggestion rows with a Use button) */
+.elo-static {
+  cursor: default;
 }

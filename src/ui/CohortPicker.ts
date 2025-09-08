@@ -312,44 +312,26 @@ class TagCohortModal extends BasePromiseModal<CohortDefinition | undefined> {
 
     const tags = Array.from(this.selectedTags).sort();
     if (tags.length === 0) {
-      const hint = document.createElement('div');
-      hint.textContent = 'No tags selected.';
-      hint.style.opacity = '0.7';
-      el.appendChild(hint);
+      el.createDiv({ cls: 'elo-muted', text: 'No tags selected.' });
       return;
     }
 
-    const list = document.createElement('div');
-    list.style.display = 'flex';
-    list.style.flexWrap = 'wrap';
-    list.style.gap = '6px';
+    const list = el.createDiv({ cls: 'elo-selected-tags' });
 
     for (const tag of tags) {
-      const pill = document.createElement('span');
-      pill.className = 'tag';
-      pill.textContent = tag;
+      const wrap = list.createSpan({ cls: 'elo-tag-wrap' });
 
-      const removeBtn = document.createElement('button');
-      removeBtn.textContent = '×';
+      wrap.createSpan({ cls: 'tag', text: tag });
+
+      const removeBtn = wrap.createEl('button', { cls: 'elo-tag-remove', text: '×' });
       removeBtn.ariaLabel = `Remove ${tag}`;
-      removeBtn.style.marginLeft = '6px';
       removeBtn.addEventListener('click', (e) => {
         e.preventDefault();
         this.selectedTags.delete(tag);
         this.renderSelectedTags();
         this.updateButtonsDisabled();
       });
-
-      const wrap = document.createElement('span');
-      wrap.style.display = 'inline-flex';
-      wrap.style.alignItems = 'center';
-      wrap.appendChild(pill);
-      wrap.appendChild(removeBtn);
-
-      list.appendChild(wrap);
     }
-
-    el.appendChild(list);
   }
 
   private updateButtonsDisabled(): void {

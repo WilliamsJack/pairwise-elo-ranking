@@ -155,15 +155,11 @@ export default class ArenaSession {
   }
 
   private mountOverlay() {
-    const el = document.createElement('div');
-    el.className = 'elo-session-bar';
+    const el = document.body.createDiv({ cls: 'elo-session-bar' });
 
-    const leftLabel = document.createElement('div');
-    leftLabel.className = 'elo-side left';
-    el.append(leftLabel);
+    el.createDiv({ cls: 'elo-side left' });
 
-    const controls = document.createElement('div');
-    controls.className = 'elo-controls';
+    const controls = el.createDiv({ cls: 'elo-controls' });
     controls.append(
       this.makeButton('← Left', () => this.choose('A')),
       this.makeButton('↑ Draw', () => this.choose('D')),
@@ -171,13 +167,9 @@ export default class ArenaSession {
       this.makeButton('Undo ⌫', () => this.undo()),
       this.makeButton('End Esc', () => this.plugin.endSession()),
     );
-    el.append(controls);
 
-    const rightLabel = document.createElement('div');
-    rightLabel.className = 'elo-side right';
-    el.append(rightLabel);
+    el.createDiv({ cls: 'elo-side right' });
 
-    document.body.append(el);
     this.overlayEl = el;
     this.updateOverlay();
   }

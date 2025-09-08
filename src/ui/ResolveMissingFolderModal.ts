@@ -93,12 +93,12 @@ export class ResolveMissingFolderModal extends BasePromiseModal<string | undefin
       .sort((a, b) => b.count - a.count || a.path.localeCompare(b.path));
 
     if (items.length === 0) {
-      const hint = document.createElement('div');
-      hint.textContent = this.scanning
-        ? 'Building suggestions...'
-        : 'No suggestions. Use Browse to pick a folder.';
-      hint.style.opacity = '0.7';
-      el.appendChild(hint);
+      el.createDiv({
+        cls: 'elo-muted',
+        text: this.scanning
+          ? 'Building suggestions...'
+          : 'No suggestions. Use Browse to pick a folder.',
+      });
       return;
     }
 
@@ -107,7 +107,7 @@ export class ResolveMissingFolderModal extends BasePromiseModal<string | undefin
         .setName(s.path || '/')
         .setDesc(`${s.count} note${s.count === 1 ? '' : 's'} with matching Elo IDs`)
         .addButton((b) => b.setCta().setButtonText('Use').onClick(() => this.finish(s.path)));
-      row.settingEl.style.cursor = 'default';
+      row.settingEl.classList.add('elo-static');
     }
   }
 

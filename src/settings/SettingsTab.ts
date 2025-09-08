@@ -589,9 +589,10 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     const defs = this.plugin.dataStore.listCohortDefs();
     if (defs.length === 0) {
-      const hint = containerEl.createEl('div');
-      hint.textContent = 'No cohorts saved yet. Start a session to create one, or use the Command Palette.';
-      hint.style.opacity = '0.7';
+      containerEl.createEl('div', {
+        cls: 'elo-muted',
+        text: 'No cohorts saved yet. Start a session to create one, or use the Command Palette.',
+      });
     } else {
       for (const def of defs) {
         new Setting(containerEl)
