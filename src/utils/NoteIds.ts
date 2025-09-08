@@ -36,19 +36,11 @@ export async function ensureEloId(
     : fallbackUUID();
 
   if (preferredLocation === 'end') {
-    const text = await app.vault.read(file);
-
-    const last = extractEloIdFromHtmlComment(text);
-    if (last) return last;
-
-    const needsNewline = text.length > 0 && !text.endsWith('\n');
-    const marker = `<!-- eloId: ${id} -->`;
-    const newText = text + (needsNewline ? '\n' : '') + '\n' + marker + '\n';
-    await app.vault.modify(file, newText);
-    return id;
-  } else {
-    await app.fileManager.processFrontMatter(file, (fm) => {
-      if (!fm.eloId) fm.eloId = id;
+    await app.vault.process(file, (data) => {
+      if (extractEloIdFromHtmlComment(data)) return data;
+      const needsNewline = data.length > 0 && !data.endsWith('\n');
+      const marker = `<!-- eloId: ${id} -->`;
+      return data + (needsNewline ? '\n' : '') + '\n' + marker + '\n';
     });
     return id;
   }
