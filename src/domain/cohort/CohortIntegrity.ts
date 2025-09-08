@@ -40,8 +40,7 @@ export async function reconcileCohortPlayersWithFiles(
   }
 
   if (removed.length > 0) {
-    await dataStore.saveStore(); // debounced + queued
-    console.debug(`[Elo] Pruned ${removed.length} missing player(s) from cohort "${cohortKey}".`);
+    await dataStore.saveStore();
   }
 
   return removed;
