@@ -158,14 +158,13 @@ export function parseCohortKey(key: string): CohortDefinition | undefined {
   return undefined;
 }
 
-export function labelForDefinition(def: CohortDefinition): string {
-  if (def.label) return def.label;
+export function prettyCohortDefinition(def: CohortDefinition): string {
   switch (def.kind) {
     case 'vault:all': return 'Vault: All notes';
     case 'folder': return `Folder: ${def.params.path}`;
     case 'folder-recursive': return `Folder (recursive): ${def.params.path}`;
-    case 'tag:any': return `Tag any: ${(def.params.tags ?? []).join(', ')}`;
-    case 'tag:all': return `Tag all: ${(def.params.tags ?? []).join(', ')}`;
+    case 'tag:any': return `Tag (any): ${(def.params.tags ?? []).join(', ')}`;
+    case 'tag:all': return `Tag (all): ${(def.params.tags ?? []).join(', ')}`;
     case 'manual': return `Manual (${(def.params.paths ?? []).length} notes)`;
     case 'base': {
       const v = def.params.view ? ` (${def.params.view})` : '';

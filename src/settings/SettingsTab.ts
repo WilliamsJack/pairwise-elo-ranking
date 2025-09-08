@@ -1,7 +1,7 @@
-import { App, Notice, PluginSettingTab, Setting, SliderComponent, TextComponent } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting, SliderComponent, TextComponent, setIcon } from 'obsidian';
 import { DEFAULT_SETTINGS, FrontmatterPropertiesSettings, effectiveFrontmatterProperties } from './settings';
 import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFrontmatter } from '../utils/FrontmatterStats';
-import { labelForDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
+import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 
 import { BasePromiseModal } from '../ui/PromiseModal';
 import type { CohortData } from '../types';
@@ -39,6 +39,42 @@ class ConfirmModal extends BasePromiseModal<boolean> {
     const btns = new Setting(contentEl);
     btns.addButton((b) => b.setButtonText(this.cancelText).onClick(() => this.finish(false)));
     btns.addButton((b) => b.setCta().setButtonText(this.ctaText).onClick(() => this.finish(true)));
+  }
+}
+
+class DeleteCohortModal extends BasePromiseModal<boolean> {
+  private cohortLabel: string;
+
+  constructor(app: App, cohortLabel: string) {
+    super(app);
+    this.cohortLabel = cohortLabel;
+  }
+
+  async openAndConfirm(): Promise<boolean> {
+    const v = await this.openAndGetValue();
+    return !!v;
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl('h3', { text: 'Delete cohort?' });
+    const p = contentEl.createEl('p');
+    p.textContent = `Are you sure you want to delete "${this.cohortLabel}"? This removes the cohort and its saved ratings. Your notes will not be modified.`;
+
+    const btns = new Setting(contentEl);
+    // Grey Cancel
+    btns.addButton((b) =>
+      b.setButtonText('Cancel').onClick(() => {
+        this.finish(false);
+      }),
+    );
+    // Red Delete
+    btns.addButton((b) =>
+      b.setWarning().setButtonText('Delete').onClick(() => {
+        this.finish(true);
+      }),
+    );
   }
 }
 
@@ -117,7 +153,7 @@ export default class EloSettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName('Cohorts').setHeading();
 
     containerEl.createEl('p', {
-      text: 'Configure existing cohorts\' frontmatter properties.',
+      text: 'Configure existing cohorts\' frontmatter properties or delete a cohort.',
     });
 
     const defs = this.plugin.dataStore.listCohortDefs();
@@ -127,16 +163,53 @@ export default class EloSettingsTab extends PluginSettingTab {
         text: 'No cohorts saved yet. Start a session to create one, or use the Command Palette.',
       });
     } else {
-      for (const def of defs) {
-        new Setting(containerEl)
-          .setName(labelForDefinition(def))
-          .addButton((b) =>
-            b
-              .setButtonText('Configure...')
-              .onClick(async () => {
-                await this.configureCohort(def.key);
-              }),
-          );
+      const list = containerEl.createDiv({ cls: 'installed-plugins-container' });
+
+      // Sort by display label
+      const sorted = defs.slice().sort((a, b) => {
+        const an = (a.label ?? prettyCohortDefinition(a)).toLowerCase();
+        const bn = (b.label ?? prettyCohortDefinition(b)).toLowerCase();
+        return an.localeCompare(bn);
+      });
+
+      for (const def of sorted) {
+        const row = list.createDiv({ cls: 'setting-item mod-toggle' });
+
+        const info = row.createDiv({ cls: 'setting-item-info' });
+        info.style.cursor = 'pointer';
+        info.addEventListener('click', async () => {
+          await this.configureCohort(def.key);
+        });
+
+        const name = info.createDiv({ cls: 'setting-item-name', text: def.label ?? prettyCohortDefinition(def) });
+        name.title = def.key;
+
+        const desc = info.createDiv({ cls: 'setting-item-description' });
+        desc.createDiv({ text: `Definition: ${prettyCohortDefinition(def)}` });
+
+        const controls = row.createDiv({ cls: 'setting-item-control' });
+
+        const settingsBtn = controls.createDiv({
+          cls: 'clickable-icon extra-setting-button',
+          attr: { 'aria-label': 'Configure cohort' },
+        });
+        setIcon(settingsBtn, 'settings');
+        settingsBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          await this.configureCohort(def.key);
+        });
+
+        const deleteBtn = controls.createDiv({
+          cls: 'clickable-icon extra-setting-button',
+          attr: { 'aria-label': 'Delete cohort' },
+        });
+        setIcon(deleteBtn, 'trash-2');
+        deleteBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          await this.deleteCohortWithConfirm(def.key);
+        });
       }
     }
 
@@ -605,6 +678,30 @@ export default class EloSettingsTab extends PluginSettingTab {
           })
           .setDisabled(!mm.upsetProbes.enabled);
       });
+  }
+
+  private async deleteCohortWithConfirm(cohortKey: string): Promise<void> {
+    const def = this.plugin.dataStore.getCohortDef(cohortKey);
+    const label = def ? (def.label ?? prettyCohortDefinition(def)) : 'Cohort';
+
+    const ok = await new DeleteCohortModal(this.app, label).openAndConfirm();
+    if (!ok) return;
+
+    // Remove data and definition
+    const store = this.plugin.dataStore.store;
+    if (store.cohorts && store.cohorts[cohortKey]) {
+      delete store.cohorts[cohortKey];
+    }
+    if (store.cohortDefs && store.cohortDefs[cohortKey]) {
+      delete store.cohortDefs[cohortKey];
+    }
+    if (store.lastUsedCohortKey === cohortKey) {
+      store.lastUsedCohortKey = undefined;
+    }
+    await this.plugin.dataStore.saveStore();
+
+    new Notice(`Deleted cohort: ${label}`);
+    this.display();
   }
 
   private async configureCohort(cohortKey: string): Promise<void> {

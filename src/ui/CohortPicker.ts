@@ -1,6 +1,6 @@
 import { App, ButtonComponent, FuzzySuggestModal, Notice, Setting } from 'obsidian';
 import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
-import { createDefinition, labelForDefinition, parseCohortKey } from '../domain/cohort/CohortResolver';
+import { createDefinition, parseCohortKey, prettyCohortDefinition } from '../domain/cohort/CohortResolver';
 
 import { CohortDefinition } from '../types';
 import { CohortOptionsModal } from './CohortOptionsModal';
@@ -39,7 +39,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     const lastKey = this.plugin.dataStore.store.lastUsedCohortKey;
     if (lastKey) {
       const lastDef = this.plugin.dataStore.getCohortDef(lastKey) ?? parseCohortKey(lastKey);
-      if (lastDef) items.push({ kind: 'saved', key: lastDef.key, label: `Last used: ${labelForDefinition(lastDef)}`, def: lastDef });
+      if (lastDef) items.push({ kind: 'saved', key: lastDef.key, label: `Last used: ${prettyCohortDefinition(lastDef)}`, def: lastDef });
     }
 
     // Saved definitions
@@ -47,7 +47,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     for (const def of defs) {
       if (def.key === 'vault:all') continue;
       if (def.key === lastKey) continue;
-      items.push({ kind: 'saved', key: def.key, label: labelForDefinition(def), def });
+      items.push({ kind: 'saved', key: def.key, label: prettyCohortDefinition(def), def });
     }
 
     // Add "Vault: All notes" only if not already present
@@ -165,7 +165,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     if (!def) return undefined;
     const existing = this.plugin.dataStore.getCohortDef(def.key);
     if (existing) {
-      const lbl = labelForDefinition(existing);
+      const lbl = prettyCohortDefinition(existing);
       new Notice(`Cohort already exists. Using existing cohort: ${lbl}`);
       return existing;
     }
