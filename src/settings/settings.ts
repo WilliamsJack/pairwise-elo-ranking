@@ -1,4 +1,5 @@
 export type EloIdLocation = 'frontmatter' | 'end';
+export type SessionLayoutMode = 'reuse-active' | 'right-split' | 'new-tab' | 'new-window';
 
 export interface FrontmatterPropertyConfig {
   property: string;
@@ -58,6 +59,7 @@ export interface EloSettings {
   kFactor: number;
   showToasts: boolean;
   eloIdLocation: EloIdLocation;
+  sessionLayout: SessionLayoutMode;
   frontmatterProperties: FrontmatterPropertiesSettings;
   askForOverridesOnCohortCreation: boolean;
   heuristics: EloHeuristicsSettings;
@@ -68,6 +70,7 @@ export const DEFAULT_SETTINGS: EloSettings = {
   kFactor: 24,
   showToasts: true,
   eloIdLocation: 'frontmatter',
+  sessionLayout: 'right-split',
   frontmatterProperties: {
     rating:  { property: 'eloRating',   enabled: false },
     rank:    { property: 'eloRank',     enabled: false },

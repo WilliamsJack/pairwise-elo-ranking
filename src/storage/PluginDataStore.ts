@@ -6,7 +6,7 @@ import {
   PlayerSnapshot,
   UndoFrame,
 } from '../types';
-import { DEFAULT_SETTINGS, EloSettings } from '../settings';
+import { DEFAULT_SETTINGS, EloSettings, SessionLayoutMode } from '../settings';
 
 import type { EloHeuristicsSettings as EloHeuristics } from '../settings'
 import { Plugin } from 'obsidian';
@@ -25,6 +25,11 @@ const DEFAULT_STORE: EloStore = {
   lastUsedCohortKey: undefined,
 };
 
+function normaliseSessionLayout(val: any, fallback: SessionLayoutMode): SessionLayoutMode {
+  const allowed: SessionLayoutMode[] = ['reuse-active', 'right-split', 'new-tab', 'new-window'];
+  return allowed.includes(val) ? val : fallback;
+}
+
 function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
   // Safe clone of defaults
   const base: EloSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
@@ -32,6 +37,9 @@ function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
   if (!raw) return base;
 
   const out: EloSettings = { ...base, ...raw };
+
+  // Validate session layout
+  out.sessionLayout = normaliseSessionLayout(raw.sessionLayout ?? base.sessionLayout, base.sessionLayout);
 
   if (raw.heuristics) {
     out.heuristics = {

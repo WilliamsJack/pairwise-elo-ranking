@@ -1,4 +1,5 @@
-import { App, MarkdownView, Notice, TFile, ViewState, WorkspaceLeaf } from 'obsidian';
+import { App, MarkdownView, Notice, TFile, WorkspaceLeaf } from 'obsidian';
+import { ArenaLayoutHandle, ArenaLayoutManager } from './LayoutManager';
 import { MatchResult, UndoFrame } from '../types';
 import { ensureEloId, getEloId } from '../utils/NoteIds';
 
@@ -18,17 +19,19 @@ export default class ArenaSession {
   private rightFile?: TFile;
   private lastPairSig?: string;
 
-  private originalLeftViewState?: ViewState;
-  private originalLeftLeaf!: WorkspaceLeaf;
   private leftLeaf!: WorkspaceLeaf;
   private rightLeaf!: WorkspaceLeaf;
-  private createdRightLeaf = false;
 
   private idByPath = new Map<string, string>();
 
   private undoStack: UndoFrame[] = [];
   private overlayEl?: HTMLElement;
+  private overlayDoc?: Document;
+  private overlayWin?: Window;
+  private popoutUnloadHandler?: () => void;
   private keydownHandler = (ev: KeyboardEvent) => this.onKeydown(ev);
+
+  private layoutHandle?: ArenaLayoutHandle;
 
   constructor(app: App, plugin: EloPlugin, cohortKey: string, files: TFile[]) {
     this.app = app;
@@ -38,62 +41,63 @@ export default class ArenaSession {
   }
 
   async start() {
-    // Use the most recent leaf as "left"
-    this.originalLeftLeaf = this.app.workspace.getMostRecentLeaf() ?? this.app.workspace.getLeaf(false);
-    this.leftLeaf = this.originalLeftLeaf;
+    // Create arena layout per settings
+    const mgr = new ArenaLayoutManager(this.app);
+    this.layoutHandle = await mgr.create(this.plugin.settings.sessionLayout ?? 'right-split');
 
-    // Create a split for "right"
-    const right = this.app.workspace.getLeaf('split');
-    if (right && right !== this.leftLeaf) {
-      this.rightLeaf = right;
-      this.createdRightLeaf = true;
-    } else {
-      // Fallback: create a right leaf
-      this.rightLeaf = this.app.workspace.getRightLeaf(true);
-      this.createdRightLeaf = true;
-    }
-
-    // Remember original left file to restore later
-    const vs = this.leftLeaf.getViewState();
-    this.originalLeftViewState = {
-      ...vs,
-      state: vs.state ? JSON.parse(JSON.stringify(vs.state)) : {},
-    };
+    this.leftLeaf = this.layoutHandle.leftLeaf;
+    this.rightLeaf = this.layoutHandle.rightLeaf;
 
     this.pickNextPair();
     await this.openCurrent();
+
+    // Resolve the correct document/window for UI and keyboard capture.
+    // Prefer the left leaf's view container; fall back to manager's doc/win.
+    const doc =
+      (this.leftLeaf.view as any)?.containerEl?.ownerDocument ??
+      (this.rightLeaf.view as any)?.containerEl?.ownerDocument ??
+      this.layoutHandle.doc ??
+      document;
+    const win = doc.defaultView ?? this.layoutHandle.win ?? window;
+
+    this.overlayDoc = doc;
+    this.overlayWin = win;
 
     // Pin both leaves during the session
     try { this.leftLeaf.setPinned(true); } catch {}
     try { this.rightLeaf.setPinned(true); } catch {}
 
-    this.mountOverlay();
-    window.addEventListener('keydown', this.keydownHandler, true);
+    this.mountOverlay(doc);
+    win.addEventListener('keydown', this.keydownHandler, true);
+
+    // If the user closes a pop-out window, end the session automatically.
+    if (win !== window) {
+      this.popoutUnloadHandler = () => this.plugin.endSession();
+      win.addEventListener('beforeunload', this.popoutUnloadHandler);
+    }
   }
 
   async end() {
-    window.removeEventListener('keydown', this.keydownHandler, true);
+    // Remove listeners from the correct window
+    if (this.overlayWin) {
+      try { this.overlayWin.removeEventListener('keydown', this.keydownHandler, true); } catch {}
+      if (this.popoutUnloadHandler) {
+        try { this.overlayWin.removeEventListener('beforeunload', this.popoutUnloadHandler); } catch {}
+      }
+    }
+    this.popoutUnloadHandler = undefined;
+
     this.unmountOverlay();
 
     // Unpin leaves
     try { this.leftLeaf.setPinned(false); } catch {}
     try { this.rightLeaf.setPinned(false); } catch {}
 
-    // Restore the user's original left file view state
-    if (this.originalLeftViewState) {
-      try {
-        await this.leftLeaf.setViewState({
-          ...this.originalLeftViewState,
-          active: true, // give focus back to the user's original tab
-        });
-      } catch {}
-    }
+    // Delegate tidy-up to the layout manager
+    try { await this.layoutHandle?.cleanup(); } catch {}
 
-    // Close the right leaf we created
-    if (this.createdRightLeaf) {
-      try { this.rightLeaf.detach(); } catch {}
-    }
-
+    this.overlayDoc = undefined;
+    this.overlayWin = undefined;
     this.undoStack = [];
   }
 
@@ -154,8 +158,8 @@ export default class ArenaSession {
     }
   }
 
-  private mountOverlay() {
-    const el = document.body.createDiv({ cls: 'elo-session-bar' });
+  private mountOverlay(doc: Document = document) {
+    const el = doc.body.createDiv({ cls: 'elo-session-bar' });
 
     el.createDiv({ cls: 'elo-side left' });
 

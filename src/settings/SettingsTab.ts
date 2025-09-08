@@ -1,5 +1,5 @@
 import { App, Notice, PluginSettingTab, Setting, SliderComponent, TextComponent, setIcon } from 'obsidian';
-import { DEFAULT_SETTINGS, FrontmatterPropertiesSettings, effectiveFrontmatterProperties } from './settings';
+import { DEFAULT_SETTINGS, FrontmatterPropertiesSettings, SessionLayoutMode, effectiveFrontmatterProperties } from './settings';
 import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFrontmatter } from '../utils/FrontmatterStats';
 import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 
@@ -132,6 +132,27 @@ export default class EloSettingsTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }),
       );
+
+    // Session layout
+    const layoutLabels: Record<SessionLayoutMode, string> = {
+      'reuse-active': 'Reuse active pane',
+      'right-split': 'Insert to the right of active pane',
+      'new-tab': 'New tab',
+      'new-window': 'New window (pop-out)',
+    };
+    new Setting(containerEl)
+      .setName('Session layout')
+      .setDesc('Choose how and where the arena opens.')
+      .addDropdown((dd) => {
+        dd.addOptions(layoutLabels as any)
+          .setValue(this.plugin.settings.sessionLayout ?? DEFAULT_SETTINGS.sessionLayout)
+          .onChange(async (v) => {
+            const val: SessionLayoutMode =
+              v === 'reuse-active' || v === 'new-tab' || v === 'new-window' ? v : 'right-split';
+            this.plugin.settings.sessionLayout = val;
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName('Elo ID location')
