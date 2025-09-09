@@ -56,7 +56,7 @@ export default class EloPlugin extends Plugin {
   }
 
   onunload(): void {
-    this.endSession();
+    this.endSession({ forUnload: true });
     void this.dataStore.saveAllImmediate?.();
   }
 
@@ -91,7 +91,7 @@ export default class EloPlugin extends Plugin {
     this.endSession();
 
     this.currentSession = new ArenaSession(this.app, this, def.key, files);
-    this.register(() => this.endSession());
+    this.register(() => this.endSession({ forUnload: true }));
 
     // Await the UI start so the currently displayed notes have IDs if needed
     await this.currentSession.start();
@@ -103,14 +103,17 @@ export default class EloPlugin extends Plugin {
     void reconcileCohortPlayersWithFiles(this.app, this.dataStore, def.key, files).catch(() => {});
   }
 
-  public endSession() {
+  public endSession(opts?: { forUnload?: boolean }) {
     if (!this.currentSession) return;
 
     const session = this.currentSession;
     const cohortKey = session.getCohortKey();
 
-    session.end();
+    session.end({ forUnload: !!opts?.forUnload });
     this.currentSession = undefined;
+
+    // On unload, skip cohort-wide frontmatter updates and any additional work
+    if (opts?.forUnload) return;
 
     // After session ends, update rank across the cohort if enabled
     const def = this.dataStore.getCohortDef(cohortKey);

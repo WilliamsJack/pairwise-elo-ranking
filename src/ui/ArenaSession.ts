@@ -77,7 +77,7 @@ export default class ArenaSession {
     }
   }
 
-  async end() {
+  async end(opts?: { forUnload?: boolean }) {
     // Remove listeners from the correct window
     if (this.overlayWin) {
       try { this.overlayWin.removeEventListener('keydown', this.keydownHandler, true); } catch {}
@@ -94,9 +94,11 @@ export default class ArenaSession {
     // Unpin leaves
     try { this.leftLeaf.setPinned(false); } catch {}
     try { this.rightLeaf.setPinned(false); } catch {}
-
-    // Delegate tidy-up to the layout manager
-    try { await this.layoutHandle?.cleanup(); } catch {}
+  
+    // Only detach/cleanup panes when not unloading the plugin (as per guidelines)
+    if (!opts?.forUnload) {
+      try { await this.layoutHandle?.cleanup(); } catch {}
+    }
 
     this.liveNotices = [];
     this.overlayWin = undefined;
