@@ -168,11 +168,11 @@ export default class ArenaSession {
 
     const controls = el.createDiv({ cls: 'elo-controls' });
     controls.append(
-      this.makeButton('← Left', () => this.choose('A')),
-      this.makeButton('↑ Draw', () => this.choose('D')),
-      this.makeButton('→ Right', () => this.choose('B')),
-      this.makeButton('Undo ⌫', () => this.undo()),
-      this.makeButton('End Esc', () => this.plugin.endSession()),
+      this.makeButton(doc, '← Left', () => this.choose('A')),
+      this.makeButton(doc, '↑ Draw', () => this.choose('D')),
+      this.makeButton(doc, '→ Right', () => this.choose('B')),
+      this.makeButton(doc, 'Undo ⌫', () => this.undo()),
+      this.makeButton(doc, 'End Esc', () => this.plugin.endSession()),
     );
 
     el.createDiv({ cls: 'elo-side right' });
@@ -186,8 +186,8 @@ export default class ArenaSession {
     this.overlayEl = undefined;
   }
 
-  private makeButton(text: string, onClick: () => void) {
-    const btn = document.createElement('button');
+  private makeButton(doc: Document, text: string, onClick: () => void) {
+    const btn = doc.createElement('button');
     btn.textContent = text;
     btn.addEventListener('click', (e) => {
       e.preventDefault();
