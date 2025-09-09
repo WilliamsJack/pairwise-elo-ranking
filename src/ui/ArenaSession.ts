@@ -44,7 +44,7 @@ export default class ArenaSession {
   async start() {
     // Create arena layout per settings
     const mgr = new ArenaLayoutManager(this.app);
-    this.layoutHandle = await mgr.create(this.plugin.settings.sessionLayout ?? 'right-split');
+    this.layoutHandle = await mgr.create(this.plugin.settings.sessionLayout ?? 'new-tab');
 
     this.leftLeaf = this.layoutHandle.leftLeaf;
     this.rightLeaf = this.layoutHandle.rightLeaf;

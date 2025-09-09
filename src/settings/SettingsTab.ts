@@ -148,7 +148,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           .setValue(this.plugin.settings.sessionLayout ?? DEFAULT_SETTINGS.sessionLayout)
           .onChange(async (v) => {
             const val: SessionLayoutMode =
-              v === 'reuse-active' || v === 'new-tab' || v === 'new-window' ? v : 'right-split';
+              v === 'reuse-active' || v === 'right-split' || v === 'new-tab' || v === 'new-window' ? v : 'new-tab';
             this.plugin.settings.sessionLayout = val;
             await this.plugin.saveSettings();
           });

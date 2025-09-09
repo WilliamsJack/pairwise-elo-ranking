@@ -70,7 +70,7 @@ export const DEFAULT_SETTINGS: EloSettings = {
   kFactor: 24,
   showToasts: true,
   eloIdLocation: 'frontmatter',
-  sessionLayout: 'right-split',
+  sessionLayout: 'new-tab',
   frontmatterProperties: {
     rating:  { property: 'eloRating',   enabled: false },
     rank:    { property: 'eloRank',     enabled: false },
