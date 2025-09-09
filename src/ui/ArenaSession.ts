@@ -53,7 +53,6 @@ export default class ArenaSession {
     await this.openCurrent();
 
     // Resolve the correct document/window for UI and keyboard capture.
-    // Prefer the left leaf's view container; fall back to manager's doc/win.
     const doc =
       (this.leftLeaf.view as any)?.containerEl?.ownerDocument ??
       (this.rightLeaf.view as any)?.containerEl?.ownerDocument ??
@@ -68,12 +67,12 @@ export default class ArenaSession {
     try { this.rightLeaf.setPinned(true); } catch {}
 
     this.mountOverlay(doc);
-    win.addEventListener('keydown', this.keydownHandler, true);
+    this.plugin.registerDomEvent(win, 'keydown', this.keydownHandler, true);
 
     // If the user closes a pop-out window, end the session automatically.
     if (win !== window) {
       this.popoutUnloadHandler = () => this.plugin.endSession();
-      win.addEventListener('beforeunload', this.popoutUnloadHandler);
+      this.plugin.registerDomEvent(win, 'beforeunload', this.popoutUnloadHandler);
     }
   }
 
