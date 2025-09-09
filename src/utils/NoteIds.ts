@@ -42,8 +42,15 @@ export async function ensureEloId(
       const marker = `<!-- eloId: ${id} -->`;
       return data + (needsNewline ? '\n' : '') + '\n' + marker + '\n';
     });
-    return id;
+  } else {
+    await app.fileManager.processFrontMatter(file, (fm) => {
+      if (typeof fm.eloId !== 'string' || !fm.eloId) {
+        fm.eloId = id;
+      }
+    });
   }
+
+  return id;
 }
 
 function fallbackUUID(): string {
