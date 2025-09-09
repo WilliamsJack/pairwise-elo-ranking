@@ -1,5 +1,5 @@
 # Pairwise Elo ranking for your notes
-Easily sort notes by arbitrary and subjective standards - Rank cohorts of notes in your vault by pairwise comparisons using the Elo rating system.
+Easily sort notes by any subjective standard - Rank cohorts of notes in your vault by pairwise comparisons using the Elo rating system.
 
 ![colour_base_example](docs/images/colour_base_example.webp)
 

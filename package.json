@@ -1,7 +1,7 @@
 {
 	"name": "pairwise-elo-ranking",
 	"version": "0.1.0",
-	"description": "Rank the notes in a Base by pairwise comparisons using the Elo rating system.",
+	"description": "Easily sort notes by any subjective standard - Rank cohorts of notes in your vault by pairwise comparisons using the Elo rating system.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
