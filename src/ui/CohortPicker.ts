@@ -50,15 +50,15 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
       items.push({ kind: 'saved', key: def.key, label: def.label ?? prettyCohortDefinition(def), def });
     }
 
-    // Add "Vault: All notes" only if not already present
+    // Add "Vault: all notes" only if not already present
     if (!items.some(item => item.kind === 'saved' && item.def?.key === 'vault:all')) {
-      items.push({ kind: 'action', action: 'vault-all', label: 'Vault: All notes' });
+      items.push({ kind: 'action', action: 'vault-all', label: 'Vault: all notes' });
     }
 
     // Creation actions
-    items.push({ kind: 'action', action: 'active-folder', label: 'New: Active folder' });
-    items.push({ kind: 'action', action: 'pick-folder', label: 'New: Pick a folder...' });
-    items.push({ kind: 'action', action: 'tag-dialog', label: 'New: Tag cohort (any/all)...' });
+    items.push({ kind: 'action', action: 'active-folder', label: 'New: active folder' });
+    items.push({ kind: 'action', action: 'pick-folder', label: 'New: pick a folder...' });
+    items.push({ kind: 'action', action: 'tag-dialog', label: 'New: tag cohort (any/all)...' });
 
     return items;
   }

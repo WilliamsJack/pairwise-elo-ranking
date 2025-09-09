@@ -82,7 +82,7 @@ export function parseCohortKey(key: string): CohortDefinition | undefined {
     return {
       key,
       kind: 'vault:all',
-      label: 'Vault: All notes',
+      label: 'Vault: all notes',
       params: {},
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -160,7 +160,7 @@ export function parseCohortKey(key: string): CohortDefinition | undefined {
 
 export function prettyCohortDefinition(def: CohortDefinition): string {
   switch (def.kind) {
-    case 'vault:all': return 'Vault: All notes';
+    case 'vault:all': return 'Vault: all notes';
     case 'folder': return `Folder: ${def.params.path}`;
     case 'folder-recursive': return `Folder (recursive): ${def.params.path}`;
     case 'tag:any': return `Tag (any): ${(def.params.tags ?? []).join(', ')}`;
