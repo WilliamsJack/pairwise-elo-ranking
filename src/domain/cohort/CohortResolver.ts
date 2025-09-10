@@ -3,6 +3,18 @@ import { CohortDefinition, CohortKind } from '../../types';
 
 import { normaliseTag } from '../../utils/tags';
 
+type CohortParamsMap = {
+  'vault:all': Record<string, never>;
+  'folder': { path: string };
+  'folder-recursive': { path: string };
+  'tag:any': { tags: string[] };
+  'tag:all': { tags: string[] };
+  'manual': { paths: string[] };
+  'base': { baseId: string; view?: string };
+};
+
+type AnyCohortParams = CohortParamsMap[CohortKind];
+
 function getAllFolders(app: App): TFolder[] {
   const out: TFolder[] = [];
   const walk = (f: TAbstractFile) => {
@@ -39,33 +51,44 @@ export function getFileTags(app: App, file: TFile): string[] {
   return Array.from(set);
 }
 
-export function makeCohortKey(kind: CohortKind, params: any): string {
-  switch (kind) {
+export function makeCohortKey<K extends CohortKind>(spec: { kind: K; params: CohortParamsMap[K] }): string {
+  switch (spec.kind) {
     case 'vault:all':
       return 'vault:all';
-    case 'folder':
-      return `folder:${params.path}`;
-    case 'folder-recursive':
-      return `folder-recursive:${params.path}`;
+
+    case 'folder': {
+      const p = spec.params as CohortParamsMap['folder'];
+      return `folder:${p.path}`;
+    }
+
+    case 'folder-recursive': {
+      const p = spec.params as CohortParamsMap['folder-recursive'];
+      return `folder-recursive:${p.path}`;
+    }
+
     case 'tag:any': {
-      const tags: string[] = (params?.tags ?? []).map(normaliseTag).filter(Boolean).sort();
+      const p = spec.params as CohortParamsMap['tag:any'];
+      const tags = p.tags.map(normaliseTag).filter(Boolean).sort();
       return `tag:any:${tags.join('|')}`;
     }
+
     case 'tag:all': {
-      const tags: string[] = (params?.tags ?? []).map(normaliseTag).filter(Boolean).sort();
+      const p = spec.params as CohortParamsMap['tag:all'];
+      const tags = p.tags.map(normaliseTag).filter(Boolean).sort();
       return `tag:all:${tags.join('|')}`;
     }
+
     case 'manual': {
-      const paths: string[] = (params?.paths ?? []).slice().sort();
+      const p = spec.params as CohortParamsMap['manual'];
+      const paths = p.paths.slice().sort();
       return `manual:${paths.join('|')}`;
     }
+
     case 'base': {
-      const baseId = String(params?.baseId ?? '');
-      const view = params?.view ? `|view=${params.view}` : '';
-      return `base:${baseId}${view}`;
+      const p = spec.params as CohortParamsMap['base'];
+      const view = p.view ? `|view=${p.view}` : '';
+      return `base:${String(p.baseId ?? '')}${view}`;
     }
-    default:
-      return 'vault:all';
   }
 }
 
@@ -174,8 +197,32 @@ export function prettyCohortDefinition(def: CohortDefinition): string {
   }
 }
 
-export function createDefinition(kind: CohortKind, params: any, label?: string): CohortDefinition {
-  const key = makeCohortKey(kind, params);
+export function createDefinition<K extends CohortKind>(
+  kind: K,
+  params: CohortParamsMap[K],
+  label?: string
+): CohortDefinition;
+export function createDefinition<K extends CohortKind>(
+  spec: { kind: K; params: CohortParamsMap[K]; label?: string }
+): CohortDefinition;
+
+export function createDefinition(...args: [unknown, unknown?, string?]): CohortDefinition {
+  let kind: CohortKind;
+  let params: AnyCohortParams;
+  let label: string | undefined;
+
+  if (typeof args[0] === 'object' && args[0] !== null && 'kind' in (args[0] as Record<string, unknown>)) {
+    const spec = args[0] as { kind: CohortKind; params: AnyCohortParams; label?: string };
+    kind = spec.kind;
+    params = spec.params;
+    label = spec.label;
+  } else {
+    kind = args[0] as CohortKind;
+    params = args[1] as AnyCohortParams;
+    label = args[2] as string | undefined;
+  }
+
+  const key = makeCohortKey({ kind, params });
   const ts = Date.now();
   return { key, kind, params, label: label ?? undefined, createdAt: ts, updatedAt: ts };
 }
@@ -196,7 +243,7 @@ export function resolveFilesForCohort(app: App, def: CohortDefinition): TFile[] 
       const folderPath: string = def.params.path ?? '';
       const prefix = folderPath.length ? folderPath + '/' : '';
       // Include all files under the folder (direct and nested)
-      return all.filter((f) => prefix === '' ? true : f.path.startsWith(prefix));
+      return all.filter((f) => (prefix === '' ? true : f.path.startsWith(prefix)));
     }
 
     case 'tag:any': {

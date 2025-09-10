@@ -25,9 +25,16 @@ const DEFAULT_STORE: EloStore = {
   lastUsedCohortKey: undefined,
 };
 
-function normaliseSessionLayout(val: any, fallback: SessionLayoutMode): SessionLayoutMode {
-  const allowed: SessionLayoutMode[] = ['reuse-active', 'right-split', 'new-tab', 'new-window'];
-  return allowed.includes(val) ? val : fallback;
+function normaliseSessionLayout(val: unknown, fallback: SessionLayoutMode): SessionLayoutMode {
+  switch (val) {
+    case 'reuse-active':
+    case 'right-split':
+    case 'new-tab':
+    case 'new-window':
+      return val;
+    default:
+      return fallback;
+  }
 }
 
 function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
@@ -39,7 +46,7 @@ function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
   const out: EloSettings = { ...base, ...raw };
 
   // Validate session layout
-  out.sessionLayout = normaliseSessionLayout(raw.sessionLayout ?? base.sessionLayout, base.sessionLayout);
+  out.sessionLayout = normaliseSessionLayout(raw?.sessionLayout, base.sessionLayout);
 
   if (raw.heuristics) {
     out.heuristics = {

@@ -45,7 +45,7 @@ export class ArenaLayoutManager {
 
   private resolveDocWinFromLeaf(leaf: WorkspaceLeaf): { doc: Document; win: Window } {
     const doc =
-      (leaf.view as any)?.containerEl?.ownerDocument ??
+      leaf.view?.containerEl?.ownerDocument ??
       this.app.workspace.containerEl.ownerDocument ??
       document;
     const win = doc.defaultView ?? window;
@@ -190,7 +190,7 @@ export class ArenaLayoutManager {
   private async createNewWindow(): Promise<ArenaLayoutHandle> {
     const referenceLeaf = this.getUserLeaf();
 
-    const openPopout = (this.app.workspace as any)?.openPopoutLeaf?.bind(this.app.workspace);
+    const openPopout = this.app.workspace.openPopoutLeaf?.bind(this.app.workspace);
     if (typeof openPopout !== 'function') {
       new Notice('Pop-out windows are not supported in this Obsidian version. Using right-side split instead.');
       return await this.createRightSplit();

@@ -113,12 +113,9 @@ export async function writeFrontmatterStatsForPair(
   await Promise.all(tasks);
 }
 
-type FrontmatterUpdatePlan = {
-  file: TFile;
-  setKey?: string;
-  setValue?: number;
-  deleteKey?: string;
-};
+type FrontmatterUpdatePlan =
+  | { op: 'set'; file: TFile; setKey: string; setValue: number; deleteKey?: string }
+  | { op: 'delete'; file: TFile; deleteKey: string };
 
 // Shared planner to compute per-file frontmatter updates (set and/or delete).
 async function planFrontmatterUpdates(
@@ -148,7 +145,7 @@ async function planFrontmatterUpdates(
     if (!prop && oldProp) {
       const hasOld = typeof fmCache?.[oldProp] !== 'undefined';
       if (hasOld) {
-        plans.push({ file, deleteKey: oldProp });
+        plans.push({ op: 'delete', file, deleteKey: oldProp });
       }
       continue;
     }
@@ -174,12 +171,17 @@ async function planFrontmatterUpdates(
     const needRemoveOld = hasOld;
 
     if (needSet || needRemoveOld) {
-      plans.push({
-        file,
-        setKey: needSet ? prop : undefined,
-        setValue: needSet ? newVal : undefined,
-        deleteKey: needRemoveOld ? oldProp : undefined,
-      });
+      if (needSet) {
+        plans.push({
+          op: 'set',
+          file,
+          setKey: prop,
+          setValue: newVal,
+          ...(needRemoveOld ? { deleteKey: oldProp } : {}),
+        });
+      } else {
+        plans.push({ op: 'delete', file, deleteKey: oldProp });
+      }
     }
   }
 
@@ -213,8 +215,14 @@ export async function updateCohortFrontmatterProperties(
   let updated = 0;
   for (const p of plans) {
     await app.fileManager.processFrontMatter(p.file, (yaml) => {
-      if (p.setKey) (yaml as any)[p.setKey] = p.setValue;
-      if (p.deleteKey) delete (yaml as any)[p.deleteKey];
+      if (p.op === 'set') {
+        yaml[p.setKey] = p.setValue;
+        if (p.deleteKey) {
+          delete yaml[p.deleteKey];
+        }
+      } else {
+        delete yaml[p.deleteKey];
+      }
     });
     updated += 1;
   }

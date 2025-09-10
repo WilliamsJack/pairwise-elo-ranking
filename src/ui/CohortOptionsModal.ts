@@ -92,7 +92,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
       const row = this.working[key];
       this.updateOverriddenFlag(row);
       if (row.overridden) {
-        (out as any)[key] = { property: row.property.trim(), enabled: !!row.enabled } as FrontmatterPropertyConfig;
+        out[key] = { property: row.property.trim(), enabled: !!row.enabled };
       }
     }
     return out;

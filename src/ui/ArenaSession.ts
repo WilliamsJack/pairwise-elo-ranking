@@ -54,8 +54,8 @@ export default class ArenaSession {
 
     // Resolve the correct document/window for UI and keyboard capture.
     const doc =
-      (this.leftLeaf.view as any)?.containerEl?.ownerDocument ??
-      (this.rightLeaf.view as any)?.containerEl?.ownerDocument ??
+      this.leftLeaf.view?.containerEl?.ownerDocument ??
+      this.rightLeaf.view?.containerEl?.ownerDocument ??
       this.layoutHandle.doc ??
       document;
     const win = doc.defaultView ?? this.layoutHandle.win ?? window;
@@ -147,14 +147,13 @@ export default class ArenaSession {
       active: false,
     });
 
-    // Safety: if somehow still in edit mode, flip to preview
-    const v = leaf.view as MarkdownView | undefined;
-    if (v && (v.getState()?.mode as string | undefined) !== 'preview') {
+    // Safety: if somehow still in edit mode, flip to preview again
+    const v = leaf.view instanceof MarkdownView ? leaf.view : undefined;
+    if (v && v.getMode() !== 'preview') {
       try {
-        const vs = leaf.getViewState();
         await leaf.setViewState({
-          ...vs,
-          state: { ...(vs.state as any), mode: 'preview' },
+          type: 'markdown',
+          state: { file: file.path, mode: 'preview' },
           active: false,
         });
       } catch {}
