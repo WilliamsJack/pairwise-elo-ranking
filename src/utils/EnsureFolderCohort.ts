@@ -31,7 +31,7 @@ export async function ensureFolderCohortPath(
     return undefined;
   }
 
-  const newKey = makeCohortKey(def.kind, { path: picked });
+  const newKey = makeCohortKey({ kind: def.kind, params: { path: picked } });
   const newDef: CohortDefinition = {
     ...def,
     key: newKey,

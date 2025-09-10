@@ -21,23 +21,36 @@ export type CohortKind =
   | 'manual'
   | 'base';
 
-export interface CohortDefinition {
+export type CohortParamsMap = {
+  'vault:all': Record<string, never>;
+  'folder': { path: string };
+  'folder-recursive': { path: string };
+  'tag:any': { tags: string[] };
+  'tag:all': { tags: string[] };
+  'manual': { paths: string[] };
+  'base': { baseId: string; view?: string };
+};
+
+export type CohortParams<K extends CohortKind = CohortKind> = CohortParamsMap[K];
+
+export type CohortSpec<K extends CohortKind = CohortKind> = {
+  kind: K;
+  params: CohortParamsMap[K];
+};
+
+type CohortDefBase<K extends CohortKind> = {
   key: string;
-  kind: CohortKind;
+  kind: K;
   label?: string;
-  // Params vary by kind:
-  // - vault:all {}
-  // - folder { path: string }
-  // - folder-recursive { path: string }
-  // - tag:any { tags: string[] }
-  // - tag:all { tags: string[] }
-  // - manual { paths: string[] }
-  // - base { baseId: string; view?: string }
-  params: any;
+  params: CohortParamsMap[K];
   frontmatterOverrides?: Partial<FrontmatterPropertiesSettings>;
   createdAt: number;
   updatedAt: number;
-}
+};
+
+export type CohortDefinition = {
+  [K in CohortKind]: CohortDefBase<K>
+}[CohortKind];
 
 export interface EloStore {
   version: number;

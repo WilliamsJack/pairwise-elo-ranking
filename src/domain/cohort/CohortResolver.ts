@@ -1,19 +1,15 @@
 import { App, TAbstractFile, TFile, TFolder } from 'obsidian';
-import { CohortDefinition, CohortKind } from '../../types';
+import {
+  CohortDefinition,
+  CohortKind,
+  CohortParams,
+  CohortParamsMap,
+  CohortSpec,
+} from '../../types';
 
 import { normaliseTag } from '../../utils/tags';
 
-type CohortParamsMap = {
-  'vault:all': Record<string, never>;
-  'folder': { path: string };
-  'folder-recursive': { path: string };
-  'tag:any': { tags: string[] };
-  'tag:all': { tags: string[] };
-  'manual': { paths: string[] };
-  'base': { baseId: string; view?: string };
-};
-
-type AnyCohortParams = CohortParamsMap[CohortKind];
+type ParamOf<K extends CohortKind> = CohortParamsMap[K];
 
 function getAllFolders(app: App): TFolder[] {
   const out: TFolder[] = [];
@@ -51,41 +47,52 @@ export function getFileTags(app: App, file: TFile): string[] {
   return Array.from(set);
 }
 
-export function makeCohortKey<K extends CohortKind>(spec: { kind: K; params: CohortParamsMap[K] }): string {
+export function makeCohortKey<K extends CohortKind>(spec: CohortSpec<K>): string;
+export function makeCohortKey<K extends CohortKind>(kind: K, params: CohortParamsMap[K]): string;
+
+export function makeCohortKey(
+  kindOrSpec: CohortKind | CohortSpec,
+  paramsMaybe?: unknown,
+): string {
+  const spec: CohortSpec =
+    typeof kindOrSpec === 'object' && kindOrSpec !== null && 'kind' in kindOrSpec
+      ? (kindOrSpec as CohortSpec)
+      : ({ kind: kindOrSpec as CohortKind, params: paramsMaybe as CohortParams } as CohortSpec);
+
   switch (spec.kind) {
     case 'vault:all':
       return 'vault:all';
 
     case 'folder': {
-      const p = spec.params as CohortParamsMap['folder'];
+      const p = spec.params as ParamOf<'folder'>;
       return `folder:${p.path}`;
     }
 
     case 'folder-recursive': {
-      const p = spec.params as CohortParamsMap['folder-recursive'];
+      const p = spec.params as ParamOf<'folder-recursive'>;
       return `folder-recursive:${p.path}`;
     }
 
     case 'tag:any': {
-      const p = spec.params as CohortParamsMap['tag:any'];
+      const p = spec.params as ParamOf<'tag:any'>;
       const tags = p.tags.map(normaliseTag).filter(Boolean).sort();
       return `tag:any:${tags.join('|')}`;
     }
 
     case 'tag:all': {
-      const p = spec.params as CohortParamsMap['tag:all'];
+      const p = spec.params as ParamOf<'tag:all'>;
       const tags = p.tags.map(normaliseTag).filter(Boolean).sort();
       return `tag:all:${tags.join('|')}`;
     }
 
     case 'manual': {
-      const p = spec.params as CohortParamsMap['manual'];
+      const p = spec.params as ParamOf<'manual'>;
       const paths = p.paths.slice().sort();
       return `manual:${paths.join('|')}`;
     }
 
     case 'base': {
-      const p = spec.params as CohortParamsMap['base'];
+      const p = spec.params as ParamOf<'base'>;
       const view = p.view ? `|view=${p.view}` : '';
       return `base:${String(p.baseId ?? '')}${view}`;
     }
@@ -101,14 +108,16 @@ export function parseCohortKey(key: string): CohortDefinition | undefined {
   // - tag:all:<t1|t2|...>
   // - manual:<path1|path2|...>
   // - base:<baseId>[|view=ViewName]
+  const now = Date.now();
+
   if (key === 'vault:all') {
     return {
       key,
       kind: 'vault:all',
       label: 'Vault: all notes',
-      params: {},
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      params: {} as CohortParamsMap['vault:all'],
+      createdAt: now,
+      updatedAt: now,
     };
   }
 
@@ -121,35 +130,46 @@ export function parseCohortKey(key: string): CohortDefinition | undefined {
       kind: 'folder',
       label: `Folder: ${rest}`,
       params: { path: rest },
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
     };
   }
+
   if (head === 'folder-recursive') {
     return {
       key,
       kind: 'folder-recursive',
       label: `Folder (recursive): ${rest}`,
       params: { path: rest },
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
     };
   }
+
   if (head === 'tag') {
     const [mode, tagsRaw] = rest.split(':', 2);
     const tags = (tagsRaw ?? '').split('|').map(normaliseTag).filter(Boolean);
-    if (mode === 'any' || mode === 'all') {
-      const kind = (`tag:${mode}`) as CohortKind;
+    if (mode === 'any') {
       return {
         key,
-        kind,
-        label: `Tag ${mode}: ${tags.join(', ')}`,
+        kind: 'tag:any',
+        label: `Tag any: ${tags.join(', ')}`,
         params: { tags },
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: now,
+        updatedAt: now,
+      };
+    } else if (mode === 'all') {
+      return {
+        key,
+        kind: 'tag:all',
+        label: `Tag all: ${tags.join(', ')}`,
+        params: { tags },
+        createdAt: now,
+        updatedAt: now,
       };
     }
   }
+
   if (head === 'manual') {
     const paths = rest.split('|').filter(Boolean);
     return {
@@ -157,10 +177,11 @@ export function parseCohortKey(key: string): CohortDefinition | undefined {
       kind: 'manual',
       label: `Manual (${paths.length} notes)`,
       params: { paths },
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
     };
   }
+
   if (head === 'base') {
     const [baseId, ...restParts] = rest.split('|');
     let view: string | undefined;
@@ -173,8 +194,8 @@ export function parseCohortKey(key: string): CohortDefinition | undefined {
       kind: 'base',
       label: view ? `Base: ${baseId} (${view})` : `Base: ${baseId}`,
       params: { baseId, view },
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
     };
   }
 
@@ -183,48 +204,150 @@ export function parseCohortKey(key: string): CohortDefinition | undefined {
 
 export function prettyCohortDefinition(def: CohortDefinition): string {
   switch (def.kind) {
-    case 'vault:all': return 'Vault: all notes';
-    case 'folder': return `Folder: ${def.params.path}`;
-    case 'folder-recursive': return `Folder (recursive): ${def.params.path}`;
-    case 'tag:any': return `Tag (any): ${(def.params.tags ?? []).join(', ')}`;
-    case 'tag:all': return `Tag (all): ${(def.params.tags ?? []).join(', ')}`;
-    case 'manual': return `Manual (${(def.params.paths ?? []).length} notes)`;
+    case 'vault:all':
+      return 'Vault: all notes';
+    case 'folder':
+      return `Folder: ${def.params.path}`;
+    case 'folder-recursive':
+      return `Folder (recursive): ${def.params.path}`;
+    case 'tag:any':
+      return `Tag (any): ${def.params.tags.join(', ')}`;
+    case 'tag:all':
+      return `Tag (all): ${def.params.tags.join(', ')}`;
+    case 'manual':
+      return `Manual (${def.params.paths.length} notes)`;
     case 'base': {
       const v = def.params.view ? ` (${def.params.view})` : '';
       return `Base: ${def.params.baseId}${v}`;
     }
-    default: return def.key;
   }
 }
 
+// Overloads keep existing call sites working
 export function createDefinition<K extends CohortKind>(
   kind: K,
   params: CohortParamsMap[K],
   label?: string
 ): CohortDefinition;
 export function createDefinition<K extends CohortKind>(
-  spec: { kind: K; params: CohortParamsMap[K]; label?: string }
+  spec: CohortSpec<K> & { label?: string }
 ): CohortDefinition;
 
-export function createDefinition(...args: [unknown, unknown?, string?]): CohortDefinition {
-  let kind: CohortKind;
-  let params: AnyCohortParams;
-  let label: string | undefined;
+export function createDefinition(
+  kindOrSpec: CohortKind | (CohortSpec & { label?: string }),
+  paramsMaybe?: unknown,
+  label?: string,
+): CohortDefinition {
+  const ts = Date.now();
 
-  if (typeof args[0] === 'object' && args[0] !== null && 'kind' in (args[0] as Record<string, unknown>)) {
-    const spec = args[0] as { kind: CohortKind; params: AnyCohortParams; label?: string };
-    kind = spec.kind;
-    params = spec.params;
-    label = spec.label;
-  } else {
-    kind = args[0] as CohortKind;
-    params = args[1] as AnyCohortParams;
-    label = args[2] as string | undefined;
+  if (typeof kindOrSpec === 'object' && kindOrSpec !== null && 'kind' in kindOrSpec) {
+    const spec = kindOrSpec as CohortSpec & { label?: string };
+    const key = makeCohortKey(spec);
+
+    switch (spec.kind) {
+      case 'vault:all':
+        return {
+          key,
+          kind: 'vault:all',
+          params: {} as CohortParamsMap['vault:all'],
+          label: spec.label,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+      case 'folder':
+        return {
+          key,
+          kind: 'folder',
+          params: spec.params as CohortParamsMap['folder'],
+          label: spec.label,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+      case 'folder-recursive':
+        return {
+          key,
+          kind: 'folder-recursive',
+          params: spec.params as CohortParamsMap['folder-recursive'],
+          label: spec.label,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+      case 'tag:any':
+        return {
+          key,
+          kind: 'tag:any',
+          params: spec.params as CohortParamsMap['tag:any'],
+          label: spec.label,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+      case 'tag:all':
+        return {
+          key,
+          kind: 'tag:all',
+          params: spec.params as CohortParamsMap['tag:all'],
+          label: spec.label,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+      case 'manual':
+        return {
+          key,
+          kind: 'manual',
+          params: spec.params as CohortParamsMap['manual'],
+          label: spec.label,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+      case 'base':
+        return {
+          key,
+          kind: 'base',
+          params: spec.params as CohortParamsMap['base'],
+          label: spec.label,
+          createdAt: ts,
+          updatedAt: ts,
+        };
+    }
   }
 
-  const key = makeCohortKey({ kind, params });
-  const ts = Date.now();
-  return { key, kind, params, label: label ?? undefined, createdAt: ts, updatedAt: ts };
+  switch (kindOrSpec as CohortKind) {
+    case 'vault:all': {
+      const params = {} as CohortParamsMap['vault:all'];
+      const key = makeCohortKey('vault:all', params);
+      return { key, kind: 'vault:all', params, label, createdAt: ts, updatedAt: ts };
+    }
+    case 'folder': {
+      const params = paramsMaybe as CohortParamsMap['folder'];
+      const key = makeCohortKey('folder', params);
+      return { key, kind: 'folder', params, label, createdAt: ts, updatedAt: ts };
+    }
+    case 'folder-recursive': {
+      const params = paramsMaybe as CohortParamsMap['folder-recursive'];
+      const key = makeCohortKey('folder-recursive', params);
+      return { key, kind: 'folder-recursive', params, label, createdAt: ts, updatedAt: ts };
+    }
+    case 'tag:any': {
+      const params = paramsMaybe as CohortParamsMap['tag:any'];
+      const key = makeCohortKey('tag:any', params);
+      return { key, kind: 'tag:any', params, label, createdAt: ts, updatedAt: ts };
+    }
+    case 'tag:all': {
+      const params = paramsMaybe as CohortParamsMap['tag:all'];
+      const key = makeCohortKey('tag:all', params);
+      return { key, kind: 'tag:all', params, label, createdAt: ts, updatedAt: ts };
+    }
+    case 'manual': {
+      const params = paramsMaybe as CohortParamsMap['manual'];
+      const key = makeCohortKey('manual', params);
+      return { key, kind: 'manual', params, label, createdAt: ts, updatedAt: ts };
+    }
+    case 'base': {
+      const params = paramsMaybe as CohortParamsMap['base'];
+      const key = makeCohortKey('base', params);
+      return { key, kind: 'base', params, label, createdAt: ts, updatedAt: ts };
+    }
+  }
 }
 
 export function resolveFilesForCohort(app: App, def: CohortDefinition): TFile[] {
@@ -235,19 +358,18 @@ export function resolveFilesForCohort(app: App, def: CohortDefinition): TFile[] 
       return all;
 
     case 'folder': {
-      const folderPath: string = def.params.path ?? '';
+      const folderPath = def.params.path;
       return all.filter((f) => f.parent?.path === folderPath);
     }
 
     case 'folder-recursive': {
-      const folderPath: string = def.params.path ?? '';
+      const folderPath = def.params.path;
       const prefix = folderPath.length ? folderPath + '/' : '';
-      // Include all files under the folder (direct and nested)
       return all.filter((f) => (prefix === '' ? true : f.path.startsWith(prefix)));
     }
 
     case 'tag:any': {
-      const want: Set<string> = new Set((def.params.tags ?? []).map(normaliseTag));
+      const want: Set<string> = new Set(def.params.tags.map(normaliseTag));
       if (want.size === 0) return [];
       return all.filter((f) => {
         const tags = getFileTags(app, f);
@@ -257,7 +379,7 @@ export function resolveFilesForCohort(app: App, def: CohortDefinition): TFile[] 
     }
 
     case 'tag:all': {
-      const want: Set<string> = new Set((def.params.tags ?? []).map(normaliseTag));
+      const want: Set<string> = new Set(def.params.tags.map(normaliseTag));
       if (want.size === 0) return [];
       return all.filter((f) => {
         const tags = new Set(getFileTags(app, f));
@@ -267,7 +389,7 @@ export function resolveFilesForCohort(app: App, def: CohortDefinition): TFile[] 
     }
 
     case 'manual': {
-      const paths: string[] = def.params.paths ?? [];
+      const paths: string[] = def.params.paths;
       const out: TFile[] = [];
       for (const p of paths) {
         const af = app.vault.getAbstractFileByPath(p);
@@ -280,9 +402,6 @@ export function resolveFilesForCohort(app: App, def: CohortDefinition): TFile[] 
       // Placeholder for future Bases integration, pending the Bases API
       return [];
     }
-
-    default:
-      return [];
   }
 }
 
