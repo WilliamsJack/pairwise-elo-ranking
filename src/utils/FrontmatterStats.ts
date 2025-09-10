@@ -246,7 +246,9 @@ export async function updateCohortFrontmatter(
   try {
     return await updateCohortFrontmatterProperties(app, files, valuesById, newPropName, oldPropName);
   } finally {
-    try { working.hide(); } catch {}
+    try { working.hide(); } catch {
+      // Non-fatal: notice may already be dismissed or window is gone. Ignore.
+    }
   }
 }
 

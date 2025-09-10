@@ -63,8 +63,12 @@ export default class ArenaSession {
     this.overlayWin = win;
 
     // Pin both leaves during the session
-    try { this.leftLeaf.setPinned(true); } catch {}
-    try { this.rightLeaf.setPinned(true); } catch {}
+    try { this.leftLeaf.setPinned(true); } catch {
+      // Non-fatal: pinning may not exist on this version or the leaf may be disposed. Ignore.
+    }
+    try { this.rightLeaf.setPinned(true); } catch {
+      // Non-fatal: pinning may not exist on this version or the leaf may be disposed. Ignore.
+    }
 
     this.mountOverlay(doc);
     this.plugin.registerDomEvent(win, 'keydown', this.keydownHandler, true);
@@ -79,11 +83,17 @@ export default class ArenaSession {
   async end(opts?: { forUnload?: boolean }) {
     // Remove listeners from the correct window
     if (this.overlayWin) {
-      try { this.overlayWin.removeEventListener('keydown', this.keydownHandler, true); } catch {}
+      try { this.overlayWin.removeEventListener('keydown', this.keydownHandler, true); } catch {
+        // Non-fatal: pop-out window may already be closed or listener already removed. Ignore.
+      }
       if (this.popoutUnloadHandler) {
-        try { this.overlayWin.removeEventListener('beforeunload', this.popoutUnloadHandler); } catch {}
+        try { this.overlayWin.removeEventListener('beforeunload', this.popoutUnloadHandler); } catch {
+          // Non-fatal: pop-out window may already be closed or listener already removed. Ignore.
+        }
         // Hide any toast we created while in the popout (so they don't reattach to the main window)
-        try { for (const n of this.liveNotices) { (n as Notice)?.hide?.(); } } catch {}
+        try { for (const n of this.liveNotices) { (n as Notice)?.hide?.(); } } catch {
+          // Non-fatal: notice handles may belong to another window or be disposed. Ignore.
+        }
       }
     }
     this.popoutUnloadHandler = undefined;
@@ -91,12 +101,18 @@ export default class ArenaSession {
     this.unmountOverlay();
 
     // Unpin leaves
-    try { this.leftLeaf.setPinned(false); } catch {}
-    try { this.rightLeaf.setPinned(false); } catch {}
+    try { this.leftLeaf.setPinned(false); } catch {
+      // Non-fatal: leaf may already be gone or API unavailable. Ignore.
+    }
+    try { this.rightLeaf.setPinned(false); } catch {
+      // Non-fatal: leaf may already be gone or API unavailable. Ignore.
+    }
   
     // Only detach/cleanup panes when not unloading the plugin (as per guidelines)
     if (!opts?.forUnload) {
-      try { await this.layoutHandle?.cleanup(); } catch {}
+      try { await this.layoutHandle?.cleanup(); } catch {
+        // Non-fatal: cleanup is best-effort; panes may already be detached. Ignore.
+      }
     }
 
     this.liveNotices = [];
@@ -156,7 +172,9 @@ export default class ArenaSession {
           state: { file: file.path, mode: 'preview' },
           active: false,
         });
-      } catch {}
+      } catch {
+        // Non-fatal: view may have been disposed or replaced between checks. Ignore.
+      }
     }
   }
 
@@ -230,7 +248,9 @@ export default class ArenaSession {
   private showToast(message: string, timeout = 4000): void {
     try {
       this.liveNotices.push(new Notice(message, timeout));
-    } catch {}
+    } catch {
+      // Non-fatal: constructing a Notice can fail in pop-outs or during teardown. Ignore.
+    }
   }
 
   private getEffectiveFrontmatter(): FrontmatterPropertiesSettings {

@@ -299,7 +299,9 @@ class TagCohortModal extends BasePromiseModal<CohortDefinition | undefined> {
       for (const f of files) {
         for (const t of getFileTags(this.app, f)) set.add(t);
       }
-    } catch {}
+    } catch {
+      // Non-fatal: metadata cache or vault access may fail; fall back to empty tag list.
+    }
 
     return Array.from(set).filter(Boolean).sort();
   }

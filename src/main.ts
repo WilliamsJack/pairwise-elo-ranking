@@ -134,7 +134,9 @@ export default class EloPlugin extends Plugin {
 
     updateCohortFrontmatter(this.app, files, rankMap, rankCfg.property, undefined, 'Updating ranks in frontmatter...')
       .catch((e) => {
-        try { console.error('[Elo] Failed to update ranks in frontmatter', e); } catch {}
+        try { console.error('[Elo] Failed to update ranks in frontmatter', e); } catch {
+          // Non-fatal: console may be unavailable in this context. Ignore.
+        }
       });
   }
 }
