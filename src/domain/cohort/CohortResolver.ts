@@ -15,7 +15,7 @@ function getAllFolders(app: App): TFolder[] {
   return out;
 }
 
-function getFileTags(app: App, file: TFile): string[] {
+export function getFileTags(app: App, file: TFile): string[] {
   const cache = app.metadataCache.getFileCache(file);
   const set = new Set<string>();
 

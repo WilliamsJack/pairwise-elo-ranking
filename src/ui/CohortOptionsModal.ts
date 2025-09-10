@@ -2,7 +2,7 @@ import { App, ButtonComponent, Setting, TextComponent, ToggleComponent } from 'o
 import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '../settings';
 
 import { BasePromiseModal } from './PromiseModal';
-import type EloPlugin from '../../main';
+import type EloPlugin from '../main';
 
 type Mode = 'create' | 'edit';
 

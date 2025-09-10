@@ -1,17 +1,18 @@
 import { App, ButtonComponent, FuzzySuggestModal, Notice, Setting } from 'obsidian';
 import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
-import { createDefinition, parseCohortKey, prettyCohortDefinition } from '../domain/cohort/CohortResolver';
+import { createDefinition, getFileTags, parseCohortKey, prettyCohortDefinition } from '../domain/cohort/CohortResolver';
 
 import { CohortDefinition } from '../types';
 import { CohortOptionsModal } from './CohortOptionsModal';
-import type EloPlugin from '../../main';
+import type EloPlugin from '../main';
 import { FolderSelectModal } from './FolderPicker';
 import type { FrontmatterPropertiesSettings } from '../settings';
 import { normaliseTag } from '../utils/tags';
 
+type Action = 'vault-all' | 'active-folder' | 'pick-folder' | 'tag-dialog';
 type Choice =
   | { kind: 'saved'; key: string; label: string; def?: CohortDefinition }
-  | { kind: 'action'; action: 'vault-all' | 'active-folder' | 'pick-folder' | 'tag-dialog'; label: string };
+  | { kind: 'action'; action: Action; label: string };
 
 export class CohortPicker extends FuzzySuggestModal<Choice> {
   private plugin: EloPlugin;
@@ -138,7 +139,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     return def;
   }
 
-  private async buildDefinitionForAction(action: Choice['action']): Promise<CohortDefinition | undefined> {
+  private async buildDefinitionForAction(action: Action): Promise<CohortDefinition | undefined> {
     switch (action) {
       case 'vault-all':
         return createDefinition('vault:all', {}, 'Vault: All notes');
@@ -294,11 +295,9 @@ class TagCohortModal extends BasePromiseModal<CohortDefinition | undefined> {
     const set = new Set<string>();
 
     try {
-      const inline = this.app.metadataCache.getTags?.();
-      if (inline && typeof inline === 'object') {
-        for (const k of Object.keys(inline)) {
-          if (k) set.add(normaliseTag(k));
-        }
+      const files = this.app.vault.getMarkdownFiles();
+      for (const f of files) {
+        for (const t of getFileTags(this.app, f)) set.add(t);
       }
     } catch {}
 

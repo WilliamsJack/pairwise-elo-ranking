@@ -121,6 +121,14 @@ export class PluginDataStore {
       });
     }
 
+    let p = this._pendingDebouncePromise;
+    if (!p) {
+      p = new Promise<void>((resolve) => {
+        this._pendingDebounceResolve = resolve;
+      });
+      this._pendingDebouncePromise = p;
+    }
+
     this._saveTimerId = window.setTimeout(async () => {
       this._saveTimerId = null;
       const resolve = this._pendingDebounceResolve;
@@ -134,7 +142,7 @@ export class PluginDataStore {
       }
     }, this._debounceMs);
 
-    return this._pendingDebouncePromise!;
+    return p;
   }
 
   // Public: debounced saves

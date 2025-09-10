@@ -36,13 +36,16 @@ export class BasePromiseModal<T> extends Modal {
 }
 
 // Base for FuzzySuggestModal that returns a value via a Promise.
-export class BasePromiseFuzzyModal<T> extends FuzzySuggestModal<T> {
+export abstract class BasePromiseFuzzyModal<T> extends FuzzySuggestModal<T> {
   protected resolver?: (value?: T) => void;
   protected _resolved = false;
 
   constructor(app: App) {
     super(app);
   }
+
+  abstract getItems(): T[];
+  abstract getItemText(item: T): string;
 
   openAndGetValue(): Promise<T | undefined> {
     return new Promise((resolve) => {
