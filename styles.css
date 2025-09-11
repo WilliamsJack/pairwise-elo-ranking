@@ -40,6 +40,10 @@
   border-radius: var(--radius-s);
 }
 
+.cohort-item-info {
+  cursor: pointer;
+}
+
 /* Settings accordions */
 .elo-settings-accordion {
   margin-top: var(--size-4-3); /* 12px */

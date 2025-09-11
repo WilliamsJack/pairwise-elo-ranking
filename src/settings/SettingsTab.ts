@@ -196,8 +196,7 @@ export default class EloSettingsTab extends PluginSettingTab {
       for (const def of sorted) {
         const row = list.createDiv({ cls: 'setting-item mod-toggle' });
 
-        const info = row.createDiv({ cls: 'setting-item-info' });
-        info.style.cursor = 'pointer';
+        const info = row.createDiv({ cls: 'cohort-item-info' });
         info.addEventListener('click', async () => {
           await this.configureCohort(def.key);
         });
