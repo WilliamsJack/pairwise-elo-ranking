@@ -7,6 +7,7 @@ import { CohortOptionsModal } from './CohortOptionsModal';
 import type EloPlugin from '../main';
 import { FolderSelectModal } from './FolderPicker';
 import type { FrontmatterPropertiesSettings } from '../settings';
+import type { ScrollStartMode } from '../types';
 import { normaliseTag } from '../utils/tags';
 
 type Action = 'vault-all' | 'active-folder' | 'pick-folder' | 'tag-dialog';
@@ -114,7 +115,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     return await this.runChild(() => new TagCohortModal(this.app).openAndGetDefinition());
   }
 
-  private async chooseFrontmatterOverrides(): Promise<{ overrides?: Partial<FrontmatterPropertiesSettings>; name?: string } | undefined> {
+  private async chooseFrontmatterOverrides(): Promise<{ overrides?: Partial<FrontmatterPropertiesSettings>; name?: string; scrollStart?: ScrollStartMode } | undefined> {
     return await this.runChild(() =>
       new CohortOptionsModal(this.app, this.plugin, {
         mode: 'create',
@@ -135,6 +136,8 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
 
     const newName = (res.name ?? '').trim();
     if (newName.length > 0) def.label = newName;
+
+    def.scrollStart = res.scrollStart && res.scrollStart !== 'none' ? res.scrollStart : undefined;
 
     return def;
   }

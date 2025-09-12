@@ -1,6 +1,6 @@
 import { App, MarkdownView, Notice, TFile, WorkspaceLeaf } from 'obsidian';
 import { ArenaLayoutHandle, ArenaLayoutManager } from './LayoutManager';
-import { MatchResult, UndoFrame } from '../types';
+import { MatchResult, ScrollStartMode, UndoFrame } from '../types';
 import { ensureEloId, getEloId } from '../utils/NoteIds';
 
 import type EloPlugin from '../main';
@@ -155,6 +155,11 @@ export default class ArenaSession {
     ]);
   }
 
+  private getCohortScrollStart(): ScrollStartMode {
+    const def = this.plugin.dataStore.getCohortDef(this.cohortKey);
+    return def?.scrollStart ?? 'none';
+  }
+
   private async openInReadingMode(leaf: WorkspaceLeaf, file: TFile) {
     // Force Reading Mode and prevent focus grabbing
     await leaf.setViewState({
@@ -176,6 +181,110 @@ export default class ArenaSession {
         // Non-fatal: view may have been disposed or replaced between checks. Ignore.
       }
     }
+
+    // Apply initial scroll behaviour
+    const mode = this.getCohortScrollStart();
+    await this.applyInitialScroll(leaf, mode);
+  }
+
+  private async applyInitialScroll(leaf: WorkspaceLeaf, mode: ScrollStartMode): Promise<void> {
+  if (mode === 'none') return;
+  const v = leaf.view;
+  if (!(v instanceof MarkdownView)) return;
+
+  // Retry briefly while content renders for all modes, including after-frontmatter
+  const maxTries = 30;
+  const stepMs = 100;
+  for (let i = 0; i < maxTries; i++) {
+    if (this.tryScrollView(v, mode)) return;
+    await this.sleep(stepMs);
+  }
+}
+
+  private tryScrollView(view: MarkdownView, mode: ScrollStartMode): boolean {
+    const preview = this.getPreviewEl(view);
+    if (!preview) return false;
+  
+    const root = this.getRenderedRoot(preview);
+  
+    const findHeading = (): HTMLElement | null =>
+      (root.querySelector('h1, h2, h3, h4, h5, h6') as HTMLElement | null);
+    const findImage = (): HTMLElement | null =>
+      (root.querySelector('img') as HTMLElement | null);
+  
+    if (mode === 'after-frontmatter') {
+      return this.scrollPastFrontmatter(preview);
+    }
+  
+    let target: HTMLElement | null = null;
+    if (mode === 'first-image') {
+      target = findImage() || findHeading();
+    } else if (mode === 'first-heading') {
+      target = findHeading();
+    }
+  
+    if (target) {
+      try {
+        target.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+      } catch {
+        // Non-fatal: scrollIntoView may fail if the element is not in the DOM. Ignore.
+      }
+      return true;
+    }
+    return false;
+  }
+
+  private getPreviewEl(view: MarkdownView): HTMLElement | null {
+    const scope = view.contentEl ?? view.containerEl;
+    return (
+      (scope.querySelector('.markdown-reading-view .markdown-preview-view') as HTMLElement | null) ??
+      (scope.querySelector('.markdown-preview-view') as HTMLElement | null)
+    );
+  }
+
+  private getRenderedRoot(preview: HTMLElement): HTMLElement {
+    return (
+      (preview.querySelector('.markdown-preview-sizer') as HTMLElement | null) ??
+      (preview.querySelector('.markdown-rendered') as HTMLElement | null) ??
+      preview
+    );
+  }
+
+  private scrollToTop(preview: HTMLElement): void {
+    try {
+      preview.scrollTo({ top: 0, behavior: 'auto' });
+    } catch {
+      try { preview.scrollTop = 0; } catch {
+        // Non-fatal: scrollTop may fail if the element is not in the DOM. Ignore.
+      }
+    }
+  }
+
+  private scrollPastFrontmatter(preview: HTMLElement): boolean {
+    const root = this.getRenderedRoot(preview);
+      
+    // Scroll to the first real content element after the properties/frontmatter block
+    let next = root.querySelector(
+      ':scope > :has(.metadata-container, .frontmatter-container, .frontmatter, pre.frontmatter) ~ *'
+    ) as HTMLElement | null;
+    
+    while (next && next.offsetHeight <= 0) {
+      next = next.nextElementSibling as HTMLElement | null;
+    }
+    
+    if (next) {
+      try {
+        next.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+        return true;
+      } catch {
+        // Non-fatal: scrollIntoView may fail if the element is not in the DOM. Ignore.
+      }
+    }
+    return false;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private mountOverlay(doc: Document = document) {

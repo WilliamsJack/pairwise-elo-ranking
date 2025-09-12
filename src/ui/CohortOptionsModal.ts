@@ -3,6 +3,7 @@ import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '.
 
 import { BasePromiseModal } from './PromiseModal';
 import type EloPlugin from '../main';
+import type { ScrollStartMode } from '../types';
 
 type Mode = 'create' | 'edit';
 
@@ -18,6 +19,7 @@ type RowState = {
 export type CohortOptionsResult = {
   overrides: Partial<FrontmatterPropertiesSettings>;
   name?: string;
+  scrollStart?: ScrollStartMode;
 };
 
 export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | undefined> {
@@ -27,15 +29,17 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
   private base: FrontmatterPropertiesSettings;
   private initial?: Partial<FrontmatterPropertiesSettings>;
   private initialName?: string;
+  private initialScrollStart?: ScrollStartMode;
 
   private nameWorking = '';
+  private scrollWorking: ScrollStartMode = 'none';
 
   private working: Record<Key, RowState>;
 
   constructor(
     app: App,
     plugin: EloPlugin,
-    opts?: { mode?: Mode; initial?: Partial<FrontmatterPropertiesSettings>; initialName?: string },
+    opts?: { mode?: Mode; initial?: Partial<FrontmatterPropertiesSettings>; initialName?: string; initialScrollStart?: ScrollStartMode },
   ) {
     super(app);
     this.plugin = plugin;
@@ -44,6 +48,9 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
     this.initial = opts?.initial;
     this.initialName = (opts?.initialName ?? '').trim();
     this.nameWorking = this.initialName ?? '';
+
+    this.initialScrollStart = opts?.initialScrollStart;
+    this.scrollWorking = this.initialScrollStart ?? 'none';
 
     const mk = (k: Key): RowState => {
       const baseCfg = this.base[k];
@@ -122,6 +129,29 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
           }),
       );
 
+    // Initial scroll position
+    const scrollLabels: Record<ScrollStartMode, string> = {
+      none: 'No auto-scroll',
+      'after-frontmatter': 'Top of content (past frontmatter)',
+      'first-heading': 'First heading',
+      'first-image': 'First image',
+    };
+
+    new Setting(contentEl)
+      .setName('Initial scroll position')
+      .setDesc('Auto-scroll notes to this position for quicker comparisons.')
+      .addDropdown((dd) => {
+        dd.addOptions(scrollLabels as Record<string, string>)
+          .setValue(this.scrollWorking)
+          .onChange((v) => {
+            if (v === 'after-frontmatter' || v === 'first-heading' || v === 'first-image' || v === 'none') {
+              this.scrollWorking = v;
+            } else {
+              this.scrollWorking = 'none';
+            }
+          });
+      });
+
     const addRow = (key: Key, label: string, help: string) => {
       const row = this.working[key];
       let textRef: TextComponent | undefined;
@@ -176,6 +206,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
           const result: CohortOptionsResult = {
             overrides: this.buildOverridesPayload(),
             name: this.nameWorking || undefined,
+            scrollStart: this.scrollWorking,
           };
           this.finish(result);
         }),

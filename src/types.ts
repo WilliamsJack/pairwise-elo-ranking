@@ -38,12 +38,15 @@ export type CohortSpec<K extends CohortKind = CohortKind> = {
   params: CohortParamsMap[K];
 };
 
+export type ScrollStartMode = 'none' | 'after-frontmatter' | 'first-image' | 'first-heading';
+
 type CohortDefBase<K extends CohortKind> = {
   key: string;
   kind: K;
   label?: string;
   params: CohortParamsMap[K];
   frontmatterOverrides?: Partial<FrontmatterPropertiesSettings>;
+  scrollStart?: ScrollStartMode;
   createdAt: number;
   updatedAt: number;
 };

@@ -732,6 +732,7 @@ export default class EloSettingsTab extends PluginSettingTab {
       mode: 'edit',
       initial: def.frontmatterOverrides,
       initialName: def.label ?? '',
+      initialScrollStart: def.scrollStart,
     }).openAndGetOptions();
 
     if (!res) return;
@@ -743,12 +744,14 @@ export default class EloSettingsTab extends PluginSettingTab {
     const oldEffective = effectiveFrontmatterProperties(base, def.frontmatterOverrides);
     const newEffective = effectiveFrontmatterProperties(base, overrides);
 
-    // Persist overrides (clear if no keys) and label (name)
+    // Persist properties overrides (clear if no keys), label, and initial scroll
     const hasKeys = Object.keys(overrides).length > 0;
     def.frontmatterOverrides = hasKeys ? overrides : undefined;
 
     const newName = (res.name ?? '').trim();
     def.label = newName.length > 0 ? newName : undefined;
+
+    def.scrollStart = res.scrollStart && res.scrollStart !== 'none' ? res.scrollStart : undefined;
 
     this.plugin.dataStore.upsertCohortDef(def);
     await this.plugin.dataStore.saveStore();
