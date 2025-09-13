@@ -49,9 +49,6 @@ export default class ArenaSession {
     this.leftLeaf = this.layoutHandle.leftLeaf;
     this.rightLeaf = this.layoutHandle.rightLeaf;
 
-    this.pickNextPair();
-    await this.openCurrent();
-
     // Resolve the correct document/window for UI and keyboard capture.
     const doc =
       this.leftLeaf.view?.containerEl?.ownerDocument ??
@@ -78,6 +75,10 @@ export default class ArenaSession {
       this.popoutUnloadHandler = () => this.plugin.endSession();
       this.plugin.registerDomEvent(win, 'beforeunload', this.popoutUnloadHandler);
     }
+  
+    this.pickNextPair();
+    this.updateOverlay();
+    await this.openCurrent();
   }
 
   async end(opts?: { forUnload?: boolean }) {
@@ -184,7 +185,7 @@ export default class ArenaSession {
 
     // Apply initial scroll behaviour
     const mode = this.getCohortScrollStart();
-    await this.applyInitialScroll(leaf, mode);
+    void this.applyInitialScroll(leaf, mode);
   }
 
   private async applyInitialScroll(leaf: WorkspaceLeaf, mode: ScrollStartMode): Promise<void> {
