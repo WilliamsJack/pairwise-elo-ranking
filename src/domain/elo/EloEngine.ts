@@ -1,15 +1,9 @@
 import { MatchResult } from '../../types';
+import type { EloHeuristicsSettings as EloHeuristics } from '../../settings';
 
 export function expectedScore(rA: number, rB: number): number {
   return 1 / (1 + Math.pow(10, (rB - rA) / 400));
 }
-
-export type EloHeuristics = {
-  provisional?: { enabled?: boolean; matches?: number; multiplier?: number };
-  decay?: { enabled?: boolean; halfLife?: number; minK?: number };
-  upsetBoost?: { enabled?: boolean; threshold?: number; multiplier?: number };
-  drawGapBoost?: { enabled?: boolean; threshold?: number; multiplier?: number };
-};
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));

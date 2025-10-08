@@ -8,7 +8,6 @@ import {
 } from '../types';
 import { DEFAULT_SETTINGS, EloSettings, SessionLayoutMode } from '../settings';
 
-import type { EloHeuristicsSettings as EloHeuristics } from '../settings'
 import { Plugin } from 'obsidian';
 import { updateElo } from '../domain/elo/EloEngine';
 
@@ -215,7 +214,7 @@ export class PluginDataStore {
       this.settings.kFactor,
       a.matches,
       b.matches,
-      hs as EloHeuristics,
+      hs,
     );
     a.rating = newA;
     b.rating = newB;
