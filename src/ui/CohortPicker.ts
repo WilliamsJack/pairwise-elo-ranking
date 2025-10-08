@@ -107,7 +107,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
       if (!scope) return undefined;
 
       const kind = scope === 'folder-recursive' ? 'folder-recursive' : 'folder';
-      return createDefinition(kind, { path });
+      return createDefinition({ kind, params: { path } });
     });
   }
 
@@ -145,7 +145,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
   private async buildDefinitionForAction(action: Action): Promise<CohortDefinition | undefined> {
     switch (action) {
       case 'vault-all':
-        return createDefinition('vault:all', {}, 'Vault: All notes');
+        return createDefinition({ kind: 'vault:all', params: {}, label: 'Vault: All notes' });
       case 'active-folder': {
         const active = this.app.workspace.getActiveFile();
         const path = active?.parent?.path;
@@ -411,7 +411,7 @@ class TagCohortModal extends BasePromiseModal<CohortDefinition | undefined> {
         if (this.selectedTags.size === 0) return;
         const tags = Array.from(this.selectedTags).sort();
         const kind = this.mode === 'all' ? 'tag:all' : 'tag:any';
-        const def = createDefinition(kind, { tags });
+        const def = createDefinition({ kind, params: { tags } });
         this.finish(def);
       });
       this.updateButtonsDisabled();

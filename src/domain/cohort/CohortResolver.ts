@@ -212,25 +212,7 @@ const handlers: Record<CohortKind, Handler<any>> = {
   },
 };
 
-
-export function makeCohortKey<K extends CohortKind>(spec: CohortSpec<K>): string;
-export function makeCohortKey<K extends CohortKind>(
-  kind: K,
-  params: CohortParamsMap[K],
-): string;
-
-export function makeCohortKey(
-  kindOrSpec: CohortKind | CohortSpec,
-  paramsMaybe?: unknown,
-): string {
-  const spec: CohortSpec =
-    typeof kindOrSpec === 'object' && kindOrSpec !== null && 'kind' in kindOrSpec
-      ? (kindOrSpec as CohortSpec)
-      : ({
-          kind: kindOrSpec as CohortKind,
-          params: paramsMaybe as CohortParamsMap[CohortKind],
-        } as CohortSpec);
-
+export function makeCohortKey(spec: CohortSpec): string {
   const h = handlers[spec.kind];
   return h.makeKey(spec.params as any);
 }
@@ -255,38 +237,15 @@ export function parseCohortKey(key: string): CohortDefinition | undefined {
     label: parsed.label,
     createdAt: now,
     updatedAt: now,
-  } as CohortDefinition;
+  };
 }
 
 export function prettyCohortDefinition(def: CohortDefinition): string {
   return handlers[def.kind].pretty(def.params as any);
 }
 
-export function createDefinition<K extends CohortKind>(
-  kind: K,
-  params: CohortParamsMap[K],
-  label?: string,
-): CohortDefinition;
-export function createDefinition<K extends CohortKind>(
-  spec: CohortSpec<K> & { label?: string },
-): CohortDefinition;
-
-export function createDefinition(
-  kindOrSpec: CohortKind | (CohortSpec & { label?: string }),
-  paramsMaybe?: unknown,
-  label?: string,
-): CohortDefinition {
+export function createDefinition(spec: CohortSpec & { label?: string }): CohortDefinition {
   const ts = Date.now();
-
-  const spec: CohortSpec & { label?: string } =
-    typeof kindOrSpec === 'object' && kindOrSpec !== null && 'kind' in kindOrSpec
-      ? (kindOrSpec as any)
-      : ({
-          kind: kindOrSpec as CohortKind,
-          params: paramsMaybe as any,
-          label,
-        } as any);
-
   const key = makeCohortKey(spec);
   return {
     key,
