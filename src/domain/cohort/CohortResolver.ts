@@ -8,7 +8,6 @@ import {
 
 import { normaliseTag } from '../../utils/tags';
 
-
 function getAllFolders(app: App): TFolder[] {
   const out: TFolder[] = [];
   const walk = (f: TAbstractFile) => {
@@ -56,7 +55,9 @@ type Handler<K extends CohortKind> = {
   resolve: (app: App, params: CohortParamsMap[K]) => TFile[];
 };
 
-const handlers: Record<CohortKind, Handler<any>> = {
+type CohortHandlersMap = { [K in CohortKind]: Handler<K> };
+
+const handlers: CohortHandlersMap = {
   'vault:all': {
     makeKey: () => 'vault:all',
     parse: (key) =>
@@ -68,22 +69,21 @@ const handlers: Record<CohortKind, Handler<any>> = {
   },
 
   folder: {
-    makeKey: (p: CohortParamsMap['folder']) => `folder:${p.path}`,
+    makeKey: (p) => `folder:${p.path}`,
     parse: (key) => {
       if (!key.startsWith('folder:')) return undefined;
       const path = key.slice('folder:'.length);
       return { kind: 'folder', params: { path }, label: `Folder: ${path}` };
     },
-    pretty: (p: CohortParamsMap['folder']) => `Folder: ${p.path}`,
-    resolve: (app, p: CohortParamsMap['folder']) => {
+    pretty: (p) => `Folder: ${p.path}`,
+    resolve: (app, p) => {
       const all = app.vault.getMarkdownFiles();
       return all.filter((f) => f.parent?.path === p.path);
     },
   },
 
   'folder-recursive': {
-    makeKey: (p: CohortParamsMap['folder-recursive']) =>
-      `folder-recursive:${p.path}`,
+    makeKey: (p) => `folder-recursive:${p.path}`,
     parse: (key) => {
       if (!key.startsWith('folder-recursive:')) return undefined;
       const path = key.slice('folder-recursive:'.length);
@@ -93,9 +93,8 @@ const handlers: Record<CohortKind, Handler<any>> = {
         label: `Folder (recursive): ${path}`,
       };
     },
-    pretty: (p: CohortParamsMap['folder-recursive']) =>
-      `Folder (recursive): ${p.path}`,
-    resolve: (app, p: CohortParamsMap['folder-recursive']) => {
+    pretty: (p) => `Folder (recursive): ${p.path}`,
+    resolve: (app, p) => {
       const all = app.vault.getMarkdownFiles();
       const prefix = p.path.length ? p.path + '/' : '';
       return all.filter((f) =>
@@ -105,7 +104,7 @@ const handlers: Record<CohortKind, Handler<any>> = {
   },
 
   'tag:any': {
-    makeKey: (p: CohortParamsMap['tag:any']) => {
+    makeKey: (p) => {
       const tags = p.tags.map(normaliseTag).filter(Boolean).sort();
       return `tag:any:${tags.join('|')}`;
     },
@@ -119,9 +118,8 @@ const handlers: Record<CohortKind, Handler<any>> = {
         label: `Tag any: ${tags.join(', ')}`,
       };
     },
-    pretty: (p: CohortParamsMap['tag:any']) =>
-      `Tag (any): ${p.tags.join(', ')}`,
-    resolve: (app, p: CohortParamsMap['tag:any']) => {
+    pretty: (p) => `Tag (any): ${p.tags.join(', ')}`,
+    resolve: (app, p) => {
       const all = app.vault.getMarkdownFiles();
       const want: Set<string> = new Set(p.tags.map(normaliseTag));
       if (want.size === 0) return [];
@@ -134,7 +132,7 @@ const handlers: Record<CohortKind, Handler<any>> = {
   },
 
   'tag:all': {
-    makeKey: (p: CohortParamsMap['tag:all']) => {
+    makeKey: (p) => {
       const tags = p.tags.map(normaliseTag).filter(Boolean).sort();
       return `tag:all:${tags.join('|')}`;
     },
@@ -148,9 +146,8 @@ const handlers: Record<CohortKind, Handler<any>> = {
         label: `Tag all: ${tags.join(', ')}`,
       };
     },
-    pretty: (p: CohortParamsMap['tag:all']) =>
-      `Tag (all): ${p.tags.join(', ')}`,
-    resolve: (app, p: CohortParamsMap['tag:all']) => {
+    pretty: (p) => `Tag (all): ${p.tags.join(', ')}`,
+    resolve: (app, p) => {
       const all = app.vault.getMarkdownFiles();
       const want: Set<string> = new Set(p.tags.map(normaliseTag));
       if (want.size === 0) return [];
@@ -163,8 +160,7 @@ const handlers: Record<CohortKind, Handler<any>> = {
   },
 
   manual: {
-    makeKey: (p: CohortParamsMap['manual']) =>
-      `manual:${p.paths.slice().sort().join('|')}`,
+    makeKey: (p) => `manual:${p.paths.slice().sort().join('|')}`,
     parse: (key) => {
       if (!key.startsWith('manual:')) return undefined;
       const paths = key.slice('manual:'.length).split('|').filter(Boolean);
@@ -174,9 +170,8 @@ const handlers: Record<CohortKind, Handler<any>> = {
         label: `Manual (${paths.length} notes)`,
       };
     },
-    pretty: (p: CohortParamsMap['manual']) =>
-      `Manual (${p.paths.length} notes)`,
-    resolve: (app, p: CohortParamsMap['manual']) => {
+    pretty: (p) => `Manual (${p.paths.length} notes)`,
+    resolve: (app, p) => {
       const out: TFile[] = [];
       for (const path of p.paths) {
         const af = app.vault.getAbstractFileByPath(path);
@@ -187,7 +182,7 @@ const handlers: Record<CohortKind, Handler<any>> = {
   },
 
   base: {
-    makeKey: (p: CohortParamsMap['base']) => {
+    makeKey: (p) => {
       const view = p.view ? `|view=${p.view}` : '';
       return `base:${String(p.baseId ?? '')}${view}`;
     },
@@ -203,8 +198,7 @@ const handlers: Record<CohortKind, Handler<any>> = {
       const label = view ? `Base: ${baseId} (${view})` : `Base: ${baseId}`;
       return { kind: 'base', params: { baseId, view }, label };
     },
-    pretty: (p: CohortParamsMap['base']) =>
-      `Base: ${p.baseId}${p.view ? ` (${p.view})` : ''}`,
+    pretty: (p) => `Base: ${p.baseId}${p.view ? ` (${p.view})` : ''}`,
     resolve: () => {
       // Placeholder for future Bases integration, pending the Bases API
       return [];
@@ -212,53 +206,68 @@ const handlers: Record<CohortKind, Handler<any>> = {
   },
 };
 
-export function makeCohortKey(spec: CohortSpec): string {
-  const h = handlers[spec.kind];
-  return h.makeKey(spec.params as any);
+function getHandler<K extends CohortKind>(kind: K): Handler<K> {
+  return handlers[kind];
+}
+
+const KIND_ORDER: readonly CohortKind[] = [
+  'vault:all',
+  'folder',
+  'folder-recursive',
+  'tag:any',
+  'tag:all',
+  'manual',
+  'base',
+] as const;
+
+export function makeCohortKey<K extends CohortKind>(spec: CohortSpec<K>): string {
+  return getHandler(spec.kind).makeKey(spec.params);
 }
 
 export function parseCohortKey(key: string): CohortDefinition | undefined {
-  const parsed =
-    handlers['vault:all'].parse(key) ??
-    handlers['folder'].parse(key) ??
-    handlers['folder-recursive'].parse(key) ??
-    handlers['tag:any'].parse(key) ??
-    handlers['tag:all'].parse(key) ??
-    handlers['manual'].parse(key) ??
-    handlers['base'].parse(key);
-
-  if (!parsed) return undefined;
-
-  const now = Date.now();
-  return {
-    key,
-    kind: parsed.kind,
-    params: parsed.params as any,
-    label: parsed.label,
-    createdAt: now,
-    updatedAt: now,
-  };
+  for (const kind of KIND_ORDER) {
+    const parsed = getHandler(kind).parse(key);
+    if (parsed) {
+      const now = Date.now();
+      return {
+        key,
+        kind: parsed.kind,
+        params: parsed.params,
+        label: parsed.label,
+        createdAt: now,
+        updatedAt: now,
+      } as CohortDefinition;
+    }
+  }
+  return undefined;
 }
 
-export function prettyCohortDefinition(def: CohortDefinition): string {
-  return handlers[def.kind].pretty(def.params as any);
+type KindAndParams<K extends CohortKind> = { kind: K; params: CohortParamsMap[K] };
+
+export function prettyCohortDefinition<K extends CohortKind>(
+  def: KindAndParams<K>
+): string {
+  return getHandler(def.kind).pretty(def.params);
 }
 
-export function createDefinition(spec: CohortSpec & { label?: string }): CohortDefinition {
+export function createDefinition<K extends CohortKind>(spec: CohortSpec<K> & { label?: string }): CohortDefinition {
   const ts = Date.now();
   const key = makeCohortKey(spec);
   return {
     key,
     kind: spec.kind,
-    params: spec.params as any,
+    params: spec.params,
     label: spec.label,
     createdAt: ts,
     updatedAt: ts,
-  };
+  } as CohortDefinition;
 }
 
-export function resolveFilesForCohort(app: App, def: CohortDefinition): TFile[] {
-  return handlers[def.kind].resolve(app, def.params as any);
+export function resolveFilesForCohort<K extends CohortKind>(
+  app: App,
+  def: KindAndParams<K>
+): TFile[] {
+  return getHandler(def.kind).resolve(app, def.params);
 }
 
 export function allFolderChoices(app: App): TFolder[] {
