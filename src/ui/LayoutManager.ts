@@ -86,7 +86,7 @@ export class ArenaLayoutManager {
         await attemptAsync(() => leftLeaf.setViewState({ ...originalLeftViewState, active: true }));
       }
       // Close the right leaf if we created it
-      if (createdRight && rightLeaf && rightLeaf !== leftLeaf) {
+      if (rightLeaf && rightLeaf !== leftLeaf) {
         attempt(() => rightLeaf.detach());
       }
       // Return focus to the user's leaf
@@ -137,7 +137,7 @@ export class ArenaLayoutManager {
       if (arenaRight && arenaRight !== arenaLeft) {
         attempt(() => arenaRight.detach());
       }
-      if (createdLeft && arenaLeft) {
+      if (arenaLeft && arenaLeft !== referenceLeaf) {
         attempt(() => arenaLeft.detach());
       }
       // Return focus to the reference
