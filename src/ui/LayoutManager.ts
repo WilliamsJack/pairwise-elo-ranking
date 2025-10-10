@@ -1,4 +1,5 @@
 import { App, Notice, ViewState, WorkspaceLeaf } from 'obsidian';
+import { attempt, attemptAsync } from '../utils/safe';
 
 import type { SessionLayoutMode } from '../settings';
 
@@ -58,11 +59,7 @@ export class ArenaLayoutManager {
     const leftLeaf = this.getUserLeaf();
     const originalLeftViewState = this.snapshot(leftLeaf.getViewState());
 
-    try {
-      this.app.workspace.setActiveLeaf(leftLeaf, { focus: false });
-    } catch {
-      // Non-fatal: workspace may be mid-transition or the leaf may be gone. Ignore.
-    }
+    attempt(() => this.app.workspace.setActiveLeaf(leftLeaf, { focus: false }));
 
     let rightLeaf = this.app.workspace.getLeaf('split');
     const createdRight = !!rightLeaf && rightLeaf !== leftLeaf;
@@ -71,11 +68,7 @@ export class ArenaLayoutManager {
       // Fallback: new tab in same group, then split that
       const newTab = this.app.workspace.getLeaf('tab');
       if (newTab && newTab !== leftLeaf) {
-        try {
-          this.app.workspace.setActiveLeaf(newTab, { focus: false });
-        } catch {
-          // Non-fatal: workspace may be mid-transition or the leaf may be gone. Ignore.
-        }
+        attempt(() => this.app.workspace.setActiveLeaf(newTab, { focus: false }));
         const split = this.app.workspace.getLeaf('split');
         if (split && split !== newTab) {
           rightLeaf = split;
@@ -90,26 +83,14 @@ export class ArenaLayoutManager {
     const cleanup = async () => {
       // Restore the user's original tab state
       if (originalLeftViewState) {
-        try {
-          await leftLeaf.setViewState({ ...originalLeftViewState, active: true });
-        } catch {
-          // Non-fatal: original view may no longer be valid (closed/moved). Ignore.
-        }
+        await attemptAsync(() => leftLeaf.setViewState({ ...originalLeftViewState, active: true }));
       }
       // Close the right leaf if we created it
       if (createdRight && rightLeaf && rightLeaf !== leftLeaf) {
-        try {
-          rightLeaf.detach();
-        } catch {
-          // Non-fatal: leaf may already be detached or removed. Ignore.
-        }
+        attempt(() => rightLeaf.detach());
       }
       // Return focus to the user's leaf
-      try {
-        this.app.workspace.setActiveLeaf(leftLeaf, { focus: true });
-      } catch {
-        // Non-fatal: focus target may be gone. Ignore.
-      }
+      attempt(() => this.app.workspace.setActiveLeaf(leftLeaf, { focus: true }));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(leftLeaf);
@@ -122,11 +103,7 @@ export class ArenaLayoutManager {
     const referenceLeaf = this.getUserLeaf();
 
     // First split: create arena-left to the right
-    try {
-      this.app.workspace.setActiveLeaf(referenceLeaf, { focus: false });
-    } catch {
-      // Non-fatal: workspace may be mid-transition or the leaf may be gone. Ignore.
-    }
+    attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: false }));
     let arenaLeft = this.app.workspace.getLeaf('split');
     const createdLeft = !!arenaLeft && arenaLeft !== referenceLeaf;
 
@@ -142,11 +119,7 @@ export class ArenaLayoutManager {
     }
 
     // Second split: split the arena-left to create arena-right
-    try {
-      this.app.workspace.setActiveLeaf(arenaLeft, { focus: false });
-    } catch {
-      // Non-fatal: workspace may be mid-transition or the leaf may be gone. Ignore.
-    }
+    attempt(() => this.app.workspace.setActiveLeaf(arenaLeft, { focus: false }));
     let arenaRight = this.app.workspace.getLeaf('split');
     const createdRight = !!arenaRight && arenaRight !== arenaLeft;
 
@@ -157,34 +130,18 @@ export class ArenaLayoutManager {
     }
 
     // Focus the arena so keyboard works immediately
-    try {
-      this.app.workspace.setActiveLeaf(arenaLeft, { focus: true });
-    } catch {
-      // Non-fatal: workspace may be mid-transition or the leaf may be gone. Ignore.
-    }
+    attempt(() => this.app.workspace.setActiveLeaf(arenaLeft, { focus: true }));
 
     const cleanup = async () => {
       // Close the two arena panes we created
       if (arenaRight && arenaRight !== arenaLeft) {
-        try {
-          arenaRight.detach();
-        } catch {
-          // Non-fatal: leaf may already be detached or removed. Ignore.
-        }
+        attempt(() => arenaRight.detach());
       }
       if (createdLeft && arenaLeft) {
-        try {
-          arenaLeft.detach();
-        } catch {
-          // Non-fatal: leaf may already be detached or removed. Ignore.
-        }
+        attempt(() => arenaLeft.detach());
       }
       // Return focus to the reference
-      try {
-        this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true });
-      } catch {
-        // Non-fatal: focus target may be gone. Ignore.
-      }
+      attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(arenaLeft);
@@ -202,11 +159,7 @@ export class ArenaLayoutManager {
       return await this.createReuseActive();
     }
 
-    try {
-      this.app.workspace.setActiveLeaf(left, { focus: false });
-    } catch {
-      // Non-fatal: workspace may be mid-transition or the leaf may be gone. Ignore.
-    }
+    attempt(() => this.app.workspace.setActiveLeaf(left, { focus: false }));
     let right = this.app.workspace.getLeaf('split');
     const createdRight = !!right && right !== left;
 
@@ -217,30 +170,14 @@ export class ArenaLayoutManager {
     }
 
     // Focus the arena
-    try {
-      this.app.workspace.setActiveLeaf(left, { focus: true });
-    } catch {
-      // Non-fatal: workspace may be mid-transition or the leaf may be gone. Ignore.
-    }
+    attempt(() => this.app.workspace.setActiveLeaf(left, { focus: true }));
 
     const cleanup = async () => {
       if (right && right !== left) {
-        try {
-          right.detach();
-        } catch {
-          // Non-fatal: leaf may already be detached or removed. Ignore.
-        }
+        attempt(() => right.detach());
       }
-      try {
-        left.detach();
-      } catch {
-        // Non-fatal: leaf may already be detached or removed. Ignore.
-      }
-      try {
-        this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true });
-      } catch {
-        // Non-fatal: focus target may be gone. Ignore.
-      }
+      attempt(() => left.detach());
+      attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(left);
@@ -265,11 +202,7 @@ export class ArenaLayoutManager {
     }
 
     // Make sure subsequent splits happen in the pop-out
-    try {
-      this.app.workspace.setActiveLeaf(popLeft, { focus: true });
-    } catch {
-      // Non-fatal: workspace may be mid-transition or the leaf may be gone. Ignore.
-    }
+    attempt(() => this.app.workspace.setActiveLeaf(popLeft, { focus: true }));
 
     let popRight = this.app.workspace.getLeaf('split');
     const createdRight = !!popRight && popRight !== popLeft;
@@ -281,22 +214,10 @@ export class ArenaLayoutManager {
     const cleanup = async () => {
       // Detach inside the popout; detaching the last leaf should close the window.
       if (popRight && popRight !== popLeft) {
-        try {
-          popRight.detach();
-        } catch {
-          // Non-fatal: leaf may already be detached or removed. Ignore.
-        }
+        attempt(() => popRight.detach());
       }
-      try {
-        popLeft.detach();
-      } catch {
-        // Non-fatal: leaf may already be detached or removed. Ignore.
-      }
-      try {
-        this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true });
-      } catch {
-        // Non-fatal: focus target may be gone. Ignore.
-      }
+      attempt(() => popLeft.detach());
+      attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(popLeft);

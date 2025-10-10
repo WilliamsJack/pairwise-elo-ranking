@@ -133,18 +133,13 @@ export class ResolveMissingFolderModal extends BasePromiseModal<string | undefin
         if (i >= files.length) break;
         const f = files[i];
 
-        try {
-          const id = await getEloId(this.app, f);
-          if (id && this.cohortIds.has(id)) {
-            const folder = f.parent?.path ?? '';
-            this.suggestions.set(folder, (this.suggestions.get(folder) ?? 0) + 1);
-          }
-        } catch {
-          // ignore
-        } finally {
-          this.progress.done += 1;
-          this.maybeRenderList();
+        const id = await getEloId(this.app, f);
+        if (id && this.cohortIds.has(id)) {
+          const folder = f.parent?.path ?? '';
+          this.suggestions.set(folder, (this.suggestions.get(folder) ?? 0) + 1);
         }
+        this.progress.done += 1;
+        this.maybeRenderList();
       }
     };
 

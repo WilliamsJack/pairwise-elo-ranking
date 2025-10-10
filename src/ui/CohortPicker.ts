@@ -296,16 +296,9 @@ class TagCohortModal extends BasePromiseModal<CohortDefinition | undefined> {
 
   private collectVaultTags(): string[] {
     const set = new Set<string>();
-
-    try {
-      const files = this.app.vault.getMarkdownFiles();
-      for (const f of files) {
-        for (const t of getFileTags(this.app, f)) set.add(t);
-      }
-    } catch {
-      // Non-fatal: metadata cache or vault access may fail; fall back to empty tag list.
+    for (const f of this.app.vault.getMarkdownFiles()) {
+      for (const t of getFileTags(this.app, f)) set.add(t);
     }
-
     return Array.from(set).filter(Boolean).sort();
   }
 

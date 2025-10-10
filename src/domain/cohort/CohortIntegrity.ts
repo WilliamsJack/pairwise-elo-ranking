@@ -21,12 +21,8 @@ export async function reconcileCohortPlayersWithFiles(
   const foundIds = new Set<string>();
   await Promise.all(
     files.map(async (f) => {
-      try {
-        const id = await getEloId(app, f);
-        if (id) foundIds.add(id);
-      } catch {
-        // ignore
-      }
+      const id = await getEloId(app, f);
+      if (id) foundIds.add(id);
     }),
   );
 

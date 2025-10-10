@@ -131,12 +131,7 @@ async function planFrontmatterUpdates(
   const plans: FrontmatterUpdatePlan[] = [];
 
   for (const file of files) {
-    let id: string | undefined;
-    try {
-      id = await getEloId(app, file);
-    } catch {
-      id = undefined;
-    }
+    const id = await getEloId(app, file);
     if (!id) continue;
 
     const fmCache = app.metadataCache.getFileCache(file)?.frontmatter;
@@ -246,9 +241,7 @@ export async function updateCohortFrontmatter(
   try {
     return await updateCohortFrontmatterProperties(app, files, valuesById, newPropName, oldPropName);
   } finally {
-    try { working.hide(); } catch {
-      // Non-fatal: notice may already be dismissed or window is gone. Ignore.
-    }
+    working?.hide?.();
   }
 }
 

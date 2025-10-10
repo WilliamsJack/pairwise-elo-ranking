@@ -1,6 +1,7 @@
 import { App, MarkdownView, Notice, TFile, WorkspaceLeaf } from 'obsidian';
 import { ArenaLayoutHandle, ArenaLayoutManager } from './LayoutManager';
 import { MatchResult, ScrollStartMode, UndoFrame } from '../types';
+import { attempt, attemptAsync } from '../utils/safe';
 import { ensureEloId, getEloId } from '../utils/NoteIds';
 
 import type EloPlugin from '../main';
@@ -61,12 +62,8 @@ export default class ArenaSession {
     this.overlayWin = win;
 
     // Pin both leaves during the session
-    try { this.leftLeaf.setPinned(true); } catch {
-      // Non-fatal: pinning may not exist on this version or the leaf may be disposed. Ignore.
-    }
-    try { this.rightLeaf.setPinned(true); } catch {
-      // Non-fatal: pinning may not exist on this version or the leaf may be disposed. Ignore.
-    }
+    attempt(() => this.leftLeaf.setPinned(true));
+    attempt(() => this.rightLeaf.setPinned(true));
 
     this.mountOverlay(doc);
     this.plugin.registerDomEvent(win, 'keydown', this.keydownHandler, true);
@@ -85,31 +82,22 @@ export default class ArenaSession {
   async end(opts?: { forUnload?: boolean }) {
     // Remove listeners from the correct window
     if (this.overlayWin) {
-      try { this.overlayWin.removeEventListener('keydown', this.keydownHandler, true); } catch {
-        // Non-fatal: pop-out window may already be closed or listener already removed. Ignore.
-      }
+      this.overlayWin.removeEventListener('keydown', this.keydownHandler, true);
       if (this.popoutUnloadHandler) {
-        try { this.overlayWin.removeEventListener('beforeunload', this.popoutUnloadHandler); } catch {
-          // Non-fatal: pop-out window may already be closed or listener already removed. Ignore.
-        }
+        this.overlayWin.removeEventListener('beforeunload', this.popoutUnloadHandler);
         // Hide any toast we created while in the popout (so they don't reattach to the main window)
-        try { for (const n of this.liveNotices) { (n as Notice)?.hide?.(); } } catch {
-          // Non-fatal: notice handles may belong to another window or be disposed. Ignore.
-        }
+        for (const n of this.liveNotices) { (n as Notice)?.hide?.(); }
       }
     }
+
     this.popoutUnloadHandler = undefined;
 
     this.unmountOverlay();
 
     // Unpin leaves
-    try { this.leftLeaf.setPinned(false); } catch {
-      // Non-fatal: leaf may already be gone or API unavailable. Ignore.
-    }
-    try { this.rightLeaf.setPinned(false); } catch {
-      // Non-fatal: leaf may already be gone or API unavailable. Ignore.
-    }
-  
+    attempt(() => this.leftLeaf.setPinned(false));
+    attempt(() => this.rightLeaf.setPinned(false));
+
     // Only detach/cleanup panes when not unloading the plugin (as per guidelines)
     if (!opts?.forUnload) {
       try { await this.layoutHandle?.cleanup(); } catch {
@@ -117,8 +105,8 @@ export default class ArenaSession {
       }
     }
 
-    this.liveNotices = [];
     this.overlayWin = undefined;
+    this.liveNotices = [];
     this.undoStack = [];
   }
 
@@ -164,25 +152,11 @@ export default class ArenaSession {
 
   private async openInReadingMode(leaf: WorkspaceLeaf, file: TFile) {
     // Force Reading Mode and prevent focus grabbing
-    await leaf.setViewState({
+    await attemptAsync(() => leaf.setViewState({
       type: 'markdown',
       state: { file: file.path, mode: 'preview' },
       active: false,
-    });
-
-    // Safety: if somehow still in edit mode, flip to preview again
-    const v = leaf.view instanceof MarkdownView ? leaf.view : undefined;
-    if (v && v.getMode() !== 'preview') {
-      try {
-        await leaf.setViewState({
-          type: 'markdown',
-          state: { file: file.path, mode: 'preview' },
-          active: false,
-        });
-      } catch {
-        // Non-fatal: view may have been disposed or replaced between checks. Ignore.
-      }
-    }
+    }));
 
     // Apply initial scroll behaviour
     const mode = this.getCohortScrollStart();
@@ -226,11 +200,7 @@ export default class ArenaSession {
     }
   
     if (target) {
-      try {
-        target.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-      } catch {
-        // Non-fatal: scrollIntoView may fail if the element is not in the DOM. Ignore.
-      }
+      target.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
       return true;
     }
     return false;
@@ -265,12 +235,8 @@ export default class ArenaSession {
     }
     
     if (next) {
-      try {
-        next.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-        return true;
-      } catch {
-        // Non-fatal: scrollIntoView may fail if the element is not in the DOM. Ignore.
-      }
+      next.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+      return true;
     }
     return false;
   }
@@ -347,11 +313,7 @@ export default class ArenaSession {
   }
 
   private showToast(message: string, timeout = 4000): void {
-    try {
-      this.liveNotices.push(new Notice(message, timeout));
-    } catch {
-      // Non-fatal: constructing a Notice can fail in pop-outs or during teardown. Ignore.
-    }
+    attempt(() => this.liveNotices.push(new Notice(message, timeout)));
   }
 
   private getEffectiveFrontmatter(): FrontmatterPropertiesSettings {

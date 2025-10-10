@@ -113,9 +113,7 @@ export class PluginDataStore {
     this._saveQueue = this._saveQueue
       .then(() => this.writePersisted())
       .catch((e) => {
-        try { console.error('[Elo] Failed to save data', e); } catch {
-          // Non-fatal: console may be unavailable in this context. Ignore.
-        }
+        console.error('[Elo] Failed to save data', e);
       });
     return this._saveQueue;
   }
