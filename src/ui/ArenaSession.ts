@@ -7,6 +7,7 @@ import type EloPlugin from '../main';
 import type { FrontmatterPropertiesSettings } from '../settings';
 import { effectiveFrontmatterProperties } from '../settings';
 import { pairSig } from '../utils/pair';
+import { pickNextPairIndices } from '../domain/matchmaking/Matchmaker';
 import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
 
 export default class ArenaSession {
@@ -251,16 +252,6 @@ export default class ArenaSession {
     );
   }
 
-  private scrollToTop(preview: HTMLElement): void {
-    try {
-      preview.scrollTo({ top: 0, behavior: 'auto' });
-    } catch {
-      try { preview.scrollTop = 0; } catch {
-        // Non-fatal: scrollTop may fail if the element is not in the DOM. Ignore.
-      }
-    }
-  }
-
   private scrollPastFrontmatter(preview: HTMLElement): boolean {
     const root = this.getRenderedRoot(preview);
       
@@ -474,139 +465,26 @@ export default class ArenaSession {
     return { rating: 1500, matches: 0 };
   }
 
-  private weightedRandomIndex(weights: number[]): number {
-    let sum = 0;
-    for (const w of weights) sum += Math.max(0, w);
-    if (sum <= 0) {
-      return Math.floor(Math.random() * weights.length);
-    }
-    let r = Math.random() * sum;
-    for (let i = 0; i < weights.length; i++) {
-      r -= Math.max(0, weights[i]);
-      if (r <= 0) return i;
-    }
-    return weights.length - 1;
-  }
-
-  private pickAnchorIndex(): number {
-    const mm = this.plugin.settings.matchmaking;
-    if (!mm?.enabled || !mm.lowMatchesBias.enabled) {
-      return Math.floor(Math.random() * this.files.length);
-    }
-    const exp = Math.max(0, Math.min(3, mm.lowMatchesBias.exponent));
-    const weights = this.files.map((f) => {
-      const s = this.getStatsForFile(f);
-      return 1 / Math.pow(1 + Math.max(0, s.matches), Math.max(0.0001, exp));
-    });
-    return this.weightedRandomIndex(weights);
-  }
-
-  private pickOpponentIndex(anchorIdx: number): number {
-    const n = this.files.length;
-    const indices: number[] = [];
-    for (let i = 0; i < n; i++) if (i !== anchorIdx) indices.push(i);
-
-    const mm = this.plugin.settings.matchmaking;
-
-    // If disabled, uniform random opponent (with a tiny guard for repeats below)
-    if (!mm?.enabled) {
-      return indices[Math.floor(Math.random() * indices.length)];
-    }
-
-    const anchorStats = this.getStatsForFile(this.files[anchorIdx]);
-
-    // Choose a sample of candidates
-    const sampleSize = mm.similarRatings.enabled
-      ? Math.max(2, Math.min(mm.similarRatings.sampleSize || 12, indices.length))
-      : Math.max(1, Math.min(12, indices.length));
-    // Reservoir/sample style random pick without allocation costs
-    const sample: number[] = [];
-    let seen = 0;
-    for (const idx of indices) {
-      seen++;
-      if (sample.length < sampleSize) {
-        sample.push(idx);
-      } else {
-        const j = Math.floor(Math.random() * seen);
-        if (j < sampleSize) sample[j] = idx;
-      }
-    }
-
-    // Upset probe path: sometimes pick the largest gap above minGap
-    if (mm.upsetProbes.enabled && Math.random() < Math.max(0, Math.min(1, mm.upsetProbes.probability))) {
-      const minGap = Math.max(0, Math.round(mm.upsetProbes.minGap || 0));
-      let bestIdx = -1;
-      let bestGap = -1;
-      for (const j of sample) {
-        const s = this.getStatsForFile(this.files[j]);
-        const gap = Math.abs(s.rating - anchorStats.rating);
-        if (gap >= minGap && gap > bestGap) {
-          bestGap = gap;
-          bestIdx = j;
-        }
-      }
-      // Fall through to similar-ratings if no candidate met min gap
-      if (bestIdx >= 0) return bestIdx;
-    }
-
-    // Similar-ratings path: pick the minimal rating difference (tie-break: fewer matches)
-    if (mm.similarRatings.enabled) {
-      let bestIdx = sample[0];
-      let bestGap = Number.POSITIVE_INFINITY;
-      let bestMatches = Number.POSITIVE_INFINITY;
-      for (const j of sample) {
-        const s = this.getStatsForFile(this.files[j]);
-        const gap = Math.abs(s.rating - anchorStats.rating);
-        if (gap < bestGap) {
-          bestGap = gap;
-          bestIdx = j;
-          bestMatches = s.matches;
-        } else if (gap === bestGap && s.matches < bestMatches) {
-          bestIdx = j;
-          bestMatches = s.matches;
-        }
-      }
-      return bestIdx;
-    }
-
-    // Default fallback: random from the sample
-    return sample[Math.floor(Math.random() * sample.length)];
-  }
-
   private pickNextPair() {
     if (this.files.length < 2) {
       this.leftFile = this.rightFile = undefined;
       return;
     }
-  
-    // Always use the helpers; they internally handle the "disabled = random" cases.
-    const aIdx = this.pickAnchorIndex();
-    let bIdx = this.pickOpponentIndex(aIdx);
-  
-    // Avoid repeating the exact same pair if possible
-    const currentSig = pairSig(this.files[aIdx].path, this.files[bIdx].path);
-    if (this.lastPairSig === currentSig && this.files.length >= 3) {
-      let guard = 0;
-      while (guard++ < 10) {
-        const alt = this.pickOpponentIndex(aIdx);
-        if (alt !== bIdx) {
-          const altSig = pairSig(this.files[aIdx].path, this.files[alt].path);
-          if (altSig !== this.lastPairSig) {
-            bIdx = alt;
-            break;
-          }
-        }
-      }
+
+    const { leftIndex, rightIndex, pairSig: sig } = pickNextPairIndices(
+      this.files,
+      (f) => this.getStatsForFile(f),
+      this.plugin.settings.matchmaking,
+      this.lastPairSig,
+    );
+
+    if (leftIndex < 0 || rightIndex < 0) {
+      this.leftFile = this.rightFile = undefined;
+      return;
     }
-  
-    // Randomise left/right for balance
-    if (Math.random() < 0.5) {
-      this.leftFile = this.files[aIdx];
-      this.rightFile = this.files[bIdx];
-    } else {
-      this.leftFile = this.files[bIdx];
-      this.rightFile = this.files[aIdx];
-    }
-    this.lastPairSig = pairSig(this.leftFile.path, this.rightFile.path);
+
+    this.leftFile = this.files[leftIndex];
+    this.rightFile = this.files[rightIndex];
+    this.lastPairSig = sig;
   }
 }
