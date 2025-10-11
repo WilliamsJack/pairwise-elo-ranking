@@ -1,5 +1,6 @@
-import { App, Notice, PluginSettingTab, Setting, SliderComponent, TextComponent, setIcon } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting, SliderComponent, setIcon } from 'obsidian';
 import { DEFAULT_SETTINGS, FrontmatterPropertiesSettings, SessionLayoutMode, effectiveFrontmatterProperties } from './settings';
+import { FM_PROP_KEYS, renderStandardFmPropertyRow } from '../ui/FrontmatterPropertyRow';
 import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFrontmatter } from '../utils/FrontmatterStats';
 import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 
@@ -63,18 +64,8 @@ class DeleteCohortModal extends BasePromiseModal<boolean> {
     p.textContent = `Are you sure you want to delete "${this.cohortLabel}"? This removes the cohort and its saved ratings. Your notes will not be modified.`;
 
     const btns = new Setting(contentEl);
-    // Grey Cancel
-    btns.addButton((b) =>
-      b.setButtonText('Cancel').onClick(() => {
-        this.finish(false);
-      }),
-    );
-    // Red Delete
-    btns.addButton((b) =>
-      b.setWarning().setButtonText('Delete').onClick(() => {
-        this.finish(true);
-      }),
-    );
+    btns.addButton((b) => b.setButtonText('Cancel').onClick(() => this.finish(false)));
+    btns.addButton((b) => b.setWarning().setButtonText('Delete').onClick(() => this.finish(true)));
   }
 }
 
@@ -256,76 +247,26 @@ export default class EloSettingsTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           }),
       );
-    
+
     fmBody.createEl('p', {
       text:
         'Choose which Elo statistics to write into a note\'s frontmatter and the property names to use. ' +
         'These are global defaults; cohort-specific overrides can be applied during creation.',
     });
 
-    const addFrontmatterSetting = (
-      parent: HTMLElement,
-      key: keyof typeof fm,
-      label: string,
-      desc: string,
-      placeholder: string,
-    ) => {
+    for (const key of FM_PROP_KEYS) {
       const cfg = fm[key];
-      let textRef: TextComponent;
-
-      new Setting(parent)
-        .setName(label)
-        .setDesc(desc)
-        .addToggle((t) =>
-          t
-            .setValue(Boolean(cfg.enabled))
-            .onChange(async (val) => {
-              cfg.enabled = val;
-              if (textRef) textRef.setDisabled(!val);
-              await this.plugin.saveSettings();
-            }),
-        )
-        .addText((t) => {
-          textRef = t;
-          t.setPlaceholder(placeholder)
-            .setValue(cfg.property)
-            .setDisabled(!cfg.enabled)
-            .onChange(async (v) => {
-              const trimmed = v.trim();
-              cfg.property = trimmed.length > 0 ? trimmed : placeholder;
-              await this.plugin.saveSettings();
-            });
-        });
-    };
-
-    addFrontmatterSetting(
-      fmBody,
-      'rating',
-      'Rating',
-      'Write the current Elo rating to this frontmatter property.',
-      'eloRating',
-    );
-    addFrontmatterSetting(
-      fmBody,
-      'rank',
-      'Rank',
-      'Write the rank (1 = highest) within the cohort to this frontmatter property.',
-      'eloRank',
-    );
-    addFrontmatterSetting(
-      fmBody,
-      'matches',
-      'Matches',
-      'Write the total number of matches to this frontmatter property.',
-      'eloMatches',
-    );
-    addFrontmatterSetting(
-      fmBody,
-      'wins',
-      'Wins',
-      'Write the number of wins to this frontmatter property.',
-      'eloWins',
-    );
+      renderStandardFmPropertyRow(fmBody, key, {
+        value: { enabled: cfg.enabled, property: cfg.property },
+        base: { enabled: cfg.enabled, property: cfg.property },
+        showReset: false,
+        onChange: async (next) => {
+          cfg.enabled = !!next.enabled;
+          cfg.property = next.property;
+          await this.plugin.saveSettings();
+        },
+      });
+    }
 
     // Convergence heuristics accordion
     const hs = this.plugin.settings.heuristics;
@@ -566,7 +507,6 @@ export default class EloSettingsTab extends PluginSettingTab {
         'Control how pairs are chosen. These heuristics can speed up convergence by focusing on informative comparisons.',
     });
 
-    // Top-level enable
     new Setting(mmBody)
       .setName('Enable matchmaking heuristics')
       .setDesc(`Globally enable the pair selection heuristics. Default: ${mmDefaults.enabled ? 'On' : 'Off'}.`)
@@ -577,12 +517,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         }),
       );
 
-    // Similar ratings
     new Setting(mmBody).setName('Prefer similar ratings').setHeading();
-    mmBody.createEl('p', {
-      text:
-        'When choosing an opponent, sample several candidates and pick the closest rating to the anchor note.',
-    });
+    mmBody.createEl('p', { text: 'When choosing an opponent, sample several candidates and pick the closest rating to the anchor note.' });
 
     let sampleSlider: SliderComponent;
 
@@ -612,12 +548,8 @@ export default class EloSettingsTab extends PluginSettingTab {
           .setDisabled(!mm.similarRatings.enabled);
       });
 
-    // Low matches bias
     new Setting(mmBody).setName('Bias towards fewer matches').setHeading();
-    mmBody.createEl('p', {
-      text:
-        'Prefer notes with fewer matches as the anchor. Weight ≈ 1 / (1 + matches)^strength.',
-    });
+    mmBody.createEl('p', { text: 'Prefer notes with fewer matches as the anchor. Weight ≈ 1 / (1 + matches)^strength.' });
 
     let exponentSlider: SliderComponent;
 
@@ -647,12 +579,8 @@ export default class EloSettingsTab extends PluginSettingTab {
           .setDisabled(!mm.lowMatchesBias.enabled);
       });
 
-    // Upset probes
     new Setting(mmBody).setName('Occasional upset probes').setHeading();
-    mmBody.createEl('p', {
-      text:
-        'Every so often, schedule a high-gap pair to detect surprises earlier.',
-    });
+    mmBody.createEl('p', { text: 'Every so often, schedule a high-gap pair to detect surprises earlier.' });
 
     let probeProbSlider: SliderComponent;
     let probeGapSlider: SliderComponent;
@@ -755,7 +683,7 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     this.plugin.dataStore.upsertCohortDef(def);
     await this.plugin.dataStore.saveStore();
-    this.display(); // refresh UI
+    this.display();
 
     // Determine changes that require optional bulk updates
     const changed: Array<{
@@ -812,13 +740,7 @@ export default class EloSettingsTab extends PluginSettingTab {
       const vals = valuesFor(key);
 
       if (change.action === 'remove' && change.oldProp) {
-        const preview = await previewCohortFrontmatterPropertyUpdates(
-          this.app,
-          files,
-          new Map(),
-          '',
-          change.oldProp,
-        );
+        const preview = await previewCohortFrontmatterPropertyUpdates(this.app, files, new Map(), '', change.oldProp);
         if (preview.wouldUpdate === 0) continue;
 
         const ok = await new ConfirmModal(
@@ -840,13 +762,7 @@ export default class EloSettingsTab extends PluginSettingTab {
         );
         new Notice(`Removed "${change.oldProp}" from ${res.updated} notes.`);
       } else if (change.action === 'rename' && change.oldProp && change.newProp) {
-        const preview = await previewCohortFrontmatterPropertyUpdates(
-          this.app,
-          files,
-          vals,
-          change.newProp,
-          change.oldProp,
-        );
+        const preview = await previewCohortFrontmatterPropertyUpdates(this.app, files, vals, change.newProp, change.oldProp);
         if (preview.wouldUpdate === 0) continue;
 
         const ok = await new ConfirmModal(
@@ -868,12 +784,7 @@ export default class EloSettingsTab extends PluginSettingTab {
         );
         new Notice(`Updated ${res.updated} notes.`);
       } else if (change.action === 'upsert' && change.newProp) {
-        const preview = await previewCohortFrontmatterPropertyUpdates(
-          this.app,
-          files,
-          vals,
-          change.newProp,
-        );
+        const preview = await previewCohortFrontmatterPropertyUpdates(this.app, files, vals, change.newProp);
         if (preview.wouldUpdate === 0) continue;
 
         const ok = await new ConfirmModal(

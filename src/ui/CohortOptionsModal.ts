@@ -1,4 +1,5 @@
-import { App, ButtonComponent, Setting, TextComponent, ToggleComponent } from 'obsidian';
+import { App, Setting } from 'obsidian';
+import { FM_PROP_KEYS, renderStandardFmPropertyRow } from './FrontmatterPropertyRow';
 import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '../settings';
 
 import { BasePromiseModal } from './PromiseModal';
@@ -76,18 +77,6 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
     return this.openAndGetValue();
   }
 
-  private resetRowToDefault(row: RowState, textRef?: TextComponent, toggleRef?: ToggleComponent) {
-    const baseCfg = this.base[row.key];
-    row.enabled = baseCfg.enabled;
-    row.property = baseCfg.property;
-    row.overridden = false;
-    if (toggleRef) toggleRef.setValue(row.enabled);
-    if (textRef) {
-      textRef.setValue(row.property);
-      textRef.setDisabled(!row.enabled);
-    }
-  }
-
   private updateOverriddenFlag(row: RowState) {
     const baseCfg = this.base[row.key];
     row.overridden = row.enabled !== baseCfg.enabled || row.property !== baseCfg.property;
@@ -129,7 +118,6 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
           }),
       );
 
-    // Initial scroll position
     const scrollLabels: Record<ScrollStartMode, string> = {
       none: 'No auto-scroll',
       'after-frontmatter': 'Top of content (past frontmatter)',
@@ -152,45 +140,21 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
           });
       });
 
-    const addRow = (key: Key, label: string, help: string) => {
+    for (const key of FM_PROP_KEYS) {
       const row = this.working[key];
-      let textRef: TextComponent | undefined;
-      let toggleRef: ToggleComponent | undefined;
+      const baseCfg = this.base[key];
 
-      const s = new Setting(contentEl)
-        .setName(label)
-        .setDesc(help)
-        .addToggle((t: ToggleComponent) => {
-          toggleRef = t;
-          t.setValue(Boolean(row.enabled)).onChange((val) => {
-            row.enabled = val;
-            if (textRef) textRef.setDisabled(!val);
-            this.updateOverriddenFlag(row);
-          });
-        })
-        .addText((t) => {
-          textRef = t;
-          t.setPlaceholder(this.base[key].property || '')
-            .setValue(row.property)
-            .setDisabled(!row.enabled)
-            .onChange((v) => {
-              row.property = (v ?? '').trim() || this.base[key].property;
-              this.updateOverriddenFlag(row);
-            });
-        });
-
-      s.addButton((b: ButtonComponent) =>
-        b
-          .setButtonText('Reset')
-          .setTooltip('Reset to global default')
-          .onClick(() => this.resetRowToDefault(row, textRef, toggleRef)),
-      );
-    };
-
-    addRow('rating', 'Rating', 'Write the current Elo rating to this property.');
-    addRow('rank', 'Rank', 'Write the cohort rank (1 = highest) to this property.');
-    addRow('matches', 'Matches', 'Write the number of matches to this property.');
-    addRow('wins', 'Wins', 'Write the number of wins to this property.');
+      renderStandardFmPropertyRow(contentEl, key, {
+        value: { enabled: row.enabled, property: row.property },
+        base: { enabled: baseCfg.enabled, property: baseCfg.property },
+        showReset: true,
+        onChange: (next) => {
+          row.enabled = !!next.enabled;
+          row.property = next.property || baseCfg.property;
+          this.updateOverriddenFlag(row);
+        },
+      });
+    }
 
     const btns = new Setting(contentEl);
     btns.addButton((b) =>
