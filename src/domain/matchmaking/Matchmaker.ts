@@ -23,17 +23,33 @@ export function pickAnchorIndex(
   files: TFile[],
   getStats: (f: TFile) => RatingStats,
   mm?: MatchmakingSettings,
+  lastPairSig?: string,
   rng: Rng = Math.random,
 ): number {
+  const n = files.length;
+
+  // Build the allowed pool, optionally excluding the last pair's paths when n >= 3
+  const allowed: number[] = [];
+  if (lastPairSig && n >= 3) {
+    const [p1, p2] = lastPairSig.split('||');
+    for (let i = 0; i < n; i++) {
+      const path = files[i].path;
+      if (path !== p1 && path !== p2) allowed.push(i);
+    }
+  } else {
+    for (let i = 0; i < n; i++) allowed.push(i);
+  }
+
   if (!mm?.enabled || !mm.lowMatchesBias.enabled) {
-    return randInt(rng, files.length);
+    return allowed[randInt(rng, allowed.length)];
   }
   const exp = Math.max(0, Math.min(3, mm.lowMatchesBias.exponent));
-  const weights = files.map((f) => {
-    const s = getStats(f);
+  const weights = allowed.map((i) => {
+    const s = getStats(files[i]);
     return 1 / Math.pow(1 + Math.max(0, s.matches), Math.max(0.0001, exp));
   });
-  return weightedRandomIndex(weights, rng);
+  const chosen = weightedRandomIndex(weights, rng);
+  return allowed[chosen];
 }
 
 function reservoirSample(indices: number[], k: number, rng: Rng): number[] {
@@ -115,26 +131,22 @@ export function pickNextPairIndices(
   lastPairSig?: string,
   rng: Rng = Math.random,
 ): { leftIndex: number; rightIndex: number; pairSig: string } {
-  if (files.length < 2) {
+  const n = files.length;
+  if (n < 2) {
     return { leftIndex: -1, rightIndex: -1, pairSig: '' };
   }
-  const aIdx = pickAnchorIndex(files, getStats, mm, rng);
-  let bIdx = pickOpponentIndex(files, aIdx, getStats, mm, rng);
 
-  // Avoid repeating the exact same pair if possible
-  const currentSig = mkPairSig(files[aIdx].path, files[bIdx].path);
-  if (lastPairSig === currentSig && files.length >= 3) {
-    for (let guard = 0; guard < 10; guard++) {
-      const alt = pickOpponentIndex(files, aIdx, getStats, mm, rng);
-      if (alt !== bIdx) {
-        const altSig = mkPairSig(files[aIdx].path, files[alt].path);
-        if (altSig !== lastPairSig) {
-          bIdx = alt;
-          break;
-        }
-      }
-    }
+  // Degenerate case: only two notes - just use them again
+  if (n === 2) {
+    const leftIndex = 0;
+    const rightIndex = 1;
+    const pair = mkPairSig(files[leftIndex].path, files[rightIndex].path);
+    return { leftIndex, rightIndex, pairSig: pair };
   }
+
+  // n >= 3: forbid either of the last pair as the next anchor (if we know it)
+  const aIdx = pickAnchorIndex(files, getStats, mm, lastPairSig, rng);
+  const bIdx = pickOpponentIndex(files, aIdx, getStats, mm, rng);
 
   const swap = rng() < 0.5;
   const leftIndex = swap ? aIdx : bIdx;
