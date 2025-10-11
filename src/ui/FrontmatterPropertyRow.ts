@@ -27,18 +27,21 @@ const META: Record<FmPropKey, Meta> = {
 export type FmRowValue = { enabled: boolean; property: string };
 export type FmRowRefs = { setting: Setting; text: TextComponent; toggle: ToggleComponent };
 
+type RowMode = 'global' | 'cohort';
+
 export function renderStandardFmPropertyRow(
   parent: HTMLElement,
   key: FmPropKey,
   opts: {
     value: FmRowValue;
-    base: FmRowValue; 
+    base: FmRowValue;
     onChange: (next: FmRowValue) => void | Promise<void>;
-    showReset?: boolean;
+    mode?: RowMode;
   }
 ): FmRowRefs {
   const meta = META[key];
   const placeholder = opts.base.property || '';
+  const mode: RowMode = opts.mode ?? 'cohort';
 
   const cur: FmRowValue = {
     enabled: !!opts.value.enabled,
@@ -55,7 +58,9 @@ export function renderStandardFmPropertyRow(
       toggleRef = t;
       t.setValue(cur.enabled).onChange((v) => {
         cur.enabled = !!v;
-        textRef?.setDisabled(!cur.enabled);
+        if (mode === 'cohort') {
+          textRef?.setDisabled(!cur.enabled);
+        }
         void opts.onChange({ ...cur });
       });
     })
@@ -63,7 +68,7 @@ export function renderStandardFmPropertyRow(
       textRef = t;
       t.setPlaceholder(placeholder)
         .setValue(cur.property)
-        .setDisabled(!cur.enabled)
+        .setDisabled(mode === 'cohort' ? !cur.enabled : false)
         .onChange((v) => {
           const trimmed = (v ?? '').trim();
           cur.property = trimmed.length > 0 ? trimmed : placeholder;
@@ -71,7 +76,7 @@ export function renderStandardFmPropertyRow(
         });
     });
 
-  if (opts.showReset) {
+  if (mode === 'cohort') {
     setting.addButton((b) =>
       b
         .setButtonText('Reset')

@@ -147,7 +147,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
       renderStandardFmPropertyRow(contentEl, key, {
         value: { enabled: row.enabled, property: row.property },
         base: { enabled: baseCfg.enabled, property: baseCfg.property },
-        showReset: true,
+        mode: 'cohort',
         onChange: (next) => {
           row.enabled = !!next.enabled;
           row.property = next.property || baseCfg.property;

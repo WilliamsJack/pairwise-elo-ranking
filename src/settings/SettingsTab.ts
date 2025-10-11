@@ -259,7 +259,7 @@ export default class EloSettingsTab extends PluginSettingTab {
       renderStandardFmPropertyRow(fmBody, key, {
         value: { enabled: cfg.enabled, property: cfg.property },
         base: { enabled: cfg.enabled, property: cfg.property },
-        showReset: false,
+        mode: 'global',
         onChange: async (next) => {
           cfg.enabled = !!next.enabled;
           cfg.property = next.property;
