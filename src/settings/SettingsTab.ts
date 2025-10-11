@@ -16,13 +16,15 @@ class ConfirmModal extends BasePromiseModal<boolean> {
   private message: string;
   private ctaText: string;
   private cancelText: string;
+  private warningCta: boolean;
 
-  constructor(app: App, titleText: string, message: string, ctaText: string, cancelText?: string) {
+  constructor(app: App, titleText: string, message: string, ctaText: string, cancelText?: string, warningCta = false) {
     super(app);
     this.titleText = titleText;
     this.message = message;
     this.ctaText = ctaText;
     this.cancelText = cancelText ? cancelText : 'Cancel';
+    this.warningCta = warningCta;
   }
 
   async openAndConfirm(): Promise<boolean> {
@@ -39,33 +41,10 @@ class ConfirmModal extends BasePromiseModal<boolean> {
 
     const btns = new Setting(contentEl);
     btns.addButton((b) => b.setButtonText(this.cancelText).onClick(() => this.finish(false)));
-    btns.addButton((b) => b.setCta().setButtonText(this.ctaText).onClick(() => this.finish(true)));
-  }
-}
-
-class DeleteCohortModal extends BasePromiseModal<boolean> {
-  private cohortLabel: string;
-
-  constructor(app: App, cohortLabel: string) {
-    super(app);
-    this.cohortLabel = cohortLabel;
-  }
-
-  async openAndConfirm(): Promise<boolean> {
-    const v = await this.openAndGetValue();
-    return !!v;
-  }
-
-  onOpen(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.createEl('h3', { text: 'Delete cohort?' });
-    const p = contentEl.createEl('p');
-    p.textContent = `Are you sure you want to delete "${this.cohortLabel}"? This removes the cohort and its saved ratings. Your notes will not be modified.`;
-
-    const btns = new Setting(contentEl);
-    btns.addButton((b) => b.setButtonText('Cancel').onClick(() => this.finish(false)));
-    btns.addButton((b) => b.setWarning().setButtonText('Delete').onClick(() => this.finish(true)));
+    btns.addButton((b) => {
+      if (this.warningCta) b.setWarning(); else b.setCta();
+      b.setButtonText(this.ctaText).onClick(() => this.finish(true));
+    });
   }
 }
 
@@ -631,21 +610,22 @@ export default class EloSettingsTab extends PluginSettingTab {
   private async deleteCohortWithConfirm(cohortKey: string): Promise<void> {
     const def = this.plugin.dataStore.getCohortDef(cohortKey);
     const label = def ? (def.label ?? prettyCohortDefinition(def)) : 'Cohort';
-
-    const ok = await new DeleteCohortModal(this.app, label).openAndConfirm();
+  
+    const ok = await new ConfirmModal(
+      this.app,
+      'Delete cohort?',
+      `Are you sure you want to delete "${label}"? This removes the cohort and its saved ratings. Your notes will not be modified.`,
+      'Delete',
+      'Cancel',
+      true,
+    ).openAndConfirm();
     if (!ok) return;
 
     // Remove data and definition
     const store = this.plugin.dataStore.store;
-    if (store.cohorts && store.cohorts[cohortKey]) {
-      delete store.cohorts[cohortKey];
-    }
-    if (store.cohortDefs && store.cohortDefs[cohortKey]) {
-      delete store.cohortDefs[cohortKey];
-    }
-    if (store.lastUsedCohortKey === cohortKey) {
-      store.lastUsedCohortKey = undefined;
-    }
+    if (store.cohorts && store.cohorts[cohortKey]) delete store.cohorts[cohortKey];
+    if (store.cohortDefs && store.cohortDefs[cohortKey]) delete store.cohortDefs[cohortKey];
+    if (store.lastUsedCohortKey === cohortKey) store.lastUsedCohortKey = undefined;
     await this.plugin.dataStore.saveStore();
 
     new Notice(`Deleted cohort: ${label}`);
