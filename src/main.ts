@@ -39,7 +39,7 @@ export default class EloPlugin extends Plugin {
       name: 'End current session',
       checkCallback: (checking) => {
         const has = !!this.currentSession;
-        if (!checking && has) this.endSession();
+        if (!checking && has) void this.endSession();
         return has;
       },
     });
@@ -56,7 +56,7 @@ export default class EloPlugin extends Plugin {
   }
 
   onunload(): void {
-    this.endSession({ forUnload: true });
+    void this.endSession({ forUnload: true });
     void this.dataStore.saveAllImmediate?.();
   }
 
@@ -88,7 +88,7 @@ export default class EloPlugin extends Plugin {
   }
 
   private async startSessionForCohort(def: CohortDefinition, files: TFile[], _opts?: { saveDef?: boolean }) {
-    this.endSession();
+    await this.endSession();
 
     this.currentSession = new ArenaSession(this.app, this, def.key, files);
     this.register(() => this.endSession({ forUnload: true }));
@@ -103,13 +103,13 @@ export default class EloPlugin extends Plugin {
     void reconcileCohortPlayersWithFiles(this.app, this.dataStore, def.key, files).catch(() => {});
   }
 
-  public endSession(opts?: { forUnload?: boolean }) {
+  public async endSession(opts?: { forUnload?: boolean }) {
     if (!this.currentSession) return;
 
     const session = this.currentSession;
     const cohortKey = session.getCohortKey();
 
-    session.end({ forUnload: !!opts?.forUnload });
+    await session.end({ forUnload: !!opts?.forUnload });
     this.currentSession = undefined;
 
     // On unload, skip cohort-wide frontmatter updates and any additional work

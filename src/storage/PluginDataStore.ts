@@ -170,10 +170,11 @@ export class PluginDataStore {
     this._pendingDebounceResolve = null;
 
     const p = this.enqueueWrite();
-    if (pending && resolvePending) {
-      p.finally(() => resolvePending());
+    try {
+      await p;
+    } finally {
+      if (pending && resolvePending) resolvePending();
     }
-    await p;
   }
 
   ensurePlayer(cohortKey: string, id: string) {

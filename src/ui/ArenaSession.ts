@@ -70,7 +70,7 @@ export default class ArenaSession {
 
     // If the user closes a pop-out window, end the session automatically.
     if (win !== window) {
-      this.popoutUnloadHandler = () => this.plugin.endSession();
+      this.popoutUnloadHandler = () => void this.plugin.endSession();
       this.plugin.registerDomEvent(win, 'beforeunload', this.popoutUnloadHandler);
     }
   
@@ -252,11 +252,11 @@ export default class ArenaSession {
 
     const controls = el.createDiv({ cls: 'elo-controls' });
     controls.append(
-      this.makeButton(doc, '← Left', () => this.choose('A')),
-      this.makeButton(doc, '↑ Draw', () => this.choose('D')),
-      this.makeButton(doc, '→ Right', () => this.choose('B')),
+      this.makeButton(doc, '← Left', () => void this.choose('A')),
+      this.makeButton(doc, '↑ Draw', () => void this.choose('D')),
+      this.makeButton(doc, '→ Right', () => void this.choose('B')),
       this.makeButton(doc, 'Undo ⌫', () => this.undo()),
-      this.makeButton(doc, 'End Esc', () => this.plugin.endSession()),
+      this.makeButton(doc, 'End Esc', () => void this.plugin.endSession()),
     );
 
     el.createDiv({ cls: 'elo-side right' });
@@ -296,19 +296,19 @@ export default class ArenaSession {
 
     if (ev.key === 'ArrowLeft') {
       ev.preventDefault();
-      this.choose('A');
+      void this.choose('A');
     } else if (ev.key === 'ArrowRight') {
       ev.preventDefault();
-      this.choose('B');
+      void this.choose('B');
     } else if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
       ev.preventDefault();
-      this.choose('D');
+      void this.choose('D');
     } else if (ev.key === 'Backspace') {
       ev.preventDefault();
       this.undo();
     } else if (ev.key === 'Escape') {
       ev.preventDefault();
-      this.plugin.endSession();
+      void this.plugin.endSession();
     }
   }
 
@@ -345,7 +345,7 @@ export default class ArenaSession {
       else if (result === 'B') this.showToast(`Winner: ${this.rightFile.basename}`);
       else this.showToast('Draw');
     }
-    this.plugin.dataStore.saveStore();
+    void this.plugin.dataStore.saveStore();
 
     // Write frontmatter stats to both notes
     const cohort = this.plugin.dataStore.store.cohorts[this.cohortKey];
@@ -361,7 +361,7 @@ export default class ArenaSession {
     );
 
     this.pickNextPair();
-    this.openCurrent();
+    void this.openCurrent();
     this.updateOverlay();
   }
 
@@ -386,7 +386,7 @@ export default class ArenaSession {
       return;
     }
     if (this.plugin.dataStore.revert(frame)) this.showToast('Undid last match.');
-    this.plugin.dataStore.saveStore();
+    void this.plugin.dataStore.saveStore();
 
     // Update the two notes involved in the undone match, if we can find them
     const aFile = this.findFileById(frame.a.id);
