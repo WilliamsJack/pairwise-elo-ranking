@@ -114,7 +114,7 @@ export default class EloSettingsTab extends PluginSettingTab {
       .setName('Session layout')
       .setDesc('Choose how and where the arena opens.')
       .addDropdown((dd) => {
-        dd.addOptions(layoutLabels as Record<SessionLayoutMode, string>)
+        dd.addOptions(layoutLabels)
           .setValue(this.plugin.settings.sessionLayout ?? DEFAULT_SETTINGS.sessionLayout)
           .onChange(async (v) => {
             const val: SessionLayoutMode =

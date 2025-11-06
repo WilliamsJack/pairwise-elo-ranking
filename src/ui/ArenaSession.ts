@@ -86,7 +86,7 @@ export default class ArenaSession {
       if (this.popoutUnloadHandler) {
         this.overlayWin.removeEventListener('beforeunload', this.popoutUnloadHandler);
         // Hide any toast we created while in the popout (so they don't reattach to the main window)
-        for (const n of this.liveNotices) { (n as Notice)?.hide?.(); }
+        for (const n of this.liveNotices) { (n)?.hide?.(); }
       }
     }
 
@@ -184,7 +184,7 @@ export default class ArenaSession {
     const root = this.getRenderedRoot(preview);
   
     const findHeading = (): HTMLElement | null =>
-      (root.querySelector('h1, h2, h3, h4, h5, h6') as HTMLElement | null);
+      (root.querySelector('h1, h2, h3, h4, h5, h6'));
     const findImage = (): HTMLElement | null =>
       (root.querySelector('img') as HTMLElement | null);
   
@@ -209,15 +209,15 @@ export default class ArenaSession {
   private getPreviewEl(view: MarkdownView): HTMLElement | null {
     const scope = view.contentEl ?? view.containerEl;
     return (
-      (scope.querySelector('.markdown-reading-view .markdown-preview-view') as HTMLElement | null) ??
-      (scope.querySelector('.markdown-preview-view') as HTMLElement | null)
+      (scope.querySelector('.markdown-reading-view .markdown-preview-view')) ??
+      (scope.querySelector('.markdown-preview-view'))
     );
   }
 
   private getRenderedRoot(preview: HTMLElement): HTMLElement {
     return (
-      (preview.querySelector('.markdown-preview-sizer') as HTMLElement | null) ??
-      (preview.querySelector('.markdown-rendered') as HTMLElement | null) ??
+      (preview.querySelector('.markdown-preview-sizer')) ??
+      (preview.querySelector('.markdown-rendered')) ??
       preview
     );
   }
@@ -228,9 +228,9 @@ export default class ArenaSession {
     // Scroll to the first real content element after the properties/frontmatter block
     let next = root.querySelector(
       ':scope > :has(.metadata-container, .frontmatter-container, .frontmatter, pre.frontmatter) ~ *'
-    ) as HTMLElement | null;
+    );
     
-    while (next && next.offsetHeight <= 0) {
+    while (next && next.scrollHeight <= 0) {
       next = next.nextElementSibling as HTMLElement | null;
     }
     
