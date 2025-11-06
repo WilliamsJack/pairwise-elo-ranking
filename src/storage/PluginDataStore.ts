@@ -151,7 +151,6 @@ export class PluginDataStore {
     return p;
   }
 
-  // Public: debounced saves
   async saveSettings(): Promise<void> {
     await this.scheduleDebouncedSave();
   }
@@ -160,7 +159,6 @@ export class PluginDataStore {
     await this.scheduleDebouncedSave();
   }
 
-  // Public: immediate save (flush any pending debounce)
   async saveAllImmediate(): Promise<void> {
     if (this._saveTimerId !== null) {
       window.clearTimeout(this._saveTimerId);
