@@ -167,8 +167,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         const row = list.createDiv({ cls: 'setting-item mod-toggle' });
 
         const info = row.createDiv({ cls: 'cohort-item-info' });
-        info.addEventListener('click', async () => {
-          await this.configureCohort(def.key);
+        info.addEventListener('click', () => {
+          void this.configureCohort(def.key);
         });
 
         const name = info.createDiv({ cls: 'setting-item-name', text: def.label ?? prettyCohortDefinition(def) });
@@ -184,10 +184,10 @@ export default class EloSettingsTab extends PluginSettingTab {
           attr: { 'aria-label': 'Configure cohort' },
         });
         setIcon(settingsBtn, 'settings');
-        settingsBtn.addEventListener('click', async (e) => {
+        settingsBtn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          await this.configureCohort(def.key);
+          void this.configureCohort(def.key);
         });
 
         const deleteBtn = controls.createDiv({
@@ -195,10 +195,10 @@ export default class EloSettingsTab extends PluginSettingTab {
           attr: { 'aria-label': 'Delete cohort' },
         });
         setIcon(deleteBtn, 'trash-2');
-        deleteBtn.addEventListener('click', async (e) => {
+        deleteBtn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          await this.deleteCohortWithConfirm(def.key);
+          void this.deleteCohortWithConfirm(def.key);
         });
       }
     }

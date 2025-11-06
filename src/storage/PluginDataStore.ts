@@ -135,17 +135,16 @@ export class PluginDataStore {
       this._pendingDebouncePromise = p;
     }
 
-    this._saveTimerId = window.setTimeout(async () => {
+    this._saveTimerId = window.setTimeout(() => {
       this._saveTimerId = null;
       const resolve = this._pendingDebounceResolve;
       this._pendingDebounceResolve = null;
 
-      try {
-        await this.enqueueWrite();
-      } finally {
-        resolve?.();
-        this._pendingDebouncePromise = null;
-      }
+      void this.enqueueWrite()
+        .finally(() => {
+          resolve?.();
+          this._pendingDebouncePromise = null;
+        });
     }, this._debounceMs);
 
     return p;
