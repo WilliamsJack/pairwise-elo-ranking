@@ -111,7 +111,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
       .setDesc('Shown in menus. Optional - leave blank to use an automatic description.')
       .addText((t) =>
         t
-          .setPlaceholder('e.g. My Reading List')
+          .setPlaceholder('My reading list')
           .setValue(this.nameWorking)
           .onChange((v) => {
             this.nameWorking = (v ?? '').trim();

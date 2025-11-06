@@ -126,7 +126,7 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Elo ID location')
-      .setDesc('Where to store the Elo ID. Changing this setting will not move existing IDs, but they will continue to work. Default: Frontmatter.')
+      .setDesc('Where to store the Elo ID. Changing this setting will not move existing IDs, but they will continue to work. Default: frontmatter.')
       .addDropdown((dd) => {
         dd.addOptions({
           frontmatter: 'Frontmatter (YAML)',
@@ -151,7 +151,7 @@ export default class EloSettingsTab extends PluginSettingTab {
     if (defs.length === 0) {
       containerEl.createEl('div', {
         cls: 'elo-muted',
-        text: 'No cohorts saved yet. Start a session to create one, or use the Command Palette.',
+        text: 'No cohorts saved yet. Start a session to create one, or use the Command palette.',
       });
     } else {
       const list = containerEl.createDiv({ cls: 'installed-plugins-container' });
