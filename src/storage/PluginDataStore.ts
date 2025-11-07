@@ -37,8 +37,7 @@ function normaliseSessionLayout(val: unknown, fallback: SessionLayoutMode): Sess
 }
 
 function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
-  // Safe clone of defaults
-  const base: EloSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  const base: EloSettings = { ...DEFAULT_SETTINGS };
 
   if (!raw) return base;
 

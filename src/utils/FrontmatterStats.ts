@@ -62,7 +62,8 @@ function buildProps(fm: FrontmatterPropertiesSettings, stats: PlayerStats): Reco
 
 async function writeProps(app: App, file: TFile, props: Record<string, number>): Promise<void> {
   if (Object.keys(props).length === 0) return;
-  await app.fileManager.processFrontMatter(file, (fm) => {
+  await app.fileManager.processFrontMatter(file, (fmRaw) => {
+    const fm = fmRaw as Record<string, unknown>;
     for (const [k, v] of Object.entries(props)) {
       fm[k] = v;
     }
@@ -134,7 +135,8 @@ async function planFrontmatterUpdates(
     const id = await getEloId(app, file);
     if (!id) continue;
 
-    const fmCache = app.metadataCache.getFileCache(file)?.frontmatter;
+    const fcRaw: unknown = app.metadataCache.getFileCache(file)?.frontmatter;
+    const fmCache = fcRaw && typeof fcRaw === 'object' ? (fcRaw as Record<string, unknown>) : undefined;
 
     // Removal-only mode: delete oldProp if present.
     if (!prop && oldProp) {
@@ -152,7 +154,7 @@ async function planFrontmatterUpdates(
     const newVal = valuesById.get(id);
     if (typeof newVal === 'undefined') continue;
 
-    const curNewRaw = fmCache?.[prop];
+    const curNewRaw: unknown = fmCache ? fmCache[prop] : undefined;
     const curNew =
       typeof curNewRaw === 'number'
         ? curNewRaw
@@ -209,7 +211,8 @@ export async function updateCohortFrontmatterProperties(
 
   let updated = 0;
   for (const p of plans) {
-    await app.fileManager.processFrontMatter(p.file, (yaml) => {
+    await app.fileManager.processFrontMatter(p.file, (yamlRaw) => {
+      const yaml = yamlRaw as Record<string, unknown>;
       if (p.op === 'set') {
         yaml[p.setKey] = p.setValue;
         if (p.deleteKey) {

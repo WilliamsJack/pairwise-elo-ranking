@@ -10,9 +10,10 @@ function extractEloIdFromHtmlComment(text: string): string | undefined {
 
 export async function getEloId(app: App, file: TFile): Promise<string | undefined> {
   // Prefer frontmatter
-  const fm = app.metadataCache.getFileCache(file)?.frontmatter;
-  const id = fm?.eloId;
-  if (typeof id === 'string' && id.length > 0) return id;
+  const fmRaw: unknown = app.metadataCache.getFileCache(file)?.frontmatter;
+  const fm = (fmRaw && typeof fmRaw === 'object') ? (fmRaw as Record<string, unknown>) : undefined;
+  const fmId = fm ? fm['eloId'] : undefined;
+  if (typeof fmId === 'string' && fmId.length > 0) return fmId;
 
   // Fallback: look for an HTML comment marker anywhere in the note
   try {
@@ -43,9 +44,11 @@ export async function ensureEloId(
       return data + (needsNewline ? '\n' : '') + '\n' + marker + '\n';
     });
   } else {
-    await app.fileManager.processFrontMatter(file, (fm) => {
-      if (typeof fm.eloId !== 'string' || !fm.eloId) {
-        fm.eloId = id;
+    await app.fileManager.processFrontMatter(file, (fmRaw) => {
+      const fm = fmRaw as Record<string, unknown>;
+      const cur = fm['eloId'];
+      if (typeof cur !== 'string' || !cur) {
+        fm['eloId'] = id;
       }
     });
   }

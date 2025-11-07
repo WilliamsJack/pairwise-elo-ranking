@@ -38,9 +38,14 @@ export class ArenaLayoutManager {
 
   private snapshot(vs: ViewState | undefined): ViewState | undefined {
     if (!vs) return undefined;
+
+    const stateRaw: unknown = (vs as { state?: unknown }).state;
+    const safeState: Record<string, unknown> =
+      stateRaw && typeof stateRaw === 'object' ? { ...(stateRaw as Record<string, unknown>) } : {};
+
     return {
       ...vs,
-      state: vs.state ? JSON.parse(JSON.stringify(vs.state)) : {},
+      state: safeState,
     };
   }
 
@@ -195,13 +200,15 @@ export class ArenaLayoutManager {
   private createNewWindow(): ArenaLayoutHandle {
     const referenceLeaf = this.getUserLeaf();
 
-    const openPopout = this.app.workspace.openPopoutLeaf?.bind(this.app.workspace);
-    if (typeof openPopout !== 'function') {
+    const maybeAny = (this.app.workspace as { openPopoutLeaf?: unknown }).openPopoutLeaf;
+    if (typeof maybeAny !== 'function') {
       new Notice('Pop-out windows are not supported in this Obsidian version. Using right-side split instead.');
       return this.createRightSplit();
     }
-
-    const popLeft: WorkspaceLeaf | undefined = openPopout();
+    
+    const wsWithFn = this.app.workspace as { openPopoutLeaf: () => WorkspaceLeaf | undefined };
+    const popLeft: WorkspaceLeaf | undefined = wsWithFn.openPopoutLeaf();
+    
     if (!popLeft) {
       new Notice('Failed to open a new window. Using right-side split instead.');
       return this.createRightSplit();
