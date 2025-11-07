@@ -18,17 +18,17 @@ export class ArenaLayoutManager {
     this.app = app;
   }
 
-  async create(mode: SessionLayoutMode): Promise<ArenaLayoutHandle> {
+  create(mode: SessionLayoutMode): Promise<ArenaLayoutHandle> {
     switch (mode) {
       case 'right-split':
-        return await this.createRightSplit();
+        return Promise.resolve(this.createRightSplit());
       case 'new-tab':
-        return await this.createNewTab();
+        return Promise.resolve(this.createNewTab());
       case 'new-window':
-        return await this.createNewWindow();
+        return Promise.resolve(this.createNewWindow());
       case 'reuse-active':
       default:
-        return await this.createReuseActive();
+        return Promise.resolve(this.createReuseActive());
     }
   }
 
@@ -55,7 +55,7 @@ export class ArenaLayoutManager {
 
   // Mode: reuse-active
   // Use the user's active leaf as the arena's left; split it to create the right.
-  private async createReuseActive(): Promise<ArenaLayoutHandle> {
+  private createReuseActive(): ArenaLayoutHandle {
     const leftLeaf = this.getUserLeaf();
     const originalLeftViewState = this.snapshot(leftLeaf.getViewState());
 
@@ -91,6 +91,8 @@ export class ArenaLayoutManager {
       }
       // Return focus to the user's leaf
       attempt(() => this.app.workspace.setActiveLeaf(leftLeaf, { focus: true }));
+      // Yield so UI teardown and any notices can settle
+      await new Promise<void>((r) => setTimeout(r, 0));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(leftLeaf);
@@ -99,7 +101,7 @@ export class ArenaLayoutManager {
 
   // Mode: right-split
   // Keep the user's current pane visible. Create two arena panes to the right.
-  private async createRightSplit(): Promise<ArenaLayoutHandle> {
+  private createRightSplit(): ArenaLayoutHandle {
     const referenceLeaf = this.getUserLeaf();
 
     // First split: create arena-left to the right
@@ -114,7 +116,7 @@ export class ArenaLayoutManager {
         arenaLeft = newTab;
       } else {
         // Ultimate fallback: reuse-active
-        return await this.createReuseActive();
+        return this.createReuseActive();
       }
     }
 
@@ -142,6 +144,8 @@ export class ArenaLayoutManager {
       }
       // Return focus to the reference
       attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
+      // Yield so UI teardown and any notices can settle
+      await new Promise<void>((r) => setTimeout(r, 0));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(arenaLeft);
@@ -150,13 +154,13 @@ export class ArenaLayoutManager {
 
   // Mode: new-tab
   // Create a new tab for the arena's left leaf, then split that tab for right.
-  private async createNewTab(): Promise<ArenaLayoutHandle> {
+  private createNewTab(): ArenaLayoutHandle {
     const referenceLeaf = this.getUserLeaf();
 
     const left = this.app.workspace.getLeaf('tab');
     if (!left) {
       // Fallback to reuse-active if tab creation failed
-      return await this.createReuseActive();
+      return this.createReuseActive();
     }
 
     attempt(() => this.app.workspace.setActiveLeaf(left, { focus: false }));
@@ -178,6 +182,8 @@ export class ArenaLayoutManager {
       }
       attempt(() => left.detach());
       attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
+      // Yield so UI teardown and any notices can settle
+      await new Promise<void>((r) => setTimeout(r, 0));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(left);
@@ -186,19 +192,19 @@ export class ArenaLayoutManager {
 
   // Mode: new-window
   // Open a pop-out window (if available), then split inside it.
-  private async createNewWindow(): Promise<ArenaLayoutHandle> {
+  private createNewWindow(): ArenaLayoutHandle {
     const referenceLeaf = this.getUserLeaf();
 
     const openPopout = this.app.workspace.openPopoutLeaf?.bind(this.app.workspace);
     if (typeof openPopout !== 'function') {
       new Notice('Pop-out windows are not supported in this Obsidian version. Using right-side split instead.');
-      return await this.createRightSplit();
+      return this.createRightSplit();
     }
 
     const popLeft: WorkspaceLeaf | undefined = openPopout();
     if (!popLeft) {
       new Notice('Failed to open a new window. Using right-side split instead.');
-      return await this.createRightSplit();
+      return this.createRightSplit();
     }
 
     // Make sure subsequent splits happen in the pop-out
@@ -218,6 +224,8 @@ export class ArenaLayoutManager {
       }
       attempt(() => popLeft.detach());
       attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
+      // Yield so UI teardown and any notices can settle
+      await new Promise<void>((r) => setTimeout(r, 0));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(popLeft);
