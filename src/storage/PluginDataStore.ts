@@ -119,24 +119,19 @@ export class PluginDataStore {
   }
 
   private scheduleDebouncedSave(): Promise<void> {
-    if (this._pendingDebouncePromise) {
+    if (this._pendingDebouncePromise !== null) {
       if (this._saveTimerId !== null) window.clearTimeout(this._saveTimerId);
     } else {
       this._pendingDebouncePromise = new Promise<void>((resolve) => {
         this._pendingDebounceResolve = resolve;
       });
     }
-
-    let p = this._pendingDebouncePromise;
-    if (!p) {
-      p = new Promise<void>((resolve) => {
-        this._pendingDebounceResolve = resolve;
-      });
-      this._pendingDebouncePromise = p;
-    }
-
+  
+    const p = this._pendingDebouncePromise;
+  
     this._saveTimerId = window.setTimeout(() => {
       this._saveTimerId = null;
+  
       const resolve = this._pendingDebounceResolve;
       this._pendingDebounceResolve = null;
 
