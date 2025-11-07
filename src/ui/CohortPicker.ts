@@ -176,16 +176,19 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     return def;
   }
 
-  async onChooseItem(item: Choice): Promise<void> {
+  onChooseItem(item: Choice): void {
     if (item.kind === 'saved') {
       const def = item.def ?? parseCohortKey(item.key);
       this.complete(def);
       return;
     }
-
-    const baseDef = await this.buildDefinitionForAction(item.action);
-
     // If a cohort with this key already exists, use it and skip any overrides prompt
+    void this.handleActionSelection(item.action);
+  }
+  
+  private async handleActionSelection(action: Action): Promise<void> {
+    const baseDef = await this.buildDefinitionForAction(action);
+  
     const deduped = this.useExistingIfDuplicate(baseDef);
     if (!deduped) {
       this.complete(undefined);
