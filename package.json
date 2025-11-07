@@ -1,6 +1,6 @@
 {
 	"name": "pairwise-elo-ranking",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "Easily sort notes by any subjective standard - Rank cohorts of notes in your vault by pairwise comparisons using the Elo rating system.",
 	"main": "main.js",
 	"scripts": {
