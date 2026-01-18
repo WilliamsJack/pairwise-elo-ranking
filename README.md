@@ -7,7 +7,7 @@ Easily sort notes by any subjective standard - Rank cohorts of notes in your vau
 
 Pairwise comparisons are much easier: given two notes, which do you prefer? By repeatedly choosing between pairs, a meaningful ranking quickly emerges.
 
-This plugin was conceived with Obsidian Bases in mind: pick a Base (and optionally view) and rank the notes it returns by pairwise comparisons using Elo. The new Bases plugin API hasn't been released yet, so direct Base integration isn't available today. In the meantime, you can define cohorts by folder, tags, or the whole vault. The full rating workflow is available right now. When the API lands, Bases will become the headline way to define "what's in scope" for a ranking.
+This plugin works especially well with **Obsidian Bases**: pick a **Base** and a **view** to define the cohort, then rank the notes it returns using pairwise Elo comparisons. If you do not use Bases, you can define cohorts by folder, tags, or the whole vault.
 
 - Start quickly from the ribbon icon or Command Palette
 - Efficiently review and pick a winner with keyboard shortcuts and an unobtrusive on-screen bar
@@ -16,8 +16,6 @@ This plugin was conceived with Obsidian Bases in mind: pick a Base (and optional
 - Robust to renames and moves via stable per-note Elo IDs
 - Cohorts are saved so you can resume ranking sessions, picking up where you left off
 
-Primary roadmap item: Bases will be supported as another cohort type. If you use Bases today, think of your Base (or a specific view) as the future cohort selector.
-
 ## Quick start
 
 ### Start a session
@@ -25,7 +23,8 @@ Primary roadmap item: Bases will be supported as another cohort type. If you use
 
 - Click the trophy icon in the left ribbon, or run the command "Start rating session".
 - Create a cohort in the picker:
-  - Vault: All notes
+  - Vault: all notes
+  - From a Base (.base file + view)
   - Active folder (with or without recursive subfolders)
   - Pick a folder...
   - Tag cohort (match Any or All of selected tags)
@@ -35,6 +34,7 @@ Primary roadmap item: Bases will be supported as another cohort type. If you use
 ![arena](docs/images/arena.webp)
 
 Two notes open side-by-side in Reading mode for you to compare. Use the arrow keys on your keyboard or the buttons on the session bar to choose a winner.
+
 - Left Arrow: choose left
 - Right Arrow: choose right
 - Up or Down Arrow: draw
@@ -43,7 +43,7 @@ Two notes open side-by-side in Reading mode for you to compare. Use the arrow ke
 
 A toast shows the winner after each comparison (toggle in Settings).
 
-### End the session  
+### End the session
 Press Escape or run "End current session". If you've enabled a Rank property for this cohort, the plugin recomputes ranks across the cohort and writes them to frontmatter.
 
 ### Configurable Frontmatter Output
@@ -53,7 +53,7 @@ Use the values computed by the plugin however you want. Choose which values get 
 
 ## What's a cohort?
 
-A cohort is the set of notes you're ranking together. Available today:
+A cohort is the set of notes you're ranking together. Supported cohort types:
 
 - Vault: all Markdown notes
 - Folder: a single folder only
@@ -61,16 +61,19 @@ A cohort is the set of notes you're ranking together. Available today:
 - Tag (any): notes that match any of the selected tags
 - Tag (all): notes that match all of the selected tags
 - Manual list of notes (advanced; not created from the picker yet)
+- Base: notes returned by a specific **Base** and a specific **view**
 
-Bases (coming soon): a Base, optionally scoped to a specific view, will be the first-class cohort type. The cohort picker will list Bases alongside the options above. Saved cohorts can be renamed and reconfigured in Settings.
+Saved cohorts can be renamed and reconfigured in Settings.
 
 If a folder cohort is later moved or renamed, the plugin will prompt you to point it to the new location and will suggest likely folders based on the notes it can still find.
+
+If a Base cohort's **.base file** is moved/renamed, or the **view name** no longer exists, the plugin will prompt you to pick the Base and/or view again and will migrate the cohort's saved ratings to the updated definition.
 
 ## Frontmatter and Elo IDs
 
 Each note that participates in a session gets a stable Elo ID so your ratings survive file moves and renames.
 
-- Where: by default in frontmatter as eloId; you can choose to store it at the end of the note as an HTML comment instead.
+- Where: by default in frontmatter as `eloId`; you can choose to store it at the end of the note as an HTML comment instead.
 - When: IDs are created lazily the first time a note is shown in a session.
 
 Example (frontmatter):
@@ -103,28 +106,29 @@ Stats are written to just the two notes involved after each match. Rank across t
 
 ## Matchmaking and convergence
 
-You can get good rankings faster with a few light-touch heuristics. All have sensible defaults and can be toggled in Settings.
+You can get good rankings faster with a few simple heuristics. All have sensible defaults and can be toggled in Settings.
 
-- K-factor: Base speed of rating changes (default 24)
-- Provisional boost: Use a higher K for a note's first N matches (default on)
-- Decay with experience: Gradually reduce K as a note gains matches (optional)
-- Upset boost: Increase K when a much lower-rated note wins (default on)
-- Big-gap draw boost: Increase K for draws across a large rating gap (default on)
+- K-factor: base speed of rating changes (default 24)
+- Provisional boost: use a higher K for a note's first N matches (default on)
+- Decay with experience: gradually reduce K as a note gains matches (optional)
+- Upset boost: increase K when a much lower-rated note wins (default on)
+- Big-gap draw boost: increase K for draws across a large rating gap (default on)
 
 Pair selection heuristics (default on):
 - Prefer similar ratings: sample candidates and pick the closest rating
 - Bias towards fewer matches: give newer notes slightly more airtime to help them find their place quickly
 - Occasional upset probes: every so often, try a large rating gap to flush out surprises
 
-## Use Elo Properties in Bases
+## Use Elo properties in Bases
 
-Even before the Base cohort integration is available, you can use the properties this plugin outputs (Rank, Rating, Matches, Wins) inside Bases to filter, sort and display your lists.
+Because the plugin can write Elo stats into frontmatter, you can use those properties inside Bases to filter, sort and display your lists.
 
-- Sort by your subjective rank - In a view's ordering, sort by Rank to show best-ranked first.
-- Filter by experience - Only include notes with at least N matches, or rating above a threshold.
-- Display columns/cards - Show Rank, Rating, Matches or Wins as columns in a table or as badges on cards.
+- Sort by your subjective rank - in a view's ordering, sort by Rank to show best-ranked first.
+- Filter by experience - only include notes with at least N matches, or rating above a threshold.
+- Display columns/cards - show Rank, Rating, Matches or Wins as columns in a table or as badges on cards.
 
 Demo Rainbow Base used in these screenshots:
+
 ```yaml
 filters:
   and:
