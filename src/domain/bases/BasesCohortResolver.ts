@@ -1,6 +1,6 @@
 import { App, OpenViewState, TFile, ViewState, WorkspaceLeaf } from 'obsidian';
 
-import { attempt } from "../../utils/safe";
+import { attempt } from '../../utils/safe';
 
 const READY_TIMEOUT_MS = 20_000;
 const RUN_TIMEOUT_MS = 20_000;

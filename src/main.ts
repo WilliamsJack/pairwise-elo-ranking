@@ -7,6 +7,7 @@ import { CohortDefinition } from './types';
 import { CohortPicker } from './ui/CohortPicker';
 import EloSettingsTab from './settings/SettingsTab';
 import { PluginDataStore } from './storage/PluginDataStore';
+import { ensureBaseCohortTarget } from './utils/EnsureBaseCohort';
 import { ensureFolderCohortPath } from './utils/EnsureFolderCohort';
 import { reconcileCohortPlayersWithFiles } from './domain/cohort/CohortIntegrity';
 import { resolveFilesForCohort } from './domain/cohort/CohortResolver';
@@ -73,7 +74,12 @@ export default class EloPlugin extends Plugin {
     def = await ensureFolderCohortPath(this.app, this.dataStore, def);
     if (!def) return;
 
+    // Recover base/view for base-based cohorts if missing
+    def = await ensureBaseCohortTarget(this.app, this.dataStore, def);
+    if (!def) return;
+
     const files = await resolveFilesForCohort(this.app, def);
+
     if (files.length < 2) {
       new Notice('Need at least two Markdown notes to compare.');
       return;
