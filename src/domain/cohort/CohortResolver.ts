@@ -183,22 +183,30 @@ const handlers: CohortHandlersMap = {
 
   base: {
     makeKey: (p) => {
-      const view = p.view ? `|view=${p.view}` : '';
-      return `base:${String(p.baseId ?? '')}${view}`;
+      const baseId = String(p.baseId ?? '');
+      const view = String(p.view ?? '');
+      return `base:${baseId}|view=${encodeURIComponent(view)}`;
     },
+  
     parse: (key) => {
       if (!key.startsWith('base:')) return undefined;
       const rest = key.slice('base:'.length);
       const [baseId, ...restParts] = rest.split('|');
+  
       let view: string | undefined;
       for (const rp of restParts) {
         const [k, v] = rp.split('=', 2);
-        if (k === 'view') view = v;
+        if (k === 'view' && typeof v === 'string') view = decodeURIComponent(v);
       }
-      const label = view ? `Base: ${baseId} (${view})` : `Base: ${baseId}`;
+  
+      if (!baseId || !view) return undefined;
+  
+      const label = `Base: ${baseId} (${view})`;
       return { kind: 'base', params: { baseId, view }, label };
     },
-    pretty: (p) => `Base: ${p.baseId}${p.view ? ` (${p.view})` : ''}`,
+  
+    pretty: (p) => `Base: ${p.baseId} (${p.view})`,
+  
     resolve: () => {
       // Placeholder for future Bases integration, pending the Bases API
       return [];

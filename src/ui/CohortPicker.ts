@@ -1,6 +1,7 @@
-import { App, ButtonComponent, FuzzySuggestModal, Notice, Setting } from 'obsidian';
+import { App, ButtonComponent, FuzzySuggestModal, Notice, Setting, TFile } from 'obsidian';
 import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
 import { createDefinition, getFileTags, parseCohortKey, prettyCohortDefinition } from '../domain/cohort/CohortResolver';
+import { listBaseFiles, readBaseViews } from '../domain/bases/BasesDiscovery';
 
 import { CohortDefinition } from '../types';
 import { CohortOptionsModal } from './CohortOptionsModal';
@@ -10,7 +11,7 @@ import type { FrontmatterPropertiesSettings } from '../settings';
 import type { ScrollStartMode } from '../types';
 import { normaliseTag } from '../utils/tags';
 
-type Action = 'vault-all' | 'active-folder' | 'pick-folder' | 'tag-dialog';
+type Action = 'vault-all' | 'active-folder' | 'pick-folder' | 'tag-dialog' | 'base-dialog';
 type Choice =
   | { kind: 'saved'; key: string; label: string; def?: CohortDefinition }
   | { kind: 'action'; action: Action; label: string };
@@ -58,9 +59,10 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     }
 
     // Creation actions
-    items.push({ kind: 'action', action: 'active-folder', label: 'New: active folder' });
+    items.push({ kind: 'action', action: 'base-dialog', label: 'New: from base...' });
+    items.push({ kind: 'action', action: 'tag-dialog', label: 'New: from #tags...' });
+    items.push({ kind: 'action', action: 'active-folder', label: 'New: current active folder' });
     items.push({ kind: 'action', action: 'pick-folder', label: 'New: pick a folder...' });
-    items.push({ kind: 'action', action: 'tag-dialog', label: 'New: tag cohort (any/all)...' });
 
     return items;
   }
@@ -92,7 +94,39 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     }
   }
 
-  // Handles folder selection (optional) + scope, and returns a ready CohortDefinition
+  private async chooseBaseCohort(): Promise<CohortDefinition | undefined> {
+    return await this.runChild(async () => {
+      const baseFiles = listBaseFiles(this.app);
+      if (baseFiles.length === 0) {
+        new Notice('No ".base" files found in your vault.');
+        return undefined;
+      }
+  
+      const baseFile = await new BaseFileSelectModal(this.app, baseFiles).openAndGetValue();
+      if (!baseFile) return undefined;
+  
+      const views = await readBaseViews(this.app, baseFile);
+      if (views.length === 0) {
+        new Notice(`No views found in "${baseFile.path}".`);
+        return undefined;
+      }
+  
+      const viewChoice = await new BaseViewSelectModal(this.app, baseFile, views).openAndGetValue();
+      if (!viewChoice) return undefined;
+  
+      const baseId = baseFile.path;
+      const view = viewChoice.view;
+  
+      const label = `Base: ${baseFile.basename} (${view})`;
+  
+      return createDefinition({
+        kind: 'base',
+        params: { baseId, view },
+        label,
+      });
+    });
+  }
+
   private async chooseFolderCohort(initialPath?: string): Promise<CohortDefinition | undefined> {
     return await this.runChild(async () => {
       let path = initialPath;
@@ -146,6 +180,8 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     switch (action) {
       case 'vault-all':
         return createDefinition({ kind: 'vault:all', params: {}, label: 'Vault: All notes' });
+      case 'base-dialog':
+        return await this.chooseBaseCohort();
       case 'active-folder': {
         const active = this.app.workspace.getActiveFile();
         const path = active?.parent?.path;
@@ -277,6 +313,51 @@ class TagSelectFuzzyModal extends BasePromiseFuzzyModal<string> {
 
   getItemText(item: string): string {
     return item;
+  }
+}
+
+class BaseFileSelectModal extends BasePromiseFuzzyModal<TFile> {
+  private files: TFile[];
+
+  constructor(app: App, files: TFile[]) {
+    super(app);
+    this.files = files.slice().sort((a, b) => a.path.localeCompare(b.path));
+    this.setPlaceholder('Pick a ".base" file...');
+  }
+
+  getItems(): TFile[] {
+    return this.files;
+  }
+
+  getItemText(item: TFile): string {
+    return item.path;
+  }
+}
+
+type BaseViewChoice = { view: string; label: string };
+
+class BaseViewSelectModal extends BasePromiseFuzzyModal<BaseViewChoice> {
+  private choices: BaseViewChoice[];
+
+  constructor(app: App, _baseFile: TFile, views: Array<{ name: string; type?: string }>) {
+    super(app);
+
+    this.choices = views
+      .map((v) => ({
+        view: v.name,
+        label: v.type ? `${v.name} (${v.type})` : v.name,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    this.setPlaceholder('Pick a view...');
+  }
+
+  getItems(): BaseViewChoice[] {
+    return this.choices;
+  }
+
+  getItemText(item: BaseViewChoice): string {
+    return item.label;
   }
 }
 

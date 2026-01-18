@@ -28,7 +28,7 @@ export type CohortParamsMap = {
   'tag:any': { tags: string[] };
   'tag:all': { tags: string[] };
   'manual': { paths: string[] };
-  'base': { baseId: string; view?: string };
+  'base': { baseId: string; view: string };
 };
 
 export type CohortParams<K extends CohortKind = CohortKind> = CohortParamsMap[K];
