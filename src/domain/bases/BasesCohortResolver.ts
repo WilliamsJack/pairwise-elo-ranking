@@ -1,4 +1,6 @@
-import { App, TFile, WorkspaceLeaf } from 'obsidian';
+import { App, OpenViewState, TFile, ViewState, WorkspaceLeaf } from 'obsidian';
+
+import { attempt } from "../../utils/safe";
 
 const READY_TIMEOUT_MS = 20_000;
 const RUN_TIMEOUT_MS = 20_000;
@@ -6,6 +8,8 @@ const RUN_TIMEOUT_MS = 20_000;
 // Consider the query "settled" once we've observed post-run activity and then
 // observed this many consecutive animation frames with no further activity
 const SETTLE_QUIET_FRAMES = 4;
+
+type ResolveOpts = { readyTimeoutMs?: number; runTimeoutMs?: number };
 
 async function nextFrame(): Promise<void> {
   await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
@@ -15,39 +19,65 @@ function nowMs(): number {
   return window.performance?.now?.() ?? Date.now();
 }
 
-function getActiveLeafSafe(app: App): WorkspaceLeaf | null {
-  const ws: any = app.workspace as any;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object';
+}
 
-  const active = ws.activeLeaf;
-  if (active) return active as WorkspaceLeaf;
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+}
 
-  if (typeof ws.getMostRecentLeaf === 'function') {
-    const mr = ws.getMostRecentLeaf();
-    if (mr) return mr as WorkspaceLeaf;
-  }
+type ControllerFn = (this: unknown, ...args: unknown[]) => unknown;
 
-  if (typeof ws.getLeaf === 'function') {
-    const leaf = ws.getLeaf(false);
-    if (leaf) return leaf as WorkspaceLeaf;
-  }
+// Minimal model of Bases controller internals
+type BasesControllerLike = {
+  currentFile?: unknown;
+  query?: unknown;
+  queryState?: unknown;
+  results?: unknown;
 
-  return null;
+  selectView?: (viewName: string) => void;
+  setQueryAndView?: (query: unknown, viewName: string) => void;
+  runQuery?: () => void;
+  getQueryViewNames?: () => unknown;
+
+  updateCurrentFile?: () => void;
+  onResize?: () => void;
+
+  // Patch points used for activity detection
+  addResult?: ControllerFn;
+  removeResult?: ControllerFn;
+  requestNotifyView?: ControllerFn;
+  stopLoader?: ControllerFn;
+};
+
+function getBasesControllerFromLeaf(leaf: WorkspaceLeaf): BasesControllerLike | undefined {
+  const viewUnknown: unknown = leaf.view;
+  if (!isRecord(viewUnknown)) return undefined;
+
+  const controllerUnknown = viewUnknown['controller'];
+  if (!isRecord(controllerUnknown)) return undefined;
+
+  return controllerUnknown as BasesControllerLike;
+}
+
+function getUserLeaf(app: App): WorkspaceLeaf | null {
+  return app.workspace.getMostRecentLeaf?.() ?? app.workspace.getLeaf(false);
 }
 
 async function openBaseLeafInBackground(app: App, baseFile: TFile, viewName: string): Promise<WorkspaceLeaf> {
   const leaf = app.workspace.getLeaf('tab');
   if (!leaf) throw new Error('[Elo][Bases] Could not create a workspace leaf');
 
-  await leaf.openFile(baseFile, { active: false } as any);
+  const openState: OpenViewState = { active: false };
+  await leaf.openFile(baseFile, openState);
 
-  await leaf.setViewState(
-    {
-      type: 'bases',
-      state: { file: baseFile.path, viewName },
-      active: false,
-    } as any,
-    { focus: false } as any,
-  );
+  const vs: ViewState = {
+    type: 'bases',
+    state: { file: baseFile.path, viewName },
+    active: false,
+  };
+  await leaf.setViewState(vs);
 
   return leaf;
 }
@@ -58,7 +88,7 @@ async function withTemporarilyActiveLeaf<T>(
   previousLeaf: WorkspaceLeaf | null,
   fn: () => Promise<T>,
 ): Promise<T> {
-  app.workspace.setActiveLeaf(leafToActivate, { focus: true } as any);
+  app.workspace.setActiveLeaf(leafToActivate, { focus: true });
 
   // Bases appears to require the leaf to be visible/active (mount/resize observers)
   await nextFrame();
@@ -68,14 +98,27 @@ async function withTemporarilyActiveLeaf<T>(
     return await fn();
   } finally {
     if (previousLeaf && previousLeaf !== leafToActivate) {
-      app.workspace.setActiveLeaf(previousLeaf, { focus: true } as any);
+      app.workspace.setActiveLeaf(previousLeaf, { focus: true });
       await nextFrame();
     }
   }
 }
 
+function controllerHasViewName(controller: BasesControllerLike, viewName: string): boolean {
+  if (typeof controller.getQueryViewNames !== 'function') return true;
+
+  try {
+    const names = controller.getQueryViewNames();
+    if (!isStringArray(names)) return false;
+    if (names.length === 0) return true;
+    return names.includes(viewName);
+  } catch {
+    return false;
+  }
+}
+
 async function awaitControllerReady(
-  controller: any,
+  controller: BasesControllerLike,
   basePath: string,
   viewName: string,
   timeoutMs: number,
@@ -83,21 +126,15 @@ async function awaitControllerReady(
   const started = nowMs();
 
   while (nowMs() - started < timeoutMs) {
-    const curFileOk = controller?.currentFile?.path === basePath;
-    const hasQuery = !!controller?.query;
-    const queryStateOk = typeof controller?.queryState === 'string' && controller.queryState.length > 0;
+    const curFile = controller.currentFile;
+    const curFileOk = curFile instanceof TFile && curFile.path === basePath;
 
-    let viewNameOk = true;
-    if (typeof controller?.getQueryViewNames === 'function') {
-      try {
-        const names = controller.getQueryViewNames();
-        if (Array.isArray(names) && names.length > 0) {
-          viewNameOk = names.includes(viewName);
-        }
-      } catch {
-        viewNameOk = false;
-      }
-    }
+    const hasQuery = typeof controller.query !== 'undefined';
+
+    const qs = controller.queryState;
+    const queryStateOk = typeof qs === 'string' && qs.length > 0;
+
+    const viewNameOk = controllerHasViewName(controller, viewName);
 
     if (curFileOk && hasQuery && queryStateOk && viewNameOk) return;
 
@@ -112,12 +149,30 @@ type InstrumentState = {
   activityCount: number;
 };
 
-function instrumentControllerForActivity(controller: any): { state: InstrumentState; unpatch: () => void } {
-  const state: InstrumentState = {
-    armed: false,
-    activityCount: 0,
+type PatchKey = 'addResult' | 'removeResult' | 'requestNotifyView' | 'stopLoader';
+
+function patchControllerMethod(
+  controller: BasesControllerLike,
+  key: PatchKey,
+  mark: () => void,
+): () => void {
+  const original = controller[key];
+  if (typeof original !== 'function') return () => {};
+
+  const wrapped: ControllerFn = function (this: unknown, ...args: unknown[]) {
+    mark();
+    return Reflect.apply(original, this, args);
   };
 
+  controller[key] = wrapped;
+
+  return () => {
+    controller[key] = original;
+  };
+}
+
+function instrumentControllerForActivity(controller: BasesControllerLike): { state: InstrumentState; unpatch: () => void } {
+  const state: InstrumentState = { armed: false, activityCount: 0 };
   const unpatches: Array<() => void> = [];
 
   const mark = () => {
@@ -125,25 +180,10 @@ function instrumentControllerForActivity(controller: any): { state: InstrumentSt
     state.activityCount += 1;
   };
 
-  const patchFn = (obj: any, key: string) => {
-    const orig = obj?.[key];
-    if (typeof orig !== 'function') return;
-
-    obj[key] = function (...args: any[]) {
-      mark();
-      return orig.apply(this, args);
-    };
-
-    unpatches.push(() => {
-      obj[key] = orig;
-    });
-  };
-
-  // Internal points observed changing when Bases actually runs
-  patchFn(controller, 'addResult');
-  patchFn(controller, 'removeResult');
-  patchFn(controller, 'requestNotifyView');
-  patchFn(controller, 'stopLoader');
+  unpatches.push(patchControllerMethod(controller, 'addResult', mark));
+  unpatches.push(patchControllerMethod(controller, 'removeResult', mark));
+  unpatches.push(patchControllerMethod(controller, 'requestNotifyView', mark));
+  unpatches.push(patchControllerMethod(controller, 'stopLoader', mark));
 
   return {
     state,
@@ -159,7 +199,12 @@ function instrumentControllerForActivity(controller: any): { state: InstrumentSt
   };
 }
 
-async function runQueryAndWaitForSettle(controller: any, viewName: string, timeoutMs: number): Promise<void> {
+function getResultsMap(controller: BasesControllerLike): Map<unknown, unknown> | undefined {
+  const results = controller.results;
+  return results instanceof Map ? results : undefined;
+}
+
+async function runQueryAndWaitForSettle(controller: BasesControllerLike, viewName: string, timeoutMs: number): Promise<void> {
   const { state, unpatch } = instrumentControllerForActivity(controller);
 
   try {
@@ -179,9 +224,9 @@ async function runQueryAndWaitForSettle(controller: any, viewName: string, timeo
 
     // Kick the run (prefer the higher-level API).
     if (hasSetQueryAndView) {
-      controller.setQueryAndView(controller.query, viewName);
+      controller.setQueryAndView?.(controller.query, viewName);
     } else {
-      controller.runQuery();
+      controller.runQuery?.();
     }
 
     const deadline = nowMs() + timeoutMs;
@@ -190,15 +235,15 @@ async function runQueryAndWaitForSettle(controller: any, viewName: string, timeo
     let quietFrames = 0;
 
     // Also detect changes even if Bases swaps the results Map without calling patched methods.
-    let lastResultsMap = controller?.results;
-    let lastResultsSize = lastResultsMap instanceof Map ? lastResultsMap.size : 0;
+    let lastResultsMap = getResultsMap(controller);
+    let lastResultsSize = lastResultsMap ? lastResultsMap.size : 0;
     let lastActivityCount = state.activityCount;
 
     while (nowMs() < deadline) {
       await nextFrame();
 
-      const curMap = controller?.results;
-      const curSize = curMap instanceof Map ? curMap.size : 0;
+      const curMap = getResultsMap(controller);
+      const curSize = curMap ? curMap.size : 0;
 
       const mapChanged = curMap !== lastResultsMap;
       const sizeChanged = curSize !== lastResultsSize;
@@ -226,9 +271,9 @@ async function runQueryAndWaitForSettle(controller: any, viewName: string, timeo
   }
 }
 
-function extractMarkdownFilesFromControllerResults(controller: any): TFile[] {
-  const results: unknown = controller?.results;
-  if (!(results instanceof Map)) return [];
+function extractMarkdownFilesFromControllerResults(controller: BasesControllerLike): TFile[] {
+  const results = getResultsMap(controller);
+  if (!results) return [];
 
   const out: TFile[] = [];
   for (const k of results.keys()) {
@@ -240,15 +285,15 @@ function extractMarkdownFilesFromControllerResults(controller: any): TFile[] {
 }
 
 /**
- * Resolve Markdown files from a Bases (.base) file + view name by temporarily opening
- * the Base, activating its leaf (required for Bases to run reliably), running the query,
+ * Resolve Markdown files from a .base file + view name by temporarily opening the
+ * Base, activating its leaf (required for Bases to run reliably), running the query,
  * waiting for results to settle, extracting `TFile`s, then cleaning up.
  */
 export async function resolveFilesFromBaseView(
   app: App,
   basePath: string,
   viewName: string,
-  opts?: { readyTimeoutMs?: number; runTimeoutMs?: number },
+  opts?: ResolveOpts,
 ): Promise<TFile[]> {
   const af = app.vault.getAbstractFileByPath(basePath);
   if (!(af instanceof TFile) || af.extension.toLowerCase() !== 'base') {
@@ -256,22 +301,23 @@ export async function resolveFilesFromBaseView(
   }
   const baseFile = af;
 
-  const previousLeaf = getActiveLeafSafe(app);
+  const previousLeaf = getUserLeaf(app);
 
   let leaf: WorkspaceLeaf | null = null;
 
   try {
-    leaf = await openBaseLeafInBackground(app, baseFile, viewName);
+    const openedLeaf = await openBaseLeafInBackground(app, baseFile, viewName);
+    leaf = openedLeaf;
 
-    const view: any = leaf.view;
-    if (view?.getViewType?.() !== 'bases') {
-      throw new Error(`[Elo][Bases] Unexpected view type: ${String(view?.getViewType?.())}`);
+    const viewType = openedLeaf.view?.getViewType?.();
+    if (viewType !== 'bases') {
+      throw new Error(`[Elo][Bases] Unexpected view type: ${String(viewType)}`);
     }
 
-    return await withTemporarilyActiveLeaf(app, leaf, previousLeaf, async () => {
+    return await withTemporarilyActiveLeaf(app, openedLeaf, previousLeaf, async () => {
       await nextFrame();
 
-      const controller: any = (leaf as any).view?.controller;
+      const controller = getBasesControllerFromLeaf(openedLeaf);
       if (!controller) throw new Error('[Elo][Bases] Bases controller missing on view');
 
       await awaitControllerReady(
@@ -281,23 +327,14 @@ export async function resolveFilesFromBaseView(
         opts?.readyTimeoutMs ?? READY_TIMEOUT_MS,
       );
 
-      // These appear to matter when running in a just-opened leaf.
-      if (typeof controller.updateCurrentFile === 'function') {
-        try {
-          controller.updateCurrentFile();
-        } catch {
-          // ignore
-        }
-      }
-      if (typeof controller.onResize === 'function') {
-        try {
-          controller.onResize();
-        } catch {
-          // ignore
-        }
-      }
+      attempt(() => controller.updateCurrentFile?.());
+      attempt(() => controller.onResize?.());
 
-      await runQueryAndWaitForSettle(controller, viewName, opts?.runTimeoutMs ?? RUN_TIMEOUT_MS);
+      await runQueryAndWaitForSettle(
+        controller,
+        viewName,
+        opts?.runTimeoutMs ?? RUN_TIMEOUT_MS,
+      );
 
       return extractMarkdownFilesFromControllerResults(controller);
     });
