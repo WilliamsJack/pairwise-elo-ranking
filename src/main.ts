@@ -73,7 +73,7 @@ export default class EloPlugin extends Plugin {
     def = await ensureFolderCohortPath(this.app, this.dataStore, def);
     if (!def) return;
 
-    const files = resolveFilesForCohort(this.app, def);
+    const files = await resolveFilesForCohort(this.app, def);
     if (files.length < 2) {
       new Notice('Need at least two Markdown notes to compare.');
       return;
@@ -127,7 +127,7 @@ export default class EloPlugin extends Plugin {
     const rankCfg = fm?.rank;
     if (!rankCfg?.enabled || !rankCfg.property) return;
 
-    const files = resolveFilesForCohort(this.app, def);
+    const files = await resolveFilesForCohort(this.app, def);
     if (files.length === 0) return;
 
     const rankMap = computeRankMap(cohort);

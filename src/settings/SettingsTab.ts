@@ -694,7 +694,7 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     if (changed.length === 0) return;
 
-    const files = resolveFilesForCohort(this.app, def);
+    const files = await resolveFilesForCohort(this.app, def);
     if (files.length === 0) return;
 
     const cohort: CohortData | undefined = this.plugin.dataStore.store.cohorts[cohortKey];

@@ -7,6 +7,7 @@ import {
 } from '../../types';
 
 import { normaliseTag } from '../../utils/tags';
+import { resolveFilesFromBaseView } from '../bases/BasesCohortResolver';
 
 function getAllFolders(app: App): TFolder[] {
   const out: TFolder[] = [];
@@ -52,7 +53,7 @@ type Handler<K extends CohortKind> = {
     | { kind: K; params: CohortParamsMap[K]; label: string }
     | undefined;
   pretty: (params: CohortParamsMap[K]) => string;
-  resolve: (app: App, params: CohortParamsMap[K]) => TFile[];
+  resolve: (app: App, params: CohortParamsMap[K]) => Promise<TFile[]>;
 };
 
 type CohortHandlersMap = { [K in CohortKind]: Handler<K> };
@@ -65,7 +66,7 @@ const handlers: CohortHandlersMap = {
         ? { kind: 'vault:all', params: {}, label: 'Vault: all notes' }
         : undefined,
     pretty: () => 'Vault: all notes',
-    resolve: (app) => app.vault.getMarkdownFiles(),
+    resolve: (app) => Promise.resolve(app.vault.getMarkdownFiles()),
   },
 
   folder: {
@@ -78,7 +79,8 @@ const handlers: CohortHandlersMap = {
     pretty: (p) => `Folder: ${p.path}`,
     resolve: (app, p) => {
       const all = app.vault.getMarkdownFiles();
-      return all.filter((f) => f.parent?.path === p.path);
+      const filtered = all.filter((f) => f.parent?.path === p.path);
+      return Promise.resolve(filtered);
     },
   },
 
@@ -97,9 +99,10 @@ const handlers: CohortHandlersMap = {
     resolve: (app, p) => {
       const all = app.vault.getMarkdownFiles();
       const prefix = p.path.length ? p.path + '/' : '';
-      return all.filter((f) =>
+      const filtered = all.filter((f) =>
         prefix === '' ? true : f.path.startsWith(prefix),
       );
+      return Promise.resolve(filtered);
     },
   },
 
@@ -122,12 +125,13 @@ const handlers: CohortHandlersMap = {
     resolve: (app, p) => {
       const all = app.vault.getMarkdownFiles();
       const want: Set<string> = new Set(p.tags.map(normaliseTag));
-      if (want.size === 0) return [];
-      return all.filter((f) => {
+
+      if (want.size === 0) return Promise.resolve([]);
+      return Promise.resolve(all.filter((f) => {
         const tags = getFileTags(app, f);
         for (const t of tags) if (want.has(t)) return true;
         return false;
-      });
+      }));
     },
   },
 
@@ -150,12 +154,12 @@ const handlers: CohortHandlersMap = {
     resolve: (app, p) => {
       const all = app.vault.getMarkdownFiles();
       const want: Set<string> = new Set(p.tags.map(normaliseTag));
-      if (want.size === 0) return [];
-      return all.filter((f) => {
+      if (want.size === 0) return Promise.resolve([]);
+      return Promise.resolve(all.filter((f) => {
         const tags = new Set(getFileTags(app, f));
         for (const t of want) if (!tags.has(t)) return false;
         return true;
-      });
+      }));
     },
   },
 
@@ -177,7 +181,7 @@ const handlers: CohortHandlersMap = {
         const af = app.vault.getAbstractFileByPath(path);
         if (af instanceof TFile && af.extension === 'md') out.push(af);
       }
-      return out;
+      return Promise.resolve(out);
     },
   },
 
@@ -207,9 +211,8 @@ const handlers: CohortHandlersMap = {
   
     pretty: (p) => `Base: ${p.baseId} (${p.view})`,
   
-    resolve: () => {
-      // Placeholder for future Bases integration, pending the Bases API
-      return [];
+    resolve: async (app, p) => {
+      return await resolveFilesFromBaseView(app, p.baseId, p.view);
     },
   },
 };
@@ -271,11 +274,11 @@ export function createDefinition<K extends CohortKind>(spec: CohortSpec<K> & { l
   } as CohortDefinition;
 }
 
-export function resolveFilesForCohort<K extends CohortKind>(
+export async function resolveFilesForCohort<K extends CohortKind>(
   app: App,
   def: KindAndParams<K>
-): TFile[] {
-  return getHandler(def.kind).resolve(app, def.params);
+): Promise<TFile[]> {
+  return await getHandler(def.kind).resolve(app, def.params);
 }
 
 export function allFolderChoices(app: App): TFolder[] {
