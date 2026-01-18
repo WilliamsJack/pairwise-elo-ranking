@@ -25,7 +25,7 @@ export class ArenaLayoutManager {
       case 'new-tab':
         return Promise.resolve(this.createNewTab());
       case 'new-window':
-        return Promise.resolve(this.createNewWindow());
+        return this.createNewWindow();
       case 'reuse-active':
       default:
         return Promise.resolve(this.createReuseActive());
@@ -56,6 +56,28 @@ export class ArenaLayoutManager {
       document;
     const win = doc.defaultView ?? window;
     return { doc, win };
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  /**
+   * Obsidian may return a popout leaf before it is actually attached to the
+   * popout window's DOM. If we split too early, the split can occur in the
+   * main window.
+   */
+  private async waitForPopoutLeafAttachment(
+    popoutLeaf: WorkspaceLeaf,
+    timeoutMs = 5000,
+    pollMs = 50,
+  ): Promise<void> {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      const { win } = this.resolveDocWinFromLeaf(popoutLeaf);
+      if (win !== window) return;
+      await this.sleep(pollMs);
+    }
   }
 
   // Mode: reuse-active
@@ -197,7 +219,7 @@ export class ArenaLayoutManager {
 
   // Mode: new-window
   // Open a pop-out window (if available), then split inside it.
-  private createNewWindow(): ArenaLayoutHandle {
+  private async createNewWindow(): Promise<ArenaLayoutHandle> {
     const referenceLeaf = this.getUserLeaf();
 
     const maybeAny = (this.app.workspace as { openPopoutLeaf?: unknown }).openPopoutLeaf;
@@ -213,6 +235,8 @@ export class ArenaLayoutManager {
       new Notice('Failed to open a new window. Using right-side split instead.');
       return this.createRightSplit();
     }
+
+    await this.waitForPopoutLeafAttachment(popLeft);
 
     // Make sure subsequent splits happen in the pop-out
     attempt(() => this.app.workspace.setActiveLeaf(popLeft, { focus: true }));
