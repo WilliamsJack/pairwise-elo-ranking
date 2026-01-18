@@ -33,8 +33,7 @@ class BaseViewSelectModal extends BasePromiseFuzzyModal<BaseViewChoice> {
       .map((v) => ({
         view: v.name,
         label: v.type ? `${v.name} (${v.type})` : v.name,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+      }));
 
     this.setPlaceholder('Pick a view...');
   }
