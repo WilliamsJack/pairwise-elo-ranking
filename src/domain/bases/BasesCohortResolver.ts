@@ -38,7 +38,6 @@ type BasesControllerLike = {
 
   selectView?: (viewName: string) => void;
   setQueryAndView?: (query: unknown, viewName: string) => void;
-  runQuery?: () => void;
   getQueryViewNames?: () => unknown;
 
   updateCurrentFile?: () => void;
@@ -197,20 +196,14 @@ async function runQueryAndWaitForSettle(controller: BasesControllerLike, viewNam
     controller.selectView(viewName);
 
     const hasSetQueryAndView = typeof controller.setQueryAndView === 'function';
-    const hasRunQuery = typeof controller.runQuery === 'function';
 
-    if (!hasSetQueryAndView && !hasRunQuery) {
-      throw new Error('[Elo][Bases] No controller.setQueryAndView or controller.runQuery (Bases internals changed)');
+    if (!hasSetQueryAndView) {
+      throw new Error('[Elo][Bases] No controller.setQueryAndView (Bases internals changed)');
     }
 
     state.armed = true;
 
-    // Kick the run (prefer the higher-level API).
-    if (hasSetQueryAndView) {
-      controller.setQueryAndView?.(controller.query, viewName);
-    } else {
-      controller.runQuery?.();
-    }
+    controller.setQueryAndView?.(controller.query, viewName);
 
     const deadline = nowMs() + timeoutMs;
 
