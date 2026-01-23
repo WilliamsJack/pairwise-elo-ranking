@@ -2,18 +2,23 @@ import { App, OpenViewState, TFile, WorkspaceLeaf } from 'obsidian';
 
 const TIMEOUT_MS = 5_000;
 
-// Consider the query "settled" once we've observed post-run activity and then
-// observed this many consecutive animation frames with no further activity
-const SETTLE_QUIET_FRAMES = 4;
+const DEFAULT_POLL_MS = 50;
 
-type ResolveOpts = { readyTimeoutMs?: number; runTimeoutMs?: number };
+type ResolveOpts = {
+  timeoutMs?: number;
+  pollMs?: number;
+};
+
+function nowMs(): number {
+  return window.performance?.now?.() ?? Date.now();
+}
 
 async function nextFrame(): Promise<void> {
   await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-function nowMs(): number {
-  return window.performance?.now?.() ?? Date.now();
+async function sleep(ms: number): Promise<void> {
+  await new Promise<void>((resolve) => window.setTimeout(resolve, Math.max(0, Math.round(ms))));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -24,7 +29,19 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }
 
-type ControllerFn = (this: unknown, ...args: unknown[]) => unknown;
+type ResultsLike = {
+  size: number;
+  keys: () => IterableIterator<unknown>;
+};
+
+function isResultsLike(value: unknown): value is ResultsLike {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    typeof (value as ResultsLike).size === 'number' &&
+    typeof (value as ResultsLike).keys === 'function'
+  );
+}
 
 // Minimal model of Bases controller internals
 type BasesControllerLike = {
@@ -33,11 +50,10 @@ type BasesControllerLike = {
   queryState?: unknown;
   results?: unknown;
 
-  getQueryViewNames?: () => unknown;
+  // True while Bases is scanning/building results, false once done.
+  initialScan?: unknown;
 
-  // Patch points used for activity detection
-  requestNotifyView?: ControllerFn;
-  stopLoader?: ControllerFn;
+  getQueryViewNames?: () => unknown;
 };
 
 function getBasesControllerFromLeaf(leaf: WorkspaceLeaf): BasesControllerLike | undefined {
@@ -58,16 +74,16 @@ async function openBaseLeaf(app: App, baseFile: TFile, viewName: string): Promis
   const leaf = app.workspace.getLeaf('tab');
   if (!leaf) throw new Error('[Elo][Bases] Could not create a workspace leaf');
 
-  // Force the target leaf to be active so openLinkText opens into it.
+  // Make the target leaf active so openLinkText opens into it.
   app.workspace.setActiveLeaf(leaf, { focus: true });
   await nextFrame();
 
   const linktext = `${baseFile.path}#${viewName}`;
   const openState: OpenViewState = { active: true };
 
-  // Open into the currently active leaf
   await app.workspace.openLinkText(linktext, baseFile.path, false, openState);
 
+  // Give Obsidian time to attach the view and controller.
   await nextFrame();
   await nextFrame();
 
@@ -92,146 +108,68 @@ async function awaitControllerReady(
   basePath: string,
   viewName: string,
   timeoutMs: number,
+  pollMs: number,
 ): Promise<void> {
   const started = nowMs();
 
-  while (nowMs() - started < timeoutMs) {
+  while (true) {
     const curFile = controller.currentFile;
     const curFileOk = curFile instanceof TFile && curFile.path === basePath;
 
     const hasQuery = typeof controller.query !== 'undefined';
-
-    const qs = controller.queryState;
-    const queryStateOk = typeof qs === 'string' && qs.length > 0;
-
+    const hasQueryState = typeof controller.queryState === 'string' && controller.queryState.length > 0;
     const viewNameOk = controllerHasViewName(controller, viewName);
 
-    if (curFileOk && hasQuery && queryStateOk && viewNameOk) return;
+    if (curFileOk && hasQuery && hasQueryState && viewNameOk) return;
 
-    await nextFrame();
+    if (nowMs() - started >= timeoutMs) break;
+    await sleep(pollMs);
   }
 
   throw new Error('[Elo][Bases] Timed out waiting for Bases controller readiness');
 }
 
-type InstrumentState = {
-  armed: boolean;
-  activityCount: number;
-};
-
-type PatchKey = 'requestNotifyView' | 'stopLoader';
-
-function patchControllerMethod(
+/**
+ * Wait for Bases to finish producing results.
+ *
+ * Completion condition:
+ * - results container exists, and
+ * - initialScan === false.
+ *
+ * On timeout:
+ * - if results exist, return settled=false (best-effort),
+ * - otherwise throw.
+ */
+async function waitForResultsToSettle(
   controller: BasesControllerLike,
-  key: PatchKey,
-  mark: () => void,
-): () => void {
-  const original = controller[key];
-  if (typeof original !== 'function') return () => {};
+  timeoutMs: number,
+  pollMs: number,
+): Promise<{ settled: boolean }> {
+  const started = nowMs();
+  const deadline = started + timeoutMs;
 
-  const wrapped: ControllerFn = function (this: unknown, ...args: unknown[]) {
-    mark();
-    return Reflect.apply(original, this, args);
-  };
+  while (true) {
+    const resultsOk = isResultsLike(controller.results);
+    const scan = controller.initialScan;
+    const scanOk = typeof scan === 'boolean';
 
-  controller[key] = wrapped;
+    if (resultsOk && scanOk && scan === false) return { settled: true };
 
-  return () => {
-    controller[key] = original;
-  };
-}
-
-function instrumentControllerForActivity(controller: BasesControllerLike): { state: InstrumentState; unpatch: () => void } {
-  const state: InstrumentState = { armed: false, activityCount: 0 };
-  const unpatches: Array<() => void> = [];
-
-  const mark = () => {
-    if (!state.armed) return;
-    state.activityCount += 1;
-  };
-
-  unpatches.push(patchControllerMethod(controller, 'requestNotifyView', mark));
-  unpatches.push(patchControllerMethod(controller, 'stopLoader', mark));
-
-  return {
-    state,
-    unpatch: () => {
-      for (const u of unpatches.reverse()) {
-        try {
-          u();
-        } catch {
-          // ignore
-        }
-      }
-    },
-  };
-}
-
-function getResultsMap(controller: BasesControllerLike): Map<unknown, unknown> | undefined {
-  const results = controller.results;
-  return results instanceof Map ? results : undefined;
-}
-
-async function waitForResultsToSettle(controller: BasesControllerLike, timeoutMs: number): Promise<void> {
-  const { state, unpatch } = instrumentControllerForActivity(controller);
-
-  try {
-    state.armed = true;
-
-    const started = nowMs();
-    const deadline = started + timeoutMs;
-
-    let activityObserved = false;
-    let quietFrames = 0;
-
-    let lastResultsMap = getResultsMap(controller);
-    let lastResultsSize = lastResultsMap ? lastResultsMap.size : 0;
-    let lastActivityCount = state.activityCount;
-
-    while (true) {
-      const curMap = getResultsMap(controller);
-      const curSize = curMap ? curMap.size : 0;
-
-      const mapChanged = curMap !== lastResultsMap;
-      const sizeChanged = curSize !== lastResultsSize;
-      const hookActivity = state.activityCount !== lastActivityCount;
-
-      if (mapChanged || sizeChanged || hookActivity) {
-        activityObserved = true;
-        quietFrames = 0;
-
-        lastResultsMap = curMap;
-        lastResultsSize = curSize;
-        lastActivityCount = state.activityCount;
-      } else if (activityObserved) {
-        quietFrames += 1;
-        if (quietFrames >= SETTLE_QUIET_FRAMES) return;
-      }
-
-      // Timeout: final check before failing
-      if (nowMs() >= deadline) {
-        const finalMap = getResultsMap(controller);
-        if (finalMap instanceof Map) {
-          return;
-        }
-        break;
-      }
-
-      await nextFrame();
+    if (nowMs() >= deadline) {
+      if (resultsOk) return { settled: false };
+      throw new Error('[Elo][Bases] Timed out waiting for Bases results container');
     }
 
-    throw new Error('[Elo][Bases] Timed out waiting for Bases query to settle');
-  } finally {
-    unpatch();
+    await sleep(pollMs);
   }
 }
 
 function extractMarkdownFilesFromControllerResults(controller: BasesControllerLike): TFile[] {
-  const results = getResultsMap(controller);
-  if (!results) return [];
+  const resultsUnknown = controller.results;
+  if (!isResultsLike(resultsUnknown)) return [];
 
   const out: TFile[] = [];
-  for (const k of results.keys()) {
+  for (const k of resultsUnknown.keys()) {
     if (k instanceof TFile && k.extension.toLowerCase() === 'md') out.push(k);
   }
 
@@ -255,6 +193,9 @@ export async function resolveFilesFromBaseView(
   }
   const baseFile = af;
 
+  const pollMs = opts?.pollMs ?? DEFAULT_POLL_MS;
+  const timeoutMs = opts?.timeoutMs ?? TIMEOUT_MS;
+
   const previousLeaf = getUserLeaf(app);
   let leaf: WorkspaceLeaf | null = null;
 
@@ -266,19 +207,12 @@ export async function resolveFilesFromBaseView(
       throw new Error(`[Elo][Bases] Unexpected view type: ${String(viewType)}`);
     }
 
-    await nextFrame();
-
     const controller = getBasesControllerFromLeaf(leaf);
     if (!controller) throw new Error('[Elo][Bases] Bases controller missing on view');
 
-    await awaitControllerReady(
-      controller,
-      baseFile.path,
-      viewName,
-      opts?.readyTimeoutMs ?? TIMEOUT_MS,
-    );
+    await awaitControllerReady(controller, baseFile.path, viewName, timeoutMs, pollMs);
 
-    await waitForResultsToSettle(controller, opts?.runTimeoutMs ?? TIMEOUT_MS);
+    await waitForResultsToSettle(controller, timeoutMs, pollMs);
 
     return extractMarkdownFilesFromControllerResults(controller);
   } finally {
