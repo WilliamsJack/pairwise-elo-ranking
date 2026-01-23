@@ -1,4 +1,4 @@
-import { App, OpenViewState, TFile, ViewState, WorkspaceLeaf } from 'obsidian';
+import { App, TFile, WorkspaceLeaf } from 'obsidian';
 
 import { attempt } from '../../utils/safe';
 
@@ -68,17 +68,14 @@ async function openBaseLeaf(app: App, baseFile: TFile, viewName: string): Promis
   const leaf = app.workspace.getLeaf('tab');
   if (!leaf) throw new Error('[Elo][Bases] Could not create a workspace leaf');
 
-  const openState: OpenViewState = { active: true };
-  await leaf.openFile(baseFile, openState);
-
-  const vs: ViewState = {
-    type: 'bases',
-    state: { file: baseFile.path, viewName },
-    active: true,
-  };
-  await leaf.setViewState(vs);
-
+  // Force the target leaf to be active so openLinkText opens into it.
   app.workspace.setActiveLeaf(leaf, { focus: true });
+  await nextFrame();
+
+  const linktext = `${baseFile.path}#${viewName}`;
+
+  // Open into the currently active leaf
+  await app.workspace.openLinkText(linktext, baseFile.path, false);
 
   await nextFrame();
   await nextFrame();
@@ -186,23 +183,17 @@ function getResultsMap(controller: BasesControllerLike): Map<unknown, unknown> |
   return results instanceof Map ? results : undefined;
 }
 
-async function runQueryAndWaitForSettle(controller: BasesControllerLike, viewName: string, timeoutMs: number): Promise<void> {
+async function waitForResultsToSettle(controller: BasesControllerLike, timeoutMs: number): Promise<void> {
   const { state, unpatch } = instrumentControllerForActivity(controller);
 
   try {
-    if (typeof controller.selectView !== 'function') {
-      throw new Error('[Elo][Bases] controller.selectView is not a function (Bases internals changed)');
-    }
-
     state.armed = true;
-    controller.selectView(viewName);
 
     const deadline = nowMs() + timeoutMs;
 
     let activityObserved = false;
     let quietFrames = 0;
 
-    // Also detect changes even if Bases swaps the results Map without calling patched methods.
     let lastResultsMap = getResultsMap(controller);
     let lastResultsSize = lastResultsMap ? lastResultsMap.size : 0;
     let lastActivityCount = state.activityCount;
@@ -254,8 +245,7 @@ function extractMarkdownFilesFromControllerResults(controller: BasesControllerLi
 
 /**
  * Resolve Markdown files from a .base file + view name by opening the Base,
- * running the query, waiting for results to settle, extracting `TFile`s,
- * then cleaning up.
+ * waiting for results to settle, extracting `TFile`s, then cleaning up.
  */
 export async function resolveFilesFromBaseView(
   app: App,
@@ -297,11 +287,7 @@ export async function resolveFilesFromBaseView(
     attempt(() => controller.updateCurrentFile?.());
     attempt(() => controller.onResize?.());
 
-    await runQueryAndWaitForSettle(
-      controller,
-      viewName,
-      opts?.runTimeoutMs ?? RUN_TIMEOUT_MS,
-    );
+    await waitForResultsToSettle(controller, opts?.runTimeoutMs ?? RUN_TIMEOUT_MS);
 
     return extractMarkdownFilesFromControllerResults(controller);
   } finally {
