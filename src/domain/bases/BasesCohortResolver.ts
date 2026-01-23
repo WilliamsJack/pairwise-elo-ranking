@@ -1,7 +1,6 @@
 import { App, OpenViewState, TFile, WorkspaceLeaf } from 'obsidian';
 
-const READY_TIMEOUT_MS = 20_000;
-const RUN_TIMEOUT_MS = 20_000;
+const TIMEOUT_MS = 5_000;
 
 // Consider the query "settled" once we've observed post-run activity and then
 // observed this many consecutive animation frames with no further activity
@@ -179,7 +178,8 @@ async function waitForResultsToSettle(controller: BasesControllerLike, timeoutMs
   try {
     state.armed = true;
 
-    const deadline = nowMs() + timeoutMs;
+    const started = nowMs();
+    const deadline = started + timeoutMs;
 
     let activityObserved = false;
     let quietFrames = 0;
@@ -188,9 +188,7 @@ async function waitForResultsToSettle(controller: BasesControllerLike, timeoutMs
     let lastResultsSize = lastResultsMap ? lastResultsMap.size : 0;
     let lastActivityCount = state.activityCount;
 
-    while (nowMs() < deadline) {
-      await nextFrame();
-
+    while (true) {
       const curMap = getResultsMap(controller);
       const curSize = curMap ? curMap.size : 0;
 
@@ -205,13 +203,21 @@ async function waitForResultsToSettle(controller: BasesControllerLike, timeoutMs
         lastResultsMap = curMap;
         lastResultsSize = curSize;
         lastActivityCount = state.activityCount;
-        continue;
-      }
-
-      if (activityObserved) {
+      } else if (activityObserved) {
         quietFrames += 1;
         if (quietFrames >= SETTLE_QUIET_FRAMES) return;
       }
+
+      // Timeout: final check before failing
+      if (nowMs() >= deadline) {
+        const finalMap = getResultsMap(controller);
+        if (finalMap instanceof Map) {
+          return;
+        }
+        break;
+      }
+
+      await nextFrame();
     }
 
     throw new Error('[Elo][Bases] Timed out waiting for Bases query to settle');
@@ -269,10 +275,10 @@ export async function resolveFilesFromBaseView(
       controller,
       baseFile.path,
       viewName,
-      opts?.readyTimeoutMs ?? READY_TIMEOUT_MS,
+      opts?.readyTimeoutMs ?? TIMEOUT_MS,
     );
 
-    await waitForResultsToSettle(controller, opts?.runTimeoutMs ?? RUN_TIMEOUT_MS);
+    await waitForResultsToSettle(controller, opts?.runTimeoutMs ?? TIMEOUT_MS);
 
     return extractMarkdownFilesFromControllerResults(controller);
   } finally {
