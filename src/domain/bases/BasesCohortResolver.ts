@@ -65,43 +65,26 @@ function getUserLeaf(app: App): WorkspaceLeaf | null {
   return app.workspace.getMostRecentLeaf?.() ?? app.workspace.getLeaf(false);
 }
 
-async function openBaseLeafInBackground(app: App, baseFile: TFile, viewName: string): Promise<WorkspaceLeaf> {
+async function openBaseLeaf(app: App, baseFile: TFile, viewName: string): Promise<WorkspaceLeaf> {
   const leaf = app.workspace.getLeaf('tab');
   if (!leaf) throw new Error('[Elo][Bases] Could not create a workspace leaf');
 
-  const openState: OpenViewState = { active: false };
+  const openState: OpenViewState = { active: true };
   await leaf.openFile(baseFile, openState);
 
   const vs: ViewState = {
     type: 'bases',
     state: { file: baseFile.path, viewName },
-    active: false,
+    active: true,
   };
   await leaf.setViewState(vs);
 
+  app.workspace.setActiveLeaf(leaf, { focus: true });
+
+  await nextFrame();
+  await nextFrame();
+
   return leaf;
-}
-
-async function withTemporarilyActiveLeaf<T>(
-  app: App,
-  leafToActivate: WorkspaceLeaf,
-  previousLeaf: WorkspaceLeaf | null,
-  fn: () => Promise<T>,
-): Promise<T> {
-  app.workspace.setActiveLeaf(leafToActivate, { focus: true });
-
-  // Bases appears to require the leaf to be visible/active (mount/resize observers)
-  await nextFrame();
-  await nextFrame();
-
-  try {
-    return await fn();
-  } finally {
-    if (previousLeaf && previousLeaf !== leafToActivate) {
-      app.workspace.setActiveLeaf(previousLeaf, { focus: true });
-      await nextFrame();
-    }
-  }
 }
 
 function controllerHasViewName(controller: BasesControllerLike, viewName: string): boolean {
@@ -285,9 +268,9 @@ function extractMarkdownFilesFromControllerResults(controller: BasesControllerLi
 }
 
 /**
- * Resolve Markdown files from a .base file + view name by temporarily opening the
- * Base, activating its leaf (required for Bases to run reliably), running the query,
- * waiting for results to settle, extracting `TFile`s, then cleaning up.
+ * Resolve Markdown files from a .base file + view name by opening the Base,
+ * running the query, waiting for results to settle, extracting `TFile`s,
+ * then cleaning up.
  */
 export async function resolveFilesFromBaseView(
   app: App,
@@ -306,7 +289,7 @@ export async function resolveFilesFromBaseView(
   let leaf: WorkspaceLeaf | null = null;
 
   try {
-    const openedLeaf = await openBaseLeafInBackground(app, baseFile, viewName);
+    const openedLeaf = await openBaseLeaf(app, baseFile, viewName);
     leaf = openedLeaf;
 
     const viewType = openedLeaf.view?.getViewType?.();
@@ -314,31 +297,39 @@ export async function resolveFilesFromBaseView(
       throw new Error(`[Elo][Bases] Unexpected view type: ${String(viewType)}`);
     }
 
-    return await withTemporarilyActiveLeaf(app, openedLeaf, previousLeaf, async () => {
-      await nextFrame();
+    await nextFrame();
 
-      const controller = getBasesControllerFromLeaf(openedLeaf);
-      if (!controller) throw new Error('[Elo][Bases] Bases controller missing on view');
+    const controller = getBasesControllerFromLeaf(openedLeaf);
+    if (!controller) throw new Error('[Elo][Bases] Bases controller missing on view');
 
-      await awaitControllerReady(
-        controller,
-        baseFile.path,
-        viewName,
-        opts?.readyTimeoutMs ?? READY_TIMEOUT_MS,
-      );
+    await awaitControllerReady(
+      controller,
+      baseFile.path,
+      viewName,
+      opts?.readyTimeoutMs ?? READY_TIMEOUT_MS,
+    );
 
-      attempt(() => controller.updateCurrentFile?.());
-      attempt(() => controller.onResize?.());
+    attempt(() => controller.updateCurrentFile?.());
+    attempt(() => controller.onResize?.());
 
-      await runQueryAndWaitForSettle(
-        controller,
-        viewName,
-        opts?.runTimeoutMs ?? RUN_TIMEOUT_MS,
-      );
+    await runQueryAndWaitForSettle(
+      controller,
+      viewName,
+      opts?.runTimeoutMs ?? RUN_TIMEOUT_MS,
+    );
 
-      return extractMarkdownFilesFromControllerResults(controller);
-    });
+    return extractMarkdownFilesFromControllerResults(controller);
   } finally {
+    // Restore the user's previous leaf
+    try {
+      if (leaf && previousLeaf && previousLeaf !== leaf) {
+        app.workspace.setActiveLeaf(previousLeaf, { focus: true });
+        await nextFrame();
+      }
+    } catch {
+      // ignore
+    }
+
     try {
       leaf?.detach();
     } catch {
