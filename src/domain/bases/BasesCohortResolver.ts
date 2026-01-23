@@ -1,6 +1,4 @@
-import { App, TFile, WorkspaceLeaf } from 'obsidian';
-
-import { attempt } from '../../utils/safe';
+import { App, OpenViewState, TFile, WorkspaceLeaf } from 'obsidian';
 
 const READY_TIMEOUT_MS = 20_000;
 const RUN_TIMEOUT_MS = 20_000;
@@ -36,16 +34,9 @@ type BasesControllerLike = {
   queryState?: unknown;
   results?: unknown;
 
-  selectView?: (viewName: string) => void;
-  setQueryAndView?: (query: unknown, viewName: string) => void;
   getQueryViewNames?: () => unknown;
 
-  updateCurrentFile?: () => void;
-  onResize?: () => void;
-
   // Patch points used for activity detection
-  addResult?: ControllerFn;
-  removeResult?: ControllerFn;
   requestNotifyView?: ControllerFn;
   stopLoader?: ControllerFn;
 };
@@ -73,9 +64,10 @@ async function openBaseLeaf(app: App, baseFile: TFile, viewName: string): Promis
   await nextFrame();
 
   const linktext = `${baseFile.path}#${viewName}`;
+  const openState: OpenViewState = { active: true };
 
   // Open into the currently active leaf
-  await app.workspace.openLinkText(linktext, baseFile.path, false);
+  await app.workspace.openLinkText(linktext, baseFile.path, false, openState);
 
   await nextFrame();
   await nextFrame();
@@ -128,7 +120,7 @@ type InstrumentState = {
   activityCount: number;
 };
 
-type PatchKey = 'addResult' | 'removeResult' | 'requestNotifyView' | 'stopLoader';
+type PatchKey = 'requestNotifyView' | 'stopLoader';
 
 function patchControllerMethod(
   controller: BasesControllerLike,
@@ -159,8 +151,6 @@ function instrumentControllerForActivity(controller: BasesControllerLike): { sta
     state.activityCount += 1;
   };
 
-  unpatches.push(patchControllerMethod(controller, 'addResult', mark));
-  unpatches.push(patchControllerMethod(controller, 'removeResult', mark));
   unpatches.push(patchControllerMethod(controller, 'requestNotifyView', mark));
   unpatches.push(patchControllerMethod(controller, 'stopLoader', mark));
 
@@ -260,21 +250,19 @@ export async function resolveFilesFromBaseView(
   const baseFile = af;
 
   const previousLeaf = getUserLeaf(app);
-
   let leaf: WorkspaceLeaf | null = null;
 
   try {
-    const openedLeaf = await openBaseLeaf(app, baseFile, viewName);
-    leaf = openedLeaf;
+    leaf = await openBaseLeaf(app, baseFile, viewName);
 
-    const viewType = openedLeaf.view?.getViewType?.();
+    const viewType = leaf.view?.getViewType?.();
     if (viewType !== 'bases') {
       throw new Error(`[Elo][Bases] Unexpected view type: ${String(viewType)}`);
     }
 
     await nextFrame();
 
-    const controller = getBasesControllerFromLeaf(openedLeaf);
+    const controller = getBasesControllerFromLeaf(leaf);
     if (!controller) throw new Error('[Elo][Bases] Bases controller missing on view');
 
     await awaitControllerReady(
@@ -283,9 +271,6 @@ export async function resolveFilesFromBaseView(
       viewName,
       opts?.readyTimeoutMs ?? READY_TIMEOUT_MS,
     );
-
-    attempt(() => controller.updateCurrentFile?.());
-    attempt(() => controller.onResize?.());
 
     await waitForResultsToSettle(controller, opts?.runTimeoutMs ?? RUN_TIMEOUT_MS);
 
