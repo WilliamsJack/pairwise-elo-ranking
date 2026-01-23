@@ -193,17 +193,9 @@ async function runQueryAndWaitForSettle(controller: BasesControllerLike, viewNam
     if (typeof controller.selectView !== 'function') {
       throw new Error('[Elo][Bases] controller.selectView is not a function (Bases internals changed)');
     }
-    controller.selectView(viewName);
-
-    const hasSetQueryAndView = typeof controller.setQueryAndView === 'function';
-
-    if (!hasSetQueryAndView) {
-      throw new Error('[Elo][Bases] No controller.setQueryAndView (Bases internals changed)');
-    }
 
     state.armed = true;
-
-    controller.setQueryAndView?.(controller.query, viewName);
+    controller.selectView(viewName);
 
     const deadline = nowMs() + timeoutMs;
 
