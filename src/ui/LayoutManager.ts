@@ -88,24 +88,7 @@ export class ArenaLayoutManager {
 
     attempt(() => this.app.workspace.setActiveLeaf(leftLeaf, { focus: false }));
 
-    let rightLeaf = this.app.workspace.getLeaf('split');
-    const createdRight = !!rightLeaf && rightLeaf !== leftLeaf;
-
-    if (!createdRight) {
-      // Fallback: new tab in same group, then split that
-      const newTab = this.app.workspace.getLeaf('tab');
-      if (newTab && newTab !== leftLeaf) {
-        attempt(() => this.app.workspace.setActiveLeaf(newTab, { focus: false }));
-        const split = this.app.workspace.getLeaf('split');
-        if (split && split !== newTab) {
-          rightLeaf = split;
-        } else {
-          rightLeaf = newTab;
-        }
-      } else {
-        rightLeaf = leftLeaf;
-      }
-    }
+    const rightLeaf = this.app.workspace.getLeaf('split');
 
     const cleanup = async () => {
       // Restore the user's original tab state
@@ -131,32 +114,13 @@ export class ArenaLayoutManager {
   private createRightSplit(): ArenaLayoutHandle {
     const referenceLeaf = this.getUserLeaf();
 
-    // First split: create arena-left to the right
+    // First split: create arena-right to the right
     attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: false }));
-    let arenaLeft = this.app.workspace.getLeaf('split');
-    const createdLeft = !!arenaLeft && arenaLeft !== referenceLeaf;
+    const arenaRight = this.app.workspace.getLeaf('split');
 
-    if (!createdLeft) {
-      // Fallback: create a new tab (still keeps reference visible in its own tab)
-      const newTab = this.app.workspace.getLeaf('tab');
-      if (newTab && newTab !== referenceLeaf) {
-        arenaLeft = newTab;
-      } else {
-        // Ultimate fallback: reuse-active
-        return this.createReuseActive();
-      }
-    }
-
-    // Second split: split the arena-left to create arena-right
-    attempt(() => this.app.workspace.setActiveLeaf(arenaLeft, { focus: false }));
-    let arenaRight = this.app.workspace.getLeaf('split');
-    const createdRight = !!arenaRight && arenaRight !== arenaLeft;
-
-    if (!createdRight) {
-      // Fallback: try another tab; otherwise, duplicate left
-      const tab = this.app.workspace.getLeaf('tab');
-      arenaRight = (tab && tab !== arenaLeft) ? tab : arenaLeft;
-    }
+    // Second split: split the arena-right to create arena-left
+    attempt(() => this.app.workspace.setActiveLeaf(arenaRight, { focus: false }));
+    const arenaLeft = this.app.workspace.getLeaf('split');
 
     // Focus the arena so keyboard works immediately
     attempt(() => this.app.workspace.setActiveLeaf(arenaLeft, { focus: true }));
@@ -185,20 +149,9 @@ export class ArenaLayoutManager {
     const referenceLeaf = this.getUserLeaf();
 
     const left = this.app.workspace.getLeaf('tab');
-    if (!left) {
-      // Fallback to reuse-active if tab creation failed
-      return this.createReuseActive();
-    }
 
     attempt(() => this.app.workspace.setActiveLeaf(left, { focus: false }));
-    let right = this.app.workspace.getLeaf('split');
-    const createdRight = !!right && right !== left;
-
-    if (!createdRight) {
-      // Fallback: at least try to create a distinct second leaf
-      const tab = this.app.workspace.getLeaf('tab');
-      right = (tab && tab !== left) ? tab : left;
-    }
+    const right = this.app.workspace.getLeaf('split');
 
     // Focus the arena
     attempt(() => this.app.workspace.setActiveLeaf(left, { focus: true }));
