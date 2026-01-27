@@ -49,6 +49,7 @@ class ConfirmModal extends BasePromiseModal<boolean> {
 }
 
 export default class EloSettingsTab extends PluginSettingTab {
+  icon = 'trophy';
   plugin: EloPlugin;
 
   constructor(app: App, plugin: EloPlugin) {
