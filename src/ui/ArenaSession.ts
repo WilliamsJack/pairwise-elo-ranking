@@ -36,6 +36,8 @@ export default class ArenaSession {
 
   private liveNotices: Notice[] = [];
 
+  private shortcutsPausedToastShown = false;
+
   constructor(app: App, plugin: EloPlugin, cohortKey: string, files: TFile[]) {
     this.app = app;
     this.plugin = plugin;
@@ -157,8 +159,8 @@ export default class ArenaSession {
         type: 'markdown',
         state: { file: file.path, mode: 'preview' },
         active: false,
-    })
-  );
+      })
+    );
 
     // Apply initial scroll behaviour
     const mode = this.getCohortScrollStart();
@@ -290,6 +292,25 @@ export default class ArenaSession {
     right.textContent = this.rightFile?.basename ?? 'Right';
   }
 
+  private isArenaShortcutKey(ev: KeyboardEvent): boolean {
+    return (
+      ev.key === 'ArrowLeft' ||
+      ev.key === 'ArrowRight' ||
+      ev.key === 'ArrowUp' ||
+      ev.key === 'ArrowDown' ||
+      ev.key === 'Backspace' ||
+      ev.key === 'Escape'
+    );
+  }
+
+  private showShortcutsPausedToast(ev: KeyboardEvent): void {
+    if (!this.isArenaShortcutKey(ev)) return;
+    if (this.shortcutsPausedToastShown == true) return;
+
+    this.shortcutsPausedToastShown = true;
+    this.showToast('Elo keyboard shortcuts are paused while editing.');
+  }
+
   private onKeydown(ev: KeyboardEvent) {
     // Ignore when typing in inputs/editors
     const target = ev.target as HTMLElement | null;
@@ -316,8 +337,13 @@ export default class ArenaSession {
 
     const isAnyCmFocused = !!activeEl?.closest?.('.cm-editor');
 
-    if (isTextEntryEl(target) || isTextEntryEl(activeEl) || isAnyCmFocused) return;
-  
+    const blockedByEditing = (isTextEntryEl(target) || isTextEntryEl(activeEl) || isAnyCmFocused);
+    if (blockedByEditing) {
+      this.showShortcutsPausedToast(ev);
+      return;
+    }
+    this.shortcutsPausedToastShown = false;
+
     if (ev.key === 'ArrowLeft') {
       ev.preventDefault();
       void this.choose('A');
