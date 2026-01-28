@@ -73,7 +73,7 @@ export default class ArenaSession {
       this.popoutUnloadHandler = () => void this.plugin.endSession();
       this.plugin.registerDomEvent(win, 'beforeunload', this.popoutUnloadHandler);
     }
-  
+
     this.pickNextPair();
     this.updateOverlay();
     await this.openCurrent();
@@ -151,12 +151,14 @@ export default class ArenaSession {
   }
 
   private async openInReadingMode(leaf: WorkspaceLeaf, file: TFile) {
-    // Force Reading Mode and prevent focus grabbing
-    await attemptAsync(() => leaf.setViewState({
-      type: 'markdown',
-      state: { file: file.path, mode: 'preview' },
-      active: false,
-    }));
+    // Force Reading Mode
+    await attemptAsync(() =>
+      leaf.setViewState({
+        type: 'markdown',
+        state: { file: file.path, mode: 'preview' },
+        active: false,
+    })
+  );
 
     // Apply initial scroll behaviour
     const mode = this.getCohortScrollStart();
@@ -164,23 +166,23 @@ export default class ArenaSession {
   }
 
   private async applyInitialScroll(leaf: WorkspaceLeaf, mode: ScrollStartMode): Promise<void> {
-  if (mode === 'none') return;
-  const v = leaf.view;
-  if (!(v instanceof MarkdownView)) return;
+    if (mode === 'none') return;
+    const v = leaf.view;
+    if (!(v instanceof MarkdownView)) return;
 
-  // Retry briefly while content renders for all modes, including after-frontmatter
-  const maxTries = 30;
-  const stepMs = 100;
-  for (let i = 0; i < maxTries; i++) {
-    if (this.tryScrollView(v, mode)) return;
-    await this.sleep(stepMs);
+    // Retry briefly while content renders
+    const maxTries = 30;
+    const stepMs = 100;
+    for (let i = 0; i < maxTries; i++) {
+      if (this.tryScrollView(v, mode)) return;
+      await this.sleep(stepMs);
+    }
   }
-}
 
   private tryScrollView(view: MarkdownView, mode: ScrollStartMode): boolean {
     const preview = this.getPreviewEl(view);
     if (!preview) return false;
-  
+
     const root = this.getRenderedRoot(preview);
   
     const findHeading = (): HTMLElement | null =>
@@ -191,14 +193,14 @@ export default class ArenaSession {
     if (mode === 'after-frontmatter') {
       return this.scrollPastFrontmatter(preview);
     }
-  
+
     let target: HTMLElement | null = null;
     if (mode === 'first-image') {
       target = findImage() || findHeading();
     } else if (mode === 'first-heading') {
       target = findHeading();
     }
-  
+
     if (target) {
       target.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
       return true;
@@ -209,22 +211,22 @@ export default class ArenaSession {
   private getPreviewEl(view: MarkdownView): HTMLElement | null {
     const scope = view.contentEl ?? view.containerEl;
     return (
-      (scope.querySelector('.markdown-reading-view .markdown-preview-view')) ??
-      (scope.querySelector('.markdown-preview-view'))
+      scope.querySelector('.markdown-reading-view .markdown-preview-view') ??
+      scope.querySelector('.markdown-preview-view')
     );
   }
 
   private getRenderedRoot(preview: HTMLElement): HTMLElement {
     return (
-      (preview.querySelector('.markdown-preview-sizer')) ??
-      (preview.querySelector('.markdown-rendered')) ??
+      preview.querySelector('.markdown-preview-sizer') ??
+      preview.querySelector('.markdown-rendered') ??
       preview
     );
   }
 
   private scrollPastFrontmatter(preview: HTMLElement): boolean {
     const root = this.getRenderedRoot(preview);
-      
+
     // Scroll to the first real content element after the properties/frontmatter block
     let next = root.querySelector(
       ':scope > :has(.metadata-container, .frontmatter-container, .frontmatter, pre.frontmatter) ~ *'
@@ -233,7 +235,7 @@ export default class ArenaSession {
     while (next && next.scrollHeight <= 0) {
       next = next.nextElementSibling as HTMLElement | null;
     }
-    
+
     if (next) {
       next.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
       return true;
@@ -291,9 +293,31 @@ export default class ArenaSession {
   private onKeydown(ev: KeyboardEvent) {
     // Ignore when typing in inputs/editors
     const target = ev.target as HTMLElement | null;
-    const tag = target?.tagName?.toLowerCase();
-    if (tag === 'input' || tag === 'textarea' || target?.closest('.cm-editor')) return;
+    const doc =
+      target?.ownerDocument ??
+      this.overlayEl?.ownerDocument ??
+      document;
+  
+    const activeEl = doc.activeElement as HTMLElement | null;
+  
+    const isTextEntryEl = (el: HTMLElement | null): boolean => {
+      if (!el) return false;
+  
+      const tag = el.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return true;
+  
+      // Any contenteditable region should also suppress shortcuts.
+      if (el.isContentEditable) return true;
+  
+      if (el.closest?.('.cm-editor')) return true;
+  
+      return false;
+    };
 
+    const isAnyCmFocused = !!activeEl?.closest?.('.cm-editor');
+
+    if (isTextEntryEl(target) || isTextEntryEl(activeEl) || isAnyCmFocused) return;
+  
     if (ev.key === 'ArrowLeft') {
       ev.preventDefault();
       void this.choose('A');
@@ -318,26 +342,15 @@ export default class ArenaSession {
 
   private getEffectiveFrontmatter(): FrontmatterPropertiesSettings {
     const def = this.plugin.dataStore.getCohortDef(this.cohortKey);
-    return effectiveFrontmatterProperties(
-      this.plugin.settings.frontmatterProperties,
-      def?.frontmatterOverrides,
-    );
+    return effectiveFrontmatterProperties(this.plugin.settings.frontmatterProperties, def?.frontmatterOverrides);
   }
 
   private async choose(result: MatchResult) {
     if (!this.leftFile || !this.rightFile) return;
 
-    const [aId, bId] = await Promise.all([
-      this.getIdForFile(this.leftFile),
-      this.getIdForFile(this.rightFile),
-    ]);
+    const [aId, bId] = await Promise.all([this.getIdForFile(this.leftFile), this.getIdForFile(this.rightFile)]);
 
-    const { undo } = this.plugin.dataStore.applyMatch(
-      this.cohortKey,
-      aId,
-      bId,
-      result,
-    );
+    const { undo } = this.plugin.dataStore.applyMatch(this.cohortKey, aId, bId, result);
     this.undoStack.push(undo);
 
     if (this.plugin.settings.showToasts) {
@@ -350,15 +363,7 @@ export default class ArenaSession {
     // Write frontmatter stats to both notes
     const cohort = this.plugin.dataStore.store.cohorts[this.cohortKey];
     const fm = this.getEffectiveFrontmatter();
-    void writeFrontmatterStatsForPair(
-      this.app,
-      fm,
-      cohort,
-      this.leftFile,
-      aId,
-      this.rightFile,
-      bId,
-    );
+    void writeFrontmatterStatsForPair(this.app, fm, cohort, this.leftFile, aId, this.rightFile, bId);
 
     this.pickNextPair();
     void this.openCurrent();
@@ -374,6 +379,7 @@ export default class ArenaSession {
       this.idByPath.set(file.path, existing);
       return existing;
     }
+
     const id = await ensureEloId(this.app, file, this.plugin.settings.eloIdLocation ?? 'frontmatter');
     this.idByPath.set(file.path, id);
     return id;
@@ -385,6 +391,7 @@ export default class ArenaSession {
       this.showToast('Nothing to undo.');
       return;
     }
+
     if (this.plugin.dataStore.revert(frame)) this.showToast('Undid last match.');
     void this.plugin.dataStore.saveStore();
 
@@ -393,15 +400,7 @@ export default class ArenaSession {
     const bFile = this.findFileById(frame.b.id);
     const cohort = this.plugin.dataStore.store.cohorts[frame.cohortKey];
     const fm = this.getEffectiveFrontmatter();
-    void writeFrontmatterStatsForPair(
-      this.app,
-      fm,
-      cohort,
-      aFile,
-      frame.a.id,
-      bFile,
-      frame.b.id,
-    );
+    void writeFrontmatterStatsForPair(this.app, fm, cohort, aFile, frame.a.id, bFile, frame.b.id);
   }
 
   private findFileById(id: string): TFile | undefined {
@@ -419,10 +418,12 @@ export default class ArenaSession {
   private getStatsForFile(file: TFile): { rating: number; matches: number } {
     const id = this.idByPath.get(file.path);
     const cohort = this.plugin.dataStore.store.cohorts[this.cohortKey];
+
     if (id && cohort) {
       const p = cohort.players[id];
       if (p) return { rating: p.rating, matches: p.matches };
     }
+
     // Unknown notes are treated as fresh
     return { rating: 1500, matches: 0 };
   }
