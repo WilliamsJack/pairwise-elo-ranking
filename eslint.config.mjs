@@ -49,7 +49,7 @@ export default [
       "no-prototype-builtins": "off",
       "@typescript-eslint/no-empty-function": "off",
       'obsidianmd/ui/sentence-case': ['warn', {
-        brands: ['Elo', 'Markdown', 'Obsidian'],
+        brands: ['Elo', 'Markdown', 'Obsidian', 'Command palette'],
         acronyms: ['ID', 'K']
       }]
     }
