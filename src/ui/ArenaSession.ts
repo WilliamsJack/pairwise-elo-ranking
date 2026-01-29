@@ -171,6 +171,11 @@ export default class ArenaSession {
     if (mode === 'none') return;
     const v = leaf.view;
     if (!(v instanceof MarkdownView)) return;
+  
+    if (mode === 'first-image') {
+      await this.scrollToFirstImageOrFallbackToHeading(v);
+      return;
+    }
 
     // Retry briefly while content renders
     const maxTries = 30;
@@ -178,6 +183,91 @@ export default class ArenaSession {
     for (let i = 0; i < maxTries; i++) {
       if (this.tryScrollView(v, mode)) return;
       await this.sleep(stepMs);
+    }
+  }
+
+  private findFirstContentImage(root: HTMLElement): HTMLElement | null {
+    const imgs = root.querySelectorAll('img');
+    for (const img of Array.from(imgs)) {
+      return img as HTMLElement;
+    }
+    return null;
+  }
+  
+  private async scrollToFirstImageOrFallbackToHeading(view: MarkdownView): Promise<void> {
+    const preview = this.getPreviewEl(view);
+    if (!preview) return;
+  
+    preview.scrollTop = 0;
+  
+    const findHeading = (): HTMLElement | null => {
+      const root = this.getRenderedRoot(preview);
+      return root.querySelector('h1, h2, h3, h4, h5, h6');
+    };
+  
+    const findImage = (): HTMLElement | null => {
+      const root = this.getRenderedRoot(preview);
+      return this.findFirstContentImage(root);
+    };
+  
+    // Phase 1: normal short retry (lets the initial viewport render)
+    const initialTries = 5;
+    const initialStepMs = 50;
+    for (let i = 0; i < initialTries; i++) {
+      const img = findImage();
+      if (img) {
+        img.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+        return;
+      }
+      await this.sleep(initialStepMs);
+    }
+  
+    // Phase 2: progressive scroll to force render in long lazily rendered notes
+    const stepPx = Math.max(200, Math.floor(preview.clientHeight * 0.8));
+    const maxSteps = 250;
+    let stalled = 0;
+  
+    for (let i = 0; i < maxSteps; i++) {
+      const img = findImage();
+      if (img) {
+        img.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+        return;
+      }
+  
+      const maxTop = Math.max(0, preview.scrollHeight - preview.clientHeight);
+      const atBottom = preview.scrollTop >= (maxTop - 2);
+  
+      if (atBottom) {
+        // Give Obsidian a moment in case scrollHeight is still expanding as it renders
+        await this.sleep(100);
+        const newMaxTop = Math.max(0, preview.scrollHeight - preview.clientHeight);
+        const stillAtBottom = preview.scrollTop >= (newMaxTop - 2);
+        if (stillAtBottom) break;
+        continue;
+      }
+  
+      const nextTop = Math.min(preview.scrollTop + stepPx, maxTop);
+  
+      // If we cannot make progress, wait a bit and then give up after a few stalls
+      if (nextTop <= preview.scrollTop + 1) {
+        stalled++;
+        if (stalled >= 5) break;
+        await this.sleep(50);
+        continue;
+      }
+  
+      stalled = 0;
+      preview.scrollTop = nextTop;
+      await this.sleep(50);
+    }
+  
+    // Phase 3: fall back to heading
+    preview.scrollTop = 0;
+    await this.sleep(0);
+  
+    const heading = findHeading();
+    if (heading) {
+      heading.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
     }
   }
 
