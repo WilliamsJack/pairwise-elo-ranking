@@ -175,12 +175,6 @@ export class ArenaLayoutManager {
   private async createNewWindow(): Promise<ArenaLayoutHandle> {
     const referenceLeaf = this.getUserLeaf();
 
-    const maybeAny = (this.app.workspace as { openPopoutLeaf?: unknown }).openPopoutLeaf;
-    if (typeof maybeAny !== 'function') {
-      new Notice('Pop-out windows are not supported in this Obsidian version. Using right-side split instead.');
-      return this.createRightSplit();
-    }
-    
     const wsWithFn = this.app.workspace as { openPopoutLeaf: () => WorkspaceLeaf | undefined };
     const popLeft: WorkspaceLeaf | undefined = wsWithFn.openPopoutLeaf();
     
