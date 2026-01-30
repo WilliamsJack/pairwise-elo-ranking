@@ -8,7 +8,7 @@ import { makeCohortKey } from '../domain/cohort/CohortResolver';
 export async function ensureFolderCohortPath(
   app: App,
   dataStore: PluginDataStore,
-  def: CohortDefinition
+  def: CohortDefinition,
 ): Promise<CohortDefinition | undefined> {
   if (def.kind !== 'folder' && def.kind !== 'folder-recursive') return def;
 

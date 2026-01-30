@@ -177,7 +177,7 @@ export class ArenaLayoutManager {
 
     const wsWithFn = this.app.workspace as { openPopoutLeaf: () => WorkspaceLeaf | undefined };
     const popLeft: WorkspaceLeaf | undefined = wsWithFn.openPopoutLeaf();
-    
+
     if (!popLeft) {
       new Notice('Failed to open a new window. Using right-side split instead.');
       return this.createRightSplit();
@@ -192,7 +192,7 @@ export class ArenaLayoutManager {
     const createdRight = !!popRight && popRight !== popLeft;
     if (!createdRight) {
       const tab = this.app.workspace.getLeaf('tab');
-      popRight = (tab && tab !== popLeft) ? tab : popLeft;
+      popRight = tab && tab !== popLeft ? tab : popLeft;
     }
 
     const cleanup = async () => {

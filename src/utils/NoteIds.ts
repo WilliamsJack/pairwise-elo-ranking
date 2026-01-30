@@ -11,7 +11,7 @@ function extractEloIdFromHtmlComment(text: string): string | undefined {
 export async function getEloId(app: App, file: TFile): Promise<string | undefined> {
   // Prefer frontmatter
   const fmRaw: unknown = app.metadataCache.getFileCache(file)?.frontmatter;
-  const fm = (fmRaw && typeof fmRaw === 'object') ? (fmRaw as Record<string, unknown>) : undefined;
+  const fm = fmRaw && typeof fmRaw === 'object' ? (fmRaw as Record<string, unknown>) : undefined;
   const fmId = fm ? fm['eloId'] : undefined;
   if (typeof fmId === 'string' && fmId.length > 0) return fmId;
 
@@ -27,14 +27,13 @@ export async function getEloId(app: App, file: TFile): Promise<string | undefine
 export async function ensureEloId(
   app: App,
   file: TFile,
-  preferredLocation: 'frontmatter' | 'end' = 'frontmatter'
+  preferredLocation: 'frontmatter' | 'end' = 'frontmatter',
 ): Promise<string> {
   const existing = await getEloId(app, file);
   if (existing) return existing;
 
-  const id = (window.crypto && 'randomUUID' in window.crypto)
-    ? window.crypto.randomUUID()
-    : fallbackUUID();
+  const id =
+    window.crypto && 'randomUUID' in window.crypto ? window.crypto.randomUUID() : fallbackUUID();
 
   if (preferredLocation === 'end') {
     await app.vault.process(file, (data) => {

@@ -1,4 +1,5 @@
 # Pairwise Elo ranking for your notes
+
 Easily sort notes by any subjective standard - Rank cohorts of notes in your vault by pairwise comparisons using the Elo rating system.
 
 ![colour_base_example](docs/images/colour_base_example.webp)
@@ -19,6 +20,7 @@ This plugin works especially well with **Obsidian Bases**: pick a **Base** and a
 ## Quick start
 
 ### Start a session
+
 ![cohort_creator](docs/images/cohort_creator.webp)
 
 - Click the trophy icon in the left ribbon, or run the command "Start rating session".
@@ -31,6 +33,7 @@ This plugin works especially well with **Obsidian Bases**: pick a **Base** and a
   - Previously saved cohorts appear here too
 
 ### Compare two notes
+
 ![arena](docs/images/arena.webp)
 
 Two notes open side-by-side in Reading mode for you to compare. Use the arrow keys on your keyboard or the buttons on the session bar to choose a winner.
@@ -44,9 +47,11 @@ Two notes open side-by-side in Reading mode for you to compare. Use the arrow ke
 A toast shows the winner after each comparison (toggle in Settings).
 
 ### End the session
+
 Press Escape or run "End current session". If you've enabled a Rank property for this cohort, the plugin recomputes ranks across the cohort and writes them to frontmatter.
 
 ### Configurable Frontmatter Output
+
 ![cohort_options](docs/images/cohort_options.webp)
 
 Use the values computed by the plugin however you want. Choose which values get written to frontmatter and what their property names are.
@@ -95,6 +100,7 @@ Example (anywhere in the body of a note, but appended to the end by default):
 ```
 
 Per-note statistics you can write to frontmatter (all optional, names customisable):
+
 - Rating
 - Rank (1 = highest within the cohort)
 - Matches
@@ -115,6 +121,7 @@ You can get good rankings faster with a few simple heuristics. All have sensible
 - Big-gap draw boost: increase K for draws across a large rating gap (default on)
 
 Pair selection heuristics (default on):
+
 - Prefer similar ratings: sample candidates and pick the closest rating
 - Bias towards fewer matches: give newer notes slightly more airtime to help them find their place quickly
 - Occasional upset probes: every so often, try a large rating gap to flush out surprises
@@ -150,6 +157,7 @@ views:
 ```
 
 This closes the loop:
+
 - Bases define the cohort
 - Pairwise Elo Ranking computes your subjective item rankings
 - Bases then use those properties to sort, filter and display your lists

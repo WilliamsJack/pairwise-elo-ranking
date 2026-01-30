@@ -117,7 +117,8 @@ async function awaitControllerReady(
     const curFileOk = curFile instanceof TFile && curFile.path === basePath;
 
     const hasQuery = typeof controller.query !== 'undefined';
-    const hasQueryState = typeof controller.queryState === 'string' && controller.queryState.length > 0;
+    const hasQueryState =
+      typeof controller.queryState === 'string' && controller.queryState.length > 0;
     const viewNameOk = controllerHasViewName(controller, viewName);
 
     if (curFileOk && hasQuery && hasQueryState && viewNameOk) return;

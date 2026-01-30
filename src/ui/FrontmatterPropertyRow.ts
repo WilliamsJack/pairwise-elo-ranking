@@ -37,7 +37,7 @@ export function renderStandardFmPropertyRow(
     base: FmRowValue;
     onChange: (next: FmRowValue) => void | Promise<void>;
     mode?: RowMode;
-  }
+  },
 ): FmRowRefs {
   const meta = META[key];
   const placeholder = opts.base.property || '';
@@ -87,7 +87,7 @@ export function renderStandardFmPropertyRow(
           toggleRef.setValue(cur.enabled);
           textRef.setValue(cur.property).setDisabled(!cur.enabled);
           void opts.onChange({ ...cur });
-        })
+        }),
     );
   }
 

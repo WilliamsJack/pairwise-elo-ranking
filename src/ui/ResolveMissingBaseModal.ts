@@ -29,11 +29,10 @@ class BaseViewSelectModal extends BasePromiseFuzzyModal<BaseViewChoice> {
   constructor(app: App, views: BaseViewInfo[]) {
     super(app);
 
-    this.choices = views
-      .map((v) => ({
-        view: v.name,
-        label: v.type ? `${v.name} (${v.type})` : v.name,
-      }));
+    this.choices = views.map((v) => ({
+      view: v.name,
+      label: v.type ? `${v.name} (${v.type})` : v.name,
+    }));
 
     this.setPlaceholder('Pick a view...');
   }
@@ -47,7 +46,9 @@ class BaseViewSelectModal extends BasePromiseFuzzyModal<BaseViewChoice> {
   }
 }
 
-export class ResolveMissingBaseModal extends BasePromiseModal<{ basePath: string; view: string } | undefined> {
+export class ResolveMissingBaseModal extends BasePromiseModal<
+  { basePath: string; view: string } | undefined
+> {
   private oldBasePath: string;
   private oldView: string;
 

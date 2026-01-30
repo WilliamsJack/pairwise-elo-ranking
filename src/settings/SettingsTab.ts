@@ -1,7 +1,16 @@
 import { App, Notice, PluginSettingTab, Setting, SliderComponent, setIcon } from 'obsidian';
-import { DEFAULT_SETTINGS, FrontmatterPropertiesSettings, SessionLayoutMode, effectiveFrontmatterProperties } from './settings';
+import {
+  DEFAULT_SETTINGS,
+  FrontmatterPropertiesSettings,
+  SessionLayoutMode,
+  effectiveFrontmatterProperties,
+} from './settings';
 import { FM_PROP_KEYS, renderStandardFmPropertyRow } from '../ui/FrontmatterPropertyRow';
-import { computeRankMap, previewCohortFrontmatterPropertyUpdates, updateCohortFrontmatter } from '../utils/FrontmatterStats';
+import {
+  computeRankMap,
+  previewCohortFrontmatterPropertyUpdates,
+  updateCohortFrontmatter,
+} from '../utils/FrontmatterStats';
 import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 
 import { BasePromiseModal } from '../ui/PromiseModal';
@@ -18,7 +27,14 @@ class ConfirmModal extends BasePromiseModal<boolean> {
   private cancelText: string;
   private warningCta: boolean;
 
-  constructor(app: App, titleText: string, message: string, ctaText: string, cancelText?: string, warningCta = false) {
+  constructor(
+    app: App,
+    titleText: string,
+    message: string,
+    ctaText: string,
+    cancelText?: string,
+    warningCta = false,
+  ) {
     super(app);
     this.titleText = titleText;
     this.message = message;
@@ -42,7 +58,8 @@ class ConfirmModal extends BasePromiseModal<boolean> {
     const btns = new Setting(contentEl);
     btns.addButton((b) => b.setButtonText(this.cancelText).onClick(() => this.finish(false)));
     btns.addButton((b) => {
-      if (this.warningCta) b.setWarning(); else b.setCta();
+      if (this.warningCta) b.setWarning();
+      else b.setCta();
       b.setButtonText(this.ctaText).onClick(() => this.finish(true));
     });
   }
@@ -73,7 +90,9 @@ export default class EloSettingsTab extends PluginSettingTab {
     // General
     new Setting(containerEl)
       .setName('K-factor')
-      .setDesc(`Adjusts how quickly ratings move (larger K = faster changes). Typical values 16–40. Default: ${DEFAULT_SETTINGS.kFactor}.`)
+      .setDesc(
+        `Adjusts how quickly ratings move (larger K = faster changes). Typical values 16–40. Default: ${DEFAULT_SETTINGS.kFactor}.`,
+      )
       .addSlider((s) => {
         s.setLimits(minK, maxK, stepK)
           .setValue(initialK)
@@ -85,7 +104,7 @@ export default class EloSettingsTab extends PluginSettingTab {
             // and clamp the stored minK if it now exceeds base K.
             const dec = this.plugin.settings.heuristics.decay;
             if (dec.minK > value) dec.minK = value;
-    
+
             // Update the UI control if it exists
             minKSlider?.setLimits(4, value, 1);
             if (minKSlider && minKSlider.getValue() > value) minKSlider.setValue(value);
@@ -96,7 +115,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Show win/draw notices')
-      .setDesc(`Show a toast with the winner after each comparison. Default: ${DEFAULT_SETTINGS.showToasts ? 'On' : 'Off'}.`)
+      .setDesc(
+        `Show a toast with the winner after each comparison. Default: ${DEFAULT_SETTINGS.showToasts ? 'On' : 'Off'}.`,
+      )
       .addToggle((t) =>
         t.setValue(this.plugin.settings.showToasts).onChange(async (v) => {
           this.plugin.settings.showToasts = v;
@@ -119,7 +140,9 @@ export default class EloSettingsTab extends PluginSettingTab {
           .setValue(this.plugin.settings.sessionLayout ?? DEFAULT_SETTINGS.sessionLayout)
           .onChange(async (v) => {
             const val: SessionLayoutMode =
-              v === 'reuse-active' || v === 'right-split' || v === 'new-tab' || v === 'new-window' ? v : 'new-tab';
+              v === 'reuse-active' || v === 'right-split' || v === 'new-tab' || v === 'new-window'
+                ? v
+                : 'new-tab';
             this.plugin.settings.sessionLayout = val;
             await this.plugin.saveSettings();
           });
@@ -127,7 +150,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Elo ID location')
-      .setDesc('Where to store the Elo ID. Changing this setting will not move existing IDs, but they will continue to work. Default: frontmatter.')
+      .setDesc(
+        'Where to store the Elo ID. Changing this setting will not move existing IDs, but they will continue to work. Default: frontmatter.',
+      )
       .addDropdown((dd) => {
         dd.addOptions({
           frontmatter: 'Frontmatter (YAML)',
@@ -145,7 +170,7 @@ export default class EloSettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName('Cohorts').setHeading();
 
     containerEl.createEl('p', {
-      text: 'Configure existing cohorts\' frontmatter properties or delete a cohort.',
+      text: "Configure existing cohorts' frontmatter properties or delete a cohort.",
     });
 
     const defs = this.plugin.dataStore.listCohortDefs();
@@ -172,7 +197,10 @@ export default class EloSettingsTab extends PluginSettingTab {
           void this.configureCohort(def.key);
         });
 
-        const name = info.createDiv({ cls: 'setting-item-name', text: def.label ?? prettyCohortDefinition(def) });
+        const name = info.createDiv({
+          cls: 'setting-item-name',
+          text: def.label ?? prettyCohortDefinition(def),
+        });
         name.title = def.key;
 
         const desc = info.createDiv({ cls: 'setting-item-description' });
@@ -216,21 +244,21 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(fmBody)
       .setName('Ask for per-cohort overrides on creation')
-      .setDesc(`When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults. 
+      .setDesc(
+        `When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults.
         Disabling this may cause clashes if you write frontmatter properties across multiple cohorts.
-        Default: ${DEFAULT_SETTINGS.askForOverridesOnCohortCreation ? 'On' : 'Off'}`)
+        Default: ${DEFAULT_SETTINGS.askForOverridesOnCohortCreation ? 'On' : 'Off'}`,
+      )
       .addToggle((t) =>
-        t
-          .setValue(this.plugin.settings.askForOverridesOnCohortCreation)
-          .onChange(async (v) => {
-            this.plugin.settings.askForOverridesOnCohortCreation = v;
-            await this.plugin.saveSettings();
-          }),
+        t.setValue(this.plugin.settings.askForOverridesOnCohortCreation).onChange(async (v) => {
+          this.plugin.settings.askForOverridesOnCohortCreation = v;
+          await this.plugin.saveSettings();
+        }),
       );
 
     fmBody.createEl('p', {
       text:
-        'Choose which Elo statistics to write into a note\'s frontmatter and the property names to use. ' +
+        "Choose which Elo statistics to write into a note's frontmatter and the property names to use. " +
         'These are global defaults; cohort-specific overrides can be applied during creation.',
     });
 
@@ -258,15 +286,14 @@ export default class EloSettingsTab extends PluginSettingTab {
     adv.createEl('summary', { text: 'Convergence heuristics' });
     const advBody = adv.createEl('div', { cls: 'elo-settings-body' });
     advBody.createEl('p', {
-      text:
-        'Optional tweaks that help new notes stabilise quickly and move ratings faster when results are more informative.',
+      text: 'Optional tweaks that help new notes stabilise quickly and move ratings faster when results are more informative.',
     });
 
     // Provisional K boost
     new Setting(advBody).setName('Provisional K boost').setHeading();
     advBody.createEl('p', {
       text:
-        'Use a higher K-factor for a note\'s first N matches to place new notes quickly. ' +
+        "Use a higher K-factor for a note's first N matches to place new notes quickly. " +
         'This is applied per note, per cohort.',
     });
 
@@ -287,7 +314,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(advBody)
       .setName('Provisional period (matches)')
-      .setDesc(`Applies while the note has played fewer than N matches. Default: ${defaults.provisional.matches}.`)
+      .setDesc(
+        `Applies while the note has played fewer than N matches. Default: ${defaults.provisional.matches}.`,
+      )
       .addSlider((sl) => {
         provMatchesSlider = sl;
         sl.setLimits(1, 30, 1)
@@ -302,7 +331,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(advBody)
       .setName('Provisional K multiplier')
-      .setDesc(`Multiplier on K during the provisional period. 1.0 disables the boost. Default: ${defaults.provisional.multiplier}.`)
+      .setDesc(
+        `Multiplier on K during the provisional period. 1.0 disables the boost. Default: ${defaults.provisional.multiplier}.`,
+      )
       .addSlider((sl) => {
         provMultSlider = sl;
         sl.setLimits(1.0, 3.0, 0.05)
@@ -339,7 +370,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(advBody)
       .setName('Half-life (matches)')
-      .setDesc(`At this many matches, the effective K is half of your base K. Default: ${defaults.decay.halfLife}.`)
+      .setDesc(
+        `At this many matches, the effective K is half of your base K. Default: ${defaults.decay.halfLife}.`,
+      )
       .addSlider((sl) => {
         halfSlider = sl;
         sl.setLimits(10, 500, 5)
@@ -354,7 +387,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(advBody)
       .setName('Minimum K')
-      .setDesc(`Lower bound on K for very experienced notes. Tip: keep this ≤ your base K (currently ${this.plugin.settings.kFactor}). Default: ${defaults.decay.minK}.`)
+      .setDesc(
+        `Lower bound on K for very experienced notes. Tip: keep this ≤ your base K (currently ${this.plugin.settings.kFactor}). Default: ${defaults.decay.minK}.`,
+      )
       .addSlider((sl) => {
         // Clamp the slider's max to the current base K on creation
         minKSlider = sl;
@@ -393,7 +428,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(advBody)
       .setName('Upset gap threshold')
-      .setDesc(`Minimum pre-match rating gap for an underdog win to qualify. Default: ${defaults.upsetBoost.threshold}.`)
+      .setDesc(
+        `Minimum pre-match rating gap for an underdog win to qualify. Default: ${defaults.upsetBoost.threshold}.`,
+      )
       .addSlider((sl) => {
         upsetGapSlider = sl;
         sl.setLimits(50, 600, 25)
@@ -408,7 +445,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(advBody)
       .setName('Upset K multiplier')
-      .setDesc(`Multiplier applied when the underdog wins. Default: ${defaults.upsetBoost.multiplier}.`)
+      .setDesc(
+        `Multiplier applied when the underdog wins. Default: ${defaults.upsetBoost.multiplier}.`,
+      )
       .addSlider((sl) => {
         upsetMultSlider = sl;
         sl.setLimits(1.0, 3, 0.05)
@@ -446,7 +485,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(advBody)
       .setName('Draw gap threshold')
-      .setDesc(`Minimum pre-match rating gap for a draw to qualify. Default: ${defaults.drawGapBoost.threshold}.`)
+      .setDesc(
+        `Minimum pre-match rating gap for a draw to qualify. Default: ${defaults.drawGapBoost.threshold}.`,
+      )
       .addSlider((sl) => {
         drawGapSlider = sl;
         sl.setLimits(50, 800, 25)
@@ -461,7 +502,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(advBody)
       .setName('Draw K multiplier')
-      .setDesc(`Multiplier applied to both sides for qualifying draws. Default: ${defaults.drawGapBoost.multiplier}.`)
+      .setDesc(
+        `Multiplier applied to both sides for qualifying draws. Default: ${defaults.drawGapBoost.multiplier}.`,
+      )
       .addSlider((sl) => {
         drawMultSlider = sl;
         sl.setLimits(1.0, 3.0, 0.05)
@@ -483,13 +526,14 @@ export default class EloSettingsTab extends PluginSettingTab {
     mmAcc.createEl('summary', { text: 'Matchmaking heuristics' });
     const mmBody = mmAcc.createEl('div', { cls: 'elo-settings-body' });
     mmBody.createEl('p', {
-      text:
-        'Control how pairs are chosen. These heuristics can speed up convergence by focusing on informative comparisons.',
+      text: 'Control how pairs are chosen. These heuristics can speed up convergence by focusing on informative comparisons.',
     });
 
     new Setting(mmBody)
       .setName('Enable matchmaking heuristics')
-      .setDesc(`Globally enable the pair selection heuristics. Default: ${mmDefaults.enabled ? 'On' : 'Off'}.`)
+      .setDesc(
+        `Globally enable the pair selection heuristics. Default: ${mmDefaults.enabled ? 'On' : 'Off'}.`,
+      )
       .addToggle((t) =>
         t.setValue(mm.enabled).onChange(async (v) => {
           mm.enabled = v;
@@ -498,7 +542,9 @@ export default class EloSettingsTab extends PluginSettingTab {
       );
 
     new Setting(mmBody).setName('Prefer similar ratings').setHeading();
-    mmBody.createEl('p', { text: 'When choosing an opponent, sample several candidates and pick the closest rating to the anchor note.' });
+    mmBody.createEl('p', {
+      text: 'When choosing an opponent, sample several candidates and pick the closest rating to the anchor note.',
+    });
 
     let sampleSlider: SliderComponent;
 
@@ -515,7 +561,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(mmBody)
       .setName('Opponent sample size')
-      .setDesc(`How many candidates to consider when picking the closest rating. Default: ${mmDefaults.similarRatings.sampleSize}.`)
+      .setDesc(
+        `How many candidates to consider when picking the closest rating. Default: ${mmDefaults.similarRatings.sampleSize}.`,
+      )
       .addSlider((sl) => {
         sampleSlider = sl;
         sl.setLimits(5, 50, 1)
@@ -529,7 +577,9 @@ export default class EloSettingsTab extends PluginSettingTab {
       });
 
     new Setting(mmBody).setName('Bias towards fewer matches').setHeading();
-    mmBody.createEl('p', { text: 'Prefer notes with fewer matches as the anchor. Weight ≈ 1 / (1 + matches)^strength.' });
+    mmBody.createEl('p', {
+      text: 'Prefer notes with fewer matches as the anchor. Weight ≈ 1 / (1 + matches)^strength.',
+    });
 
     let exponentSlider: SliderComponent;
 
@@ -546,7 +596,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(mmBody)
       .setName('Bias strength')
-      .setDesc(`Higher values emphasise low-match notes more strongly. Default: ${mmDefaults.lowMatchesBias.exponent}.`)
+      .setDesc(
+        `Higher values emphasise low-match notes more strongly. Default: ${mmDefaults.lowMatchesBias.exponent}.`,
+      )
       .addSlider((sl) => {
         exponentSlider = sl;
         sl.setLimits(0, 3, 0.1)
@@ -560,7 +612,9 @@ export default class EloSettingsTab extends PluginSettingTab {
       });
 
     new Setting(mmBody).setName('Occasional upset probes').setHeading();
-    mmBody.createEl('p', { text: 'Every so often, schedule a high-gap pair to detect surprises earlier.' });
+    mmBody.createEl('p', {
+      text: 'Every so often, schedule a high-gap pair to detect surprises earlier.',
+    });
 
     let probeProbSlider: SliderComponent;
     let probeGapSlider: SliderComponent;
@@ -579,7 +633,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(mmBody)
       .setName('Probe probability')
-      .setDesc(`Chance of picking a high-gap opponent instead of a similar one. Default: ${(mmDefaults.upsetProbes.probability * 100).toFixed(0)}%.`)
+      .setDesc(
+        `Chance of picking a high-gap opponent instead of a similar one. Default: ${(mmDefaults.upsetProbes.probability * 100).toFixed(0)}%.`,
+      )
       .addSlider((sl) => {
         probeProbSlider = sl;
         sl.setLimits(0, 50, 1)
@@ -594,7 +650,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     new Setting(mmBody)
       .setName('Minimum gap (rating)')
-      .setDesc(`Only consider an upset probe if the candidate gap is at least this large. Default: ${mmDefaults.upsetProbes.minGap}.`)
+      .setDesc(
+        `Only consider an upset probe if the candidate gap is at least this large. Default: ${mmDefaults.upsetProbes.minGap}.`,
+      )
       .addSlider((sl) => {
         probeGapSlider = sl;
         sl.setLimits(100, 800, 25)
@@ -611,7 +669,7 @@ export default class EloSettingsTab extends PluginSettingTab {
   private async deleteCohortWithConfirm(cohortKey: string): Promise<void> {
     const def = this.plugin.dataStore.getCohortDef(cohortKey);
     const label = def ? (def.label ?? prettyCohortDefinition(def)) : 'Cohort';
-  
+
     const ok = await new ConfirmModal(
       this.app,
       'Delete cohort?',
@@ -721,7 +779,13 @@ export default class EloSettingsTab extends PluginSettingTab {
       const vals = valuesFor(key);
 
       if (change.action === 'remove' && change.oldProp) {
-        const preview = await previewCohortFrontmatterPropertyUpdates(this.app, files, new Map(), '', change.oldProp);
+        const preview = await previewCohortFrontmatterPropertyUpdates(
+          this.app,
+          files,
+          new Map(),
+          '',
+          change.oldProp,
+        );
         if (preview.wouldUpdate === 0) continue;
 
         const ok = await new ConfirmModal(
@@ -729,7 +793,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           'Remove cohort property?',
           `Remove frontmatter property "${change.oldProp}" from ${preview.wouldUpdate} notes in this cohort?`,
           'Yes, remove',
-          'No, don\'t update'
+          "No, don't update",
         ).openAndConfirm();
         if (!ok) continue;
 
@@ -743,7 +807,13 @@ export default class EloSettingsTab extends PluginSettingTab {
         );
         new Notice(`Removed "${change.oldProp}" from ${res.updated} notes.`);
       } else if (change.action === 'rename' && change.oldProp && change.newProp) {
-        const preview = await previewCohortFrontmatterPropertyUpdates(this.app, files, vals, change.newProp, change.oldProp);
+        const preview = await previewCohortFrontmatterPropertyUpdates(
+          this.app,
+          files,
+          vals,
+          change.newProp,
+          change.oldProp,
+        );
         if (preview.wouldUpdate === 0) continue;
 
         const ok = await new ConfirmModal(
@@ -751,7 +821,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           'Rename cohort property?',
           `Rename frontmatter property "${change.oldProp}" to "${change.newProp}" on ${preview.wouldUpdate} notes in this cohort?`,
           'Yes, rename',
-          'No, don\'t rename'
+          "No, don't rename",
         ).openAndConfirm();
         if (!ok) continue;
 
@@ -765,7 +835,12 @@ export default class EloSettingsTab extends PluginSettingTab {
         );
         new Notice(`Updated ${res.updated} notes.`);
       } else if (change.action === 'upsert' && change.newProp) {
-        const preview = await previewCohortFrontmatterPropertyUpdates(this.app, files, vals, change.newProp);
+        const preview = await previewCohortFrontmatterPropertyUpdates(
+          this.app,
+          files,
+          vals,
+          change.newProp,
+        );
         if (preview.wouldUpdate === 0) continue;
 
         const ok = await new ConfirmModal(
@@ -773,7 +848,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           'Write cohort property?',
           `Write frontmatter property "${change.newProp}" to ${preview.wouldUpdate} notes in this cohort?`,
           'Yes, write',
-          'No, don\'t write'
+          "No, don't write",
         ).openAndConfirm();
         if (!ok) continue;
 

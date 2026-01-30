@@ -1,6 +1,11 @@
 import { App, ButtonComponent, FuzzySuggestModal, Notice, Setting, TFile } from 'obsidian';
 import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
-import { createDefinition, getFileTags, parseCohortKey, prettyCohortDefinition } from '../domain/cohort/CohortResolver';
+import {
+  createDefinition,
+  getFileTags,
+  parseCohortKey,
+  prettyCohortDefinition,
+} from '../domain/cohort/CohortResolver';
 import { listBaseFiles, readBaseViews } from '../domain/bases/BasesDiscovery';
 
 import { CohortDefinition } from '../types';
@@ -42,7 +47,13 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     const lastKey = this.plugin.dataStore.store.lastUsedCohortKey;
     if (lastKey) {
       const lastDef = this.plugin.dataStore.getCohortDef(lastKey) ?? parseCohortKey(lastKey);
-      if (lastDef) items.push({ kind: 'saved', key: lastDef.key, label: `Last used: ${lastDef.label ?? prettyCohortDefinition(lastDef)}`, def: lastDef });
+      if (lastDef)
+        items.push({
+          kind: 'saved',
+          key: lastDef.key,
+          label: `Last used: ${lastDef.label ?? prettyCohortDefinition(lastDef)}`,
+          def: lastDef,
+        });
     }
 
     // Saved definitions
@@ -50,11 +61,16 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     for (const def of defs) {
       if (def.key === 'vault:all') continue;
       if (def.key === lastKey) continue;
-      items.push({ kind: 'saved', key: def.key, label: def.label ?? prettyCohortDefinition(def), def });
+      items.push({
+        kind: 'saved',
+        key: def.key,
+        label: def.label ?? prettyCohortDefinition(def),
+        def,
+      });
     }
 
     // Add "Vault: all notes" only if not already present
-    if (!items.some(item => item.kind === 'saved' && item.def?.key === 'vault:all')) {
+    if (!items.some((item) => item.kind === 'saved' && item.def?.key === 'vault:all')) {
       items.push({ kind: 'action', action: 'vault-all', label: 'Vault: all notes' });
     }
 
@@ -101,24 +117,24 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
         new Notice('No ".base" files found in your vault.');
         return undefined;
       }
-  
+
       const baseFile = await new BaseFileSelectModal(this.app, baseFiles).openAndGetValue();
       if (!baseFile) return undefined;
-  
+
       const views = await readBaseViews(this.app, baseFile);
       if (views.length === 0) {
         new Notice(`No views found in "${baseFile.path}".`);
         return undefined;
       }
-  
+
       const viewChoice = await new BaseViewSelectModal(this.app, baseFile, views).openAndGetValue();
       if (!viewChoice) return undefined;
-  
+
       const baseId = baseFile.path;
       const view = viewChoice.view;
-  
+
       const label = `Base: ${baseFile.basename} (${view})`;
-  
+
       return createDefinition({
         kind: 'base',
         params: { baseId, view },
@@ -149,7 +165,14 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     return await this.runChild(() => new TagCohortModal(this.app).openAndGetDefinition());
   }
 
-  private async chooseFrontmatterOverrides(): Promise<{ overrides?: Partial<FrontmatterPropertiesSettings>; name?: string; scrollStart?: ScrollStartMode } | undefined> {
+  private async chooseFrontmatterOverrides(): Promise<
+    | {
+        overrides?: Partial<FrontmatterPropertiesSettings>;
+        name?: string;
+        scrollStart?: ScrollStartMode;
+      }
+    | undefined
+  > {
     return await this.runChild(() =>
       new CohortOptionsModal(this.app, this.plugin, {
         mode: 'create',
@@ -157,7 +180,9 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     );
   }
 
-  private async applyFrontmatterOverrides(def: CohortDefinition | undefined): Promise<CohortDefinition | undefined> {
+  private async applyFrontmatterOverrides(
+    def: CohortDefinition | undefined,
+  ): Promise<CohortDefinition | undefined> {
     if (!def) return undefined;
     if (!this.plugin.settings.askForOverridesOnCohortCreation) return def;
 
@@ -221,10 +246,10 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     // If a cohort with this key already exists, use it and skip any overrides prompt
     void this.handleActionSelection(item.action);
   }
-  
+
   private async handleActionSelection(action: Action): Promise<void> {
     const baseDef = await this.buildDefinitionForAction(action);
-  
+
     const deduped = this.useExistingIfDuplicate(baseDef);
     if (!deduped) {
       this.complete(undefined);
@@ -290,9 +315,12 @@ class FolderScopeModal extends BasePromiseModal<'folder' | 'folder-recursive' | 
       }),
     );
     btns.addButton((b) =>
-      b.setCta().setButtonText('Select').onClick(() => {
-        this.finish(this.selected);
-      }),
+      b
+        .setCta()
+        .setButtonText('Select')
+        .onClick(() => {
+          this.finish(this.selected);
+        }),
     );
   }
 }
@@ -342,11 +370,10 @@ class BaseViewSelectModal extends BasePromiseFuzzyModal<BaseViewChoice> {
   constructor(app: App, _baseFile: TFile, views: Array<{ name: string; type?: string }>) {
     super(app);
 
-    this.choices = views
-      .map((v) => ({
-        view: v.name,
-        label: v.type ? `${v.name} (${v.type})` : v.name,
-      }));
+    this.choices = views.map((v) => ({
+      view: v.name,
+      label: v.type ? `${v.name} (${v.type})` : v.name,
+    }));
 
     this.setPlaceholder('Pick a view...');
   }
@@ -443,7 +470,11 @@ class TagCohortModal extends BasePromiseModal<CohortDefinition | undefined> {
     const hasAvailable = this.availableTags.length > 0;
     new Setting(contentEl)
       .setName('Select tags')
-      .setDesc(hasAvailable ? 'Click "Add tag..." and search to add multiple tags.' : 'No tags found in your vault.')
+      .setDesc(
+        hasAvailable
+          ? 'Click "Add tag..." and search to add multiple tags.'
+          : 'No tags found in your vault.',
+      )
       .addButton((b) => {
         this.addBtn = b
           .setButtonText('Add tag...')
@@ -454,13 +485,11 @@ class TagCohortModal extends BasePromiseModal<CohortDefinition | undefined> {
         return this.addBtn;
       })
       .addButton((b) =>
-        b
-          .setButtonText('Clear')
-          .onClick(() => {
-            this.selectedTags.clear();
-            this.renderSelectedTags();
-            this.updateButtonsDisabled();
-          }),
+        b.setButtonText('Clear').onClick(() => {
+          this.selectedTags.clear();
+          this.renderSelectedTags();
+          this.updateButtonsDisabled();
+        }),
       );
 
     const sel = new Setting(contentEl).setName('Selected tags');
@@ -483,13 +512,16 @@ class TagCohortModal extends BasePromiseModal<CohortDefinition | undefined> {
       }),
     );
     btns.addButton((b) => {
-      this.createBtn = b.setCta().setButtonText('Create').onClick(() => {
-        if (this.selectedTags.size === 0) return;
-        const tags = Array.from(this.selectedTags).sort();
-        const kind = this.mode === 'all' ? 'tag:all' : 'tag:any';
-        const def = createDefinition({ kind, params: { tags } });
-        this.finish(def);
-      });
+      this.createBtn = b
+        .setCta()
+        .setButtonText('Create')
+        .onClick(() => {
+          if (this.selectedTags.size === 0) return;
+          const tags = Array.from(this.selectedTags).sort();
+          const kind = this.mode === 'all' ? 'tag:all' : 'tag:any';
+          const def = createDefinition({ kind, params: { tags } });
+          this.finish(def);
+        });
       this.updateButtonsDisabled();
       return this.createBtn;
     });

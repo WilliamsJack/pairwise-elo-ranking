@@ -23,12 +23,12 @@ export type CohortKind =
 
 export type CohortParamsMap = {
   'vault:all': Record<string, never>;
-  'folder': { path: string };
+  folder: { path: string };
   'folder-recursive': { path: string };
   'tag:any': { tags: string[] };
   'tag:all': { tags: string[] };
-  'manual': { paths: string[] };
-  'base': { baseId: string; view: string };
+  manual: { paths: string[] };
+  base: { baseId: string; view: string };
 };
 
 export type CohortParams<K extends CohortKind = CohortKind> = CohortParamsMap[K];
@@ -52,7 +52,7 @@ type CohortDefBase<K extends CohortKind> = {
 };
 
 export type CohortDefinition = {
-  [K in CohortKind]: CohortDefBase<K>
+  [K in CohortKind]: CohortDefBase<K>;
 }[CohortKind];
 
 export interface EloStore {

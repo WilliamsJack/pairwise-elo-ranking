@@ -43,7 +43,8 @@ export class ResolveMissingFolderModal extends BasePromiseModal<string | undefin
     p.textContent = `The folder for this cohort was not found: "${this.oldPath}". Pick the current location for this cohort.`;
 
     const info = contentEl.createEl('p');
-    info.textContent = 'Suggestions are based on notes in this cohort that still exist in your vault.';
+    info.textContent =
+      'Suggestions are based on notes in this cohort that still exist in your vault.';
 
     const prog = new Setting(contentEl).setName('Scan progress');
     this.progressEl = prog.controlEl.createDiv();
@@ -106,7 +107,12 @@ export class ResolveMissingFolderModal extends BasePromiseModal<string | undefin
       const row = new Setting(el)
         .setName(s.path || '/')
         .setDesc(`${s.count} note${s.count === 1 ? '' : 's'} with matching Elo IDs`)
-        .addButton((b) => b.setCta().setButtonText('Use').onClick(() => this.finish(s.path)));
+        .addButton((b) =>
+          b
+            .setCta()
+            .setButtonText('Use')
+            .onClick(() => this.finish(s.path)),
+        );
       row.settingEl.classList.add('elo-static');
     }
   }

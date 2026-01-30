@@ -1,5 +1,5 @@
-import { MatchResult } from '../../types';
 import type { EloHeuristicsSettings as EloHeuristics } from '../../settings';
+import { MatchResult } from '../../types';
 
 export function expectedScore(rA: number, rB: number): number {
   return 1 / (1 + Math.pow(10, (rB - rA) / 400));
@@ -23,7 +23,11 @@ function kFromMatches(baseK: number, matches: number, decay?: EloHeuristics['dec
   return Math.max(minK, k);
 }
 
-function applyProvisionalBoost(k: number, matches: number, prov?: EloHeuristics['provisional']): number {
+function applyProvisionalBoost(
+  k: number,
+  matches: number,
+  prov?: EloHeuristics['provisional'],
+): number {
   if (!prov?.enabled) return k;
   const n = Math.max(1, Math.round(prov.matches ?? 10));
   const mult = clamp(prov.multiplier ?? 2.0, 1.0, 5.0);
@@ -88,7 +92,15 @@ export function updateElo(
   kB = applyProvisionalBoost(kB, bMatches, heuristics?.provisional);
 
   // Outcome-based multipliers (upsets and big-gap draws)
-  const boosted = applyOutcomeBoosts(kA, kB, rA, rB, result, heuristics?.upsetBoost, heuristics?.drawGapBoost);
+  const boosted = applyOutcomeBoosts(
+    kA,
+    kB,
+    rA,
+    rB,
+    result,
+    heuristics?.upsetBoost,
+    heuristics?.drawGapBoost,
+  );
   kA = boosted.kA;
   kB = boosted.kB;
 

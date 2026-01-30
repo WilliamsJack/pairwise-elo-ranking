@@ -93,7 +93,11 @@ export default class EloPlugin extends Plugin {
     await this.startSessionForCohort(def, files, { saveDef: false });
   }
 
-  private async startSessionForCohort(def: CohortDefinition, files: TFile[], _opts?: { saveDef?: boolean }) {
+  private async startSessionForCohort(
+    def: CohortDefinition,
+    files: TFile[],
+    _opts?: { saveDef?: boolean },
+  ) {
     await this.endSession();
 
     this.currentSession = new ArenaSession(this.app, this, def.key, files);
@@ -138,9 +142,15 @@ export default class EloPlugin extends Plugin {
 
     const rankMap = computeRankMap(cohort);
 
-    updateCohortFrontmatter(this.app, files, rankMap, rankCfg.property, undefined, 'Updating ranks in frontmatter...')
-      .catch((e) => {
-        console.error('[Elo] Failed to update ranks in frontmatter', e);
-      });
+    updateCohortFrontmatter(
+      this.app,
+      files,
+      rankMap,
+      rankCfg.property,
+      undefined,
+      'Updating ranks in frontmatter...',
+    ).catch((e) => {
+      console.error('[Elo] Failed to update ranks in frontmatter', e);
+    });
   }
 }

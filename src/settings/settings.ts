@@ -17,13 +17,13 @@ export interface FrontmatterPropertiesSettings {
 export interface EloHeuristicsSettings {
   provisional: {
     enabled: boolean;
-    matches: number;   // First N matches use a higher K
+    matches: number; // First N matches use a higher K
     multiplier: number; // Multiplier on K during provisional phase
   };
   decay: {
     enabled: boolean;
-    halfLife: number;  // Matches at which K is halved (via 1/(1+m/halfLife))
-    minK: number;      // Lower bound on K
+    halfLife: number; // Matches at which K is halved (via 1/(1+m/halfLife))
+    minK: number; // Lower bound on K
   };
   upsetBoost: {
     enabled: boolean;
@@ -32,7 +32,7 @@ export interface EloHeuristicsSettings {
   };
   drawGapBoost: {
     enabled: boolean;
-    threshold: number;  // Rating gap where a draw is considered highly informative
+    threshold: number; // Rating gap where a draw is considered highly informative
     multiplier: number; // K multiplier for those draws
   };
 }
@@ -46,12 +46,12 @@ export interface MatchmakingSettings {
   };
   lowMatchesBias: {
     enabled: boolean;
-    exponent: number;   // Strength of bias towards fewer matches (0 = none, higher = stronger)
+    exponent: number; // Strength of bias towards fewer matches (0 = none, higher = stronger)
   };
   upsetProbes: {
     enabled: boolean;
     probability: number; // Chance to schedule a high-gap pair instead of similar ratings
-    minGap: number;      // Minimum rating gap to qualify as a probe
+    minGap: number; // Minimum rating gap to qualify as a probe
   };
 }
 
@@ -72,10 +72,10 @@ export const DEFAULT_SETTINGS: EloSettings = {
   eloIdLocation: 'frontmatter',
   sessionLayout: 'new-tab',
   frontmatterProperties: {
-    rating:  { property: 'eloRating',   enabled: false },
-    rank:    { property: 'eloRank',     enabled: false },
-    matches: { property: 'eloMatches',  enabled: false },
-    wins:    { property: 'eloWins',     enabled: false },
+    rating: { property: 'eloRating', enabled: false },
+    rank: { property: 'eloRank', enabled: false },
+    matches: { property: 'eloMatches', enabled: false },
+    wins: { property: 'eloWins', enabled: false },
   },
   askForOverridesOnCohortCreation: true,
 
@@ -116,7 +116,7 @@ export const DEFAULT_SETTINGS: EloSettings = {
     },
     upsetProbes: {
       enabled: true,
-      probability: 0.10,
+      probability: 0.1,
       minGap: 300,
     },
   },

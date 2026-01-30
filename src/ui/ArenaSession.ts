@@ -88,7 +88,9 @@ export default class ArenaSession {
       if (this.popoutUnloadHandler) {
         this.overlayWin.removeEventListener('beforeunload', this.popoutUnloadHandler);
         // Hide any toast we created while in the popout (so they don't reattach to the main window)
-        for (const n of this.liveNotices) { (n)?.hide?.(); }
+        for (const n of this.liveNotices) {
+          n?.hide?.();
+        }
       }
     }
 
@@ -102,7 +104,9 @@ export default class ArenaSession {
 
     // Only detach/cleanup panes when not unloading the plugin (as per guidelines)
     if (!opts?.forUnload) {
-      try { await this.layoutHandle?.cleanup(); } catch {
+      try {
+        await this.layoutHandle?.cleanup();
+      } catch {
         // Non-fatal: cleanup is best-effort; panes may already be detached. Ignore.
       }
     }
@@ -126,9 +130,10 @@ export default class ArenaSession {
     // Update labels if visible
     if (this.leftFile?.path === oldPath) this.leftFile = newFile;
     if (this.rightFile?.path === oldPath) this.rightFile = newFile;
-    this.lastPairSig = this.leftFile && this.rightFile
-      ? pairSig(this.leftFile.path, this.rightFile.path)
-      : undefined;
+    this.lastPairSig =
+      this.leftFile && this.rightFile
+        ? pairSig(this.leftFile.path, this.rightFile.path)
+        : undefined;
     this.updateOverlay();
   }
 
@@ -136,10 +141,7 @@ export default class ArenaSession {
     if (!this.leftFile || !this.rightFile) return;
 
     // Lazily ensure eloIds only for the notes being displayed
-    await Promise.all([
-      this.getIdForFile(this.leftFile),
-      this.getIdForFile(this.rightFile),
-    ]);
+    await Promise.all([this.getIdForFile(this.leftFile), this.getIdForFile(this.rightFile)]);
 
     await Promise.all([
       this.openInReadingMode(this.leftLeaf, this.leftFile),
@@ -159,7 +161,7 @@ export default class ArenaSession {
         type: 'markdown',
         state: { file: file.path, mode: 'preview' },
         active: false,
-      })
+      }),
     );
 
     // Apply initial scroll behaviour
@@ -171,7 +173,7 @@ export default class ArenaSession {
     if (mode === 'none') return;
     const v = leaf.view;
     if (!(v instanceof MarkdownView)) return;
-  
+
     if (mode === 'first-image') {
       await this.scrollToFirstImageOrFallbackToHeading(v);
       return;
@@ -193,23 +195,23 @@ export default class ArenaSession {
     }
     return null;
   }
-  
+
   private async scrollToFirstImageOrFallbackToHeading(view: MarkdownView): Promise<void> {
     const preview = this.getPreviewEl(view);
     if (!preview) return;
-  
+
     preview.scrollTop = 0;
-  
+
     const findHeading = (): HTMLElement | null => {
       const root = this.getRenderedRoot(preview);
       return root.querySelector('h1, h2, h3, h4, h5, h6');
     };
-  
+
     const findImage = (): HTMLElement | null => {
       const root = this.getRenderedRoot(preview);
       return this.findFirstContentImage(root);
     };
-  
+
     // Phase 1: normal short retry (lets the initial viewport render)
     const initialTries = 5;
     const initialStepMs = 50;
@@ -221,33 +223,33 @@ export default class ArenaSession {
       }
       await this.sleep(initialStepMs);
     }
-  
+
     // Phase 2: progressive scroll to force render in long lazily rendered notes
     const stepPx = Math.max(200, Math.floor(preview.clientHeight * 0.8));
     const maxSteps = 250;
     let stalled = 0;
-  
+
     for (let i = 0; i < maxSteps; i++) {
       const img = findImage();
       if (img) {
         img.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
         return;
       }
-  
+
       const maxTop = Math.max(0, preview.scrollHeight - preview.clientHeight);
-      const atBottom = preview.scrollTop >= (maxTop - 2);
-  
+      const atBottom = preview.scrollTop >= maxTop - 2;
+
       if (atBottom) {
         // Give Obsidian a moment in case scrollHeight is still expanding as it renders
         await this.sleep(100);
         const newMaxTop = Math.max(0, preview.scrollHeight - preview.clientHeight);
-        const stillAtBottom = preview.scrollTop >= (newMaxTop - 2);
+        const stillAtBottom = preview.scrollTop >= newMaxTop - 2;
         if (stillAtBottom) break;
         continue;
       }
-  
+
       const nextTop = Math.min(preview.scrollTop + stepPx, maxTop);
-  
+
       // If we cannot make progress, wait a bit and then give up after a few stalls
       if (nextTop <= preview.scrollTop + 1) {
         stalled++;
@@ -255,16 +257,16 @@ export default class ArenaSession {
         await this.sleep(50);
         continue;
       }
-  
+
       stalled = 0;
       preview.scrollTop = nextTop;
       await this.sleep(50);
     }
-  
+
     // Phase 3: fall back to heading
     preview.scrollTop = 0;
     await this.sleep(0);
-  
+
     const heading = findHeading();
     if (heading) {
       heading.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
@@ -276,12 +278,10 @@ export default class ArenaSession {
     if (!preview) return false;
 
     const root = this.getRenderedRoot(preview);
-  
-    const findHeading = (): HTMLElement | null =>
-      (root.querySelector('h1, h2, h3, h4, h5, h6'));
-    const findImage = (): HTMLElement | null =>
-      (root.querySelector('img') as HTMLElement | null);
-  
+
+    const findHeading = (): HTMLElement | null => root.querySelector('h1, h2, h3, h4, h5, h6');
+    const findImage = (): HTMLElement | null => root.querySelector('img') as HTMLElement | null;
+
     if (mode === 'after-frontmatter') {
       return this.scrollPastFrontmatter(preview);
     }
@@ -321,9 +321,9 @@ export default class ArenaSession {
 
     // Scroll to the first real content element after the properties/frontmatter block
     let next = root.querySelector(
-      ':scope > :has(.metadata-container, .frontmatter-container, .frontmatter, pre.frontmatter) ~ *'
+      ':scope > :has(.metadata-container, .frontmatter-container, .frontmatter, pre.frontmatter) ~ *',
     );
-    
+
     while (next && next.scrollHeight <= 0) {
       next = next.nextElementSibling as HTMLElement | null;
     }
@@ -404,30 +404,27 @@ export default class ArenaSession {
   private onKeydown(ev: KeyboardEvent) {
     // Ignore when typing in inputs/editors
     const target = ev.target as HTMLElement | null;
-    const doc =
-      target?.ownerDocument ??
-      this.overlayEl?.ownerDocument ??
-      document;
-  
+    const doc = target?.ownerDocument ?? this.overlayEl?.ownerDocument ?? document;
+
     const activeEl = doc.activeElement as HTMLElement | null;
-  
+
     const isTextEntryEl = (el: HTMLElement | null): boolean => {
       if (!el) return false;
-  
+
       const tag = el.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea') return true;
-  
+
       // Any contenteditable region should also suppress shortcuts.
       if (el.isContentEditable) return true;
-  
+
       if (el.closest?.('.cm-editor')) return true;
-  
+
       return false;
     };
 
     const isAnyCmFocused = !!activeEl?.closest?.('.cm-editor');
 
-    const blockedByEditing = (isTextEntryEl(target) || isTextEntryEl(activeEl) || isAnyCmFocused);
+    const blockedByEditing = isTextEntryEl(target) || isTextEntryEl(activeEl) || isAnyCmFocused;
     if (blockedByEditing) {
       this.showShortcutsPausedToast(ev);
       return;
@@ -458,13 +455,19 @@ export default class ArenaSession {
 
   private getEffectiveFrontmatter(): FrontmatterPropertiesSettings {
     const def = this.plugin.dataStore.getCohortDef(this.cohortKey);
-    return effectiveFrontmatterProperties(this.plugin.settings.frontmatterProperties, def?.frontmatterOverrides);
+    return effectiveFrontmatterProperties(
+      this.plugin.settings.frontmatterProperties,
+      def?.frontmatterOverrides,
+    );
   }
 
   private async choose(result: MatchResult) {
     if (!this.leftFile || !this.rightFile) return;
 
-    const [aId, bId] = await Promise.all([this.getIdForFile(this.leftFile), this.getIdForFile(this.rightFile)]);
+    const [aId, bId] = await Promise.all([
+      this.getIdForFile(this.leftFile),
+      this.getIdForFile(this.rightFile),
+    ]);
 
     const { undo } = this.plugin.dataStore.applyMatch(this.cohortKey, aId, bId, result);
     this.undoStack.push(undo);
@@ -479,7 +482,15 @@ export default class ArenaSession {
     // Write frontmatter stats to both notes
     const cohort = this.plugin.dataStore.store.cohorts[this.cohortKey];
     const fm = this.getEffectiveFrontmatter();
-    void writeFrontmatterStatsForPair(this.app, fm, cohort, this.leftFile, aId, this.rightFile, bId);
+    void writeFrontmatterStatsForPair(
+      this.app,
+      fm,
+      cohort,
+      this.leftFile,
+      aId,
+      this.rightFile,
+      bId,
+    );
 
     this.pickNextPair();
     void this.openCurrent();
@@ -496,7 +507,11 @@ export default class ArenaSession {
       return existing;
     }
 
-    const id = await ensureEloId(this.app, file, this.plugin.settings.eloIdLocation ?? 'frontmatter');
+    const id = await ensureEloId(
+      this.app,
+      file,
+      this.plugin.settings.eloIdLocation ?? 'frontmatter',
+    );
     this.idByPath.set(file.path, id);
     return id;
   }
@@ -550,7 +565,11 @@ export default class ArenaSession {
       return;
     }
 
-    const { leftIndex, rightIndex, pairSig: sig } = pickNextPairIndices(
+    const {
+      leftIndex,
+      rightIndex,
+      pairSig: sig,
+    } = pickNextPairIndices(
       this.files,
       (f) => this.getStatsForFile(f),
       this.plugin.settings.matchmaking,

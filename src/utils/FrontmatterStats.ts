@@ -13,10 +13,7 @@ type PlayerStats = {
 
 function anyEnabled(fm: FrontmatterPropertiesSettings): boolean {
   return (
-    !!fm?.rating?.enabled ||
-    !!fm?.rank?.enabled ||
-    !!fm?.matches?.enabled ||
-    !!fm?.wins?.enabled
+    !!fm?.rating?.enabled || !!fm?.rank?.enabled || !!fm?.matches?.enabled || !!fm?.wins?.enabled
   );
 }
 
@@ -136,7 +133,8 @@ async function planFrontmatterUpdates(
     if (!id) continue;
 
     const fcRaw: unknown = app.metadataCache.getFileCache(file)?.frontmatter;
-    const fmCache = fcRaw && typeof fcRaw === 'object' ? (fcRaw as Record<string, unknown>) : undefined;
+    const fmCache =
+      fcRaw && typeof fcRaw === 'object' ? (fcRaw as Record<string, unknown>) : undefined;
 
     // Removal-only mode: delete oldProp if present.
     if (!prop && oldProp) {
@@ -159,8 +157,8 @@ async function planFrontmatterUpdates(
       typeof curNewRaw === 'number'
         ? curNewRaw
         : typeof curNewRaw === 'string'
-        ? parseInt(curNewRaw, 10)
-        : undefined;
+          ? parseInt(curNewRaw, 10)
+          : undefined;
 
     const hasOld = !!oldProp && oldProp !== prop && typeof fmCache?.[oldProp] !== 'undefined';
 
@@ -242,7 +240,13 @@ export async function updateCohortFrontmatter(
 ): Promise<{ updated: number }> {
   const working = new Notice(noticeMessage ?? 'Updating frontmatter...', 0);
   try {
-    return await updateCohortFrontmatterProperties(app, files, valuesById, newPropName, oldPropName);
+    return await updateCohortFrontmatterProperties(
+      app,
+      files,
+      valuesById,
+      newPropName,
+      oldPropName,
+    );
   } finally {
     working?.hide?.();
   }

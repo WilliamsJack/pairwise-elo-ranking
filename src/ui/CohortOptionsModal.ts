@@ -40,7 +40,12 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
   constructor(
     app: App,
     plugin: EloPlugin,
-    opts?: { mode?: Mode; initial?: Partial<FrontmatterPropertiesSettings>; initialName?: string; initialScrollStart?: ScrollStartMode },
+    opts?: {
+      mode?: Mode;
+      initial?: Partial<FrontmatterPropertiesSettings>;
+      initialName?: string;
+      initialScrollStart?: ScrollStartMode;
+    },
   ) {
     super(app);
     this.plugin = plugin;
@@ -132,7 +137,12 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
         dd.addOptions(scrollLabels as Record<string, string>)
           .setValue(this.scrollWorking)
           .onChange((v) => {
-            if (v === 'after-frontmatter' || v === 'first-heading' || v === 'first-image' || v === 'none') {
+            if (
+              v === 'after-frontmatter' ||
+              v === 'first-heading' ||
+              v === 'first-image' ||
+              v === 'none'
+            ) {
               this.scrollWorking = v;
             } else {
               this.scrollWorking = 'none';

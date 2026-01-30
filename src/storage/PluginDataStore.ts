@@ -125,20 +125,19 @@ export class PluginDataStore {
         this._pendingDebounceResolve = resolve;
       });
     }
-  
+
     const p = this._pendingDebouncePromise;
-  
+
     this._saveTimerId = window.setTimeout(() => {
       this._saveTimerId = null;
-  
+
       const resolve = this._pendingDebounceResolve;
       this._pendingDebounceResolve = null;
 
-      void this.enqueueWrite()
-        .finally(() => {
-          resolve?.();
-          this._pendingDebouncePromise = null;
-        });
+      void this.enqueueWrite().finally(() => {
+        resolve?.();
+        this._pendingDebouncePromise = null;
+      });
     }, this._debounceMs);
 
     return p;
@@ -180,7 +179,7 @@ export class PluginDataStore {
     cohortKey: string,
     aId: string,
     bId: string,
-    result: MatchResult
+    result: MatchResult,
   ): { winnerId?: string; undo: UndoFrame } {
     const cohort = (this.store.cohorts[cohortKey] ??= { players: {} });
 

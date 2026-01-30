@@ -1,10 +1,5 @@
 import { App, TAbstractFile, TFile, TFolder } from 'obsidian';
-import {
-  CohortDefinition,
-  CohortKind,
-  CohortParamsMap,
-  CohortSpec,
-} from '../../types';
+import { CohortDefinition, CohortKind, CohortParamsMap, CohortSpec } from '../../types';
 
 import { normaliseTag } from '../../utils/tags';
 import { resolveFilesFromBaseView } from '../bases/BasesCohortResolver';
@@ -49,9 +44,7 @@ export function getFileTags(app: App, file: TFile): string[] {
 
 type Handler<K extends CohortKind> = {
   makeKey: (params: CohortParamsMap[K]) => string;
-  parse: (key: string) =>
-    | { kind: K; params: CohortParamsMap[K]; label: string }
-    | undefined;
+  parse: (key: string) => { kind: K; params: CohortParamsMap[K]; label: string } | undefined;
   pretty: (params: CohortParamsMap[K]) => string;
   resolve: (app: App, params: CohortParamsMap[K]) => Promise<TFile[]>;
 };
@@ -99,9 +92,7 @@ const handlers: CohortHandlersMap = {
     resolve: (app, p) => {
       const all = app.vault.getMarkdownFiles();
       const prefix = p.path.length ? p.path + '/' : '';
-      const filtered = all.filter((f) =>
-        prefix === '' ? true : f.path.startsWith(prefix),
-      );
+      const filtered = all.filter((f) => (prefix === '' ? true : f.path.startsWith(prefix)));
       return Promise.resolve(filtered);
     },
   },
@@ -127,11 +118,13 @@ const handlers: CohortHandlersMap = {
       const want: Set<string> = new Set(p.tags.map(normaliseTag));
 
       if (want.size === 0) return Promise.resolve([]);
-      return Promise.resolve(all.filter((f) => {
-        const tags = getFileTags(app, f);
-        for (const t of tags) if (want.has(t)) return true;
-        return false;
-      }));
+      return Promise.resolve(
+        all.filter((f) => {
+          const tags = getFileTags(app, f);
+          for (const t of tags) if (want.has(t)) return true;
+          return false;
+        }),
+      );
     },
   },
 
@@ -155,11 +148,13 @@ const handlers: CohortHandlersMap = {
       const all = app.vault.getMarkdownFiles();
       const want: Set<string> = new Set(p.tags.map(normaliseTag));
       if (want.size === 0) return Promise.resolve([]);
-      return Promise.resolve(all.filter((f) => {
-        const tags = new Set(getFileTags(app, f));
-        for (const t of want) if (!tags.has(t)) return false;
-        return true;
-      }));
+      return Promise.resolve(
+        all.filter((f) => {
+          const tags = new Set(getFileTags(app, f));
+          for (const t of want) if (!tags.has(t)) return false;
+          return true;
+        }),
+      );
     },
   },
 
@@ -191,26 +186,26 @@ const handlers: CohortHandlersMap = {
       const view = String(p.view ?? '');
       return `base:${baseId}|view=${encodeURIComponent(view)}`;
     },
-  
+
     parse: (key) => {
       if (!key.startsWith('base:')) return undefined;
       const rest = key.slice('base:'.length);
       const [baseId, ...restParts] = rest.split('|');
-  
+
       let view: string | undefined;
       for (const rp of restParts) {
         const [k, v] = rp.split('=', 2);
         if (k === 'view' && typeof v === 'string') view = decodeURIComponent(v);
       }
-  
+
       if (!baseId || !view) return undefined;
-  
+
       const label = `Base: ${baseId} (${view})`;
       return { kind: 'base', params: { baseId, view }, label };
     },
-  
+
     pretty: (p) => `Base: ${p.baseId} (${p.view})`,
-  
+
     resolve: async (app, p) => {
       return await resolveFilesFromBaseView(app, p.baseId, p.view);
     },
@@ -255,13 +250,13 @@ export function parseCohortKey(key: string): CohortDefinition | undefined {
 
 type KindAndParams<K extends CohortKind> = { kind: K; params: CohortParamsMap[K] };
 
-export function prettyCohortDefinition<K extends CohortKind>(
-  def: KindAndParams<K>
-): string {
+export function prettyCohortDefinition<K extends CohortKind>(def: KindAndParams<K>): string {
   return getHandler(def.kind).pretty(def.params);
 }
 
-export function createDefinition<K extends CohortKind>(spec: CohortSpec<K> & { label?: string }): CohortDefinition {
+export function createDefinition<K extends CohortKind>(
+  spec: CohortSpec<K> & { label?: string },
+): CohortDefinition {
   const ts = Date.now();
   const key = makeCohortKey(spec);
   return {
@@ -276,7 +271,7 @@ export function createDefinition<K extends CohortKind>(spec: CohortSpec<K> & { l
 
 export async function resolveFilesForCohort<K extends CohortKind>(
   app: App,
-  def: KindAndParams<K>
+  def: KindAndParams<K>,
 ): Promise<TFile[]> {
   return await getHandler(def.kind).resolve(app, def.params);
 }
