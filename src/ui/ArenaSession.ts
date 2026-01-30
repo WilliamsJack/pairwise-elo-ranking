@@ -1,15 +1,17 @@
-import { App, MarkdownView, Notice, TFile, WorkspaceLeaf } from 'obsidian';
-import { ArenaLayoutHandle, ArenaLayoutManager } from './LayoutManager';
-import { MatchResult, ScrollStartMode, UndoFrame } from '../types';
-import { attempt, attemptAsync } from '../utils/safe';
-import { ensureEloId, getEloId } from '../utils/NoteIds';
+import type { App, WorkspaceLeaf } from 'obsidian';
+import { MarkdownView, Notice, TFile } from 'obsidian';
 
+import { pickNextPairIndices } from '../domain/matchmaking/Matchmaker';
 import type EloPlugin from '../main';
 import type { FrontmatterPropertiesSettings } from '../settings';
 import { effectiveFrontmatterProperties } from '../settings';
-import { pairSig } from '../utils/pair';
-import { pickNextPairIndices } from '../domain/matchmaking/Matchmaker';
+import type { MatchResult, ScrollStartMode, UndoFrame } from '../types';
 import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
+import { ensureEloId, getEloId } from '../utils/NoteIds';
+import { pairSig } from '../utils/pair';
+import { attempt, attemptAsync } from '../utils/safe';
+import type { ArenaLayoutHandle} from './LayoutManager';
+import { ArenaLayoutManager } from './LayoutManager';
 
 export default class ArenaSession {
   private app: App;

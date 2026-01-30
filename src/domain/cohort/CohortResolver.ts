@@ -1,6 +1,7 @@
-import { App, TAbstractFile, TFile, TFolder } from 'obsidian';
-import { CohortDefinition, CohortKind, CohortParamsMap, CohortSpec } from '../../types';
+import type { App, TAbstractFile} from 'obsidian';
+import { TFile, TFolder } from 'obsidian';
 
+import type { CohortDefinition, CohortKind, CohortParamsMap, CohortSpec } from '../../types';
 import { normaliseTag } from '../../utils/tags';
 import { resolveFilesFromBaseView } from '../bases/BasesCohortResolver';
 

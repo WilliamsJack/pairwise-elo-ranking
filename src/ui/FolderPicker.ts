@@ -1,7 +1,7 @@
-import { App, TFolder } from 'obsidian';
+import type { App, TFolder } from 'obsidian';
 
-import { BasePromiseFuzzyModal } from './PromiseModal';
 import { allFolderChoices } from '../domain/cohort/CohortResolver';
+import { BasePromiseFuzzyModal } from './PromiseModal';
 
 export class FolderSelectModal extends BasePromiseFuzzyModal<TFolder> {
   private folders: TFolder[];

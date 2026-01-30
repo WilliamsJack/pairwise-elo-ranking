@@ -1,4 +1,9 @@
-import {
+import type { Plugin } from 'obsidian';
+
+import { updateElo } from '../domain/elo/EloEngine';
+import type { EloSettings, SessionLayoutMode } from '../settings';
+import { DEFAULT_SETTINGS } from '../settings';
+import type {
   CohortData,
   CohortDefinition,
   EloStore,
@@ -6,10 +11,6 @@ import {
   PlayerSnapshot,
   UndoFrame,
 } from '../types';
-import { DEFAULT_SETTINGS, EloSettings, SessionLayoutMode } from '../settings';
-
-import { Plugin } from 'obsidian';
-import { updateElo } from '../domain/elo/EloEngine';
 
 interface PersistedData {
   version: number;

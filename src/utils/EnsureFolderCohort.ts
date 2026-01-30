@@ -1,9 +1,10 @@
-import { App, Notice, TFolder } from 'obsidian';
+import type { App} from 'obsidian';
+import { Notice, TFolder } from 'obsidian';
 
-import { CohortDefinition } from '../types';
-import { PluginDataStore } from '../storage/PluginDataStore';
-import { ResolveMissingFolderModal } from '../ui/ResolveMissingFolderModal';
 import { makeCohortKey } from '../domain/cohort/CohortResolver';
+import type { PluginDataStore } from '../storage/PluginDataStore';
+import type { CohortDefinition } from '../types';
+import { ResolveMissingFolderModal } from '../ui/ResolveMissingFolderModal';
 
 export async function ensureFolderCohortPath(
   app: App,

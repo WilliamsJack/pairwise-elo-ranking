@@ -1,10 +1,11 @@
-import { App, Setting } from 'obsidian';
-import { FM_PROP_KEYS, renderStandardFmPropertyRow } from './FrontmatterPropertyRow';
-import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '../settings';
+import type { App} from 'obsidian';
+import { Setting } from 'obsidian';
 
-import { BasePromiseModal } from './PromiseModal';
 import type EloPlugin from '../main';
+import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '../settings';
 import type { ScrollStartMode } from '../types';
+import { FM_PROP_KEYS, renderStandardFmPropertyRow } from './FrontmatterPropertyRow';
+import { BasePromiseModal } from './PromiseModal';
 
 type Mode = 'create' | 'edit';
 

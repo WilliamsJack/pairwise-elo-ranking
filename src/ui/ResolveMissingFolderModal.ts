@@ -1,8 +1,9 @@
-import { App, Setting } from 'obsidian';
+import type { App} from 'obsidian';
+import { Setting } from 'obsidian';
 
-import { BasePromiseModal } from './PromiseModal';
-import { FolderSelectModal } from './FolderPicker';
 import { getEloId } from '../utils/NoteIds';
+import { FolderSelectModal } from './FolderPicker';
+import { BasePromiseModal } from './PromiseModal';
 
 type Suggestion = {
   path: string;

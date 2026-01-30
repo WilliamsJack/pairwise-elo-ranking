@@ -1,6 +1,7 @@
-import { App, Notice, Setting, TFile } from 'obsidian';
+import type { App} from 'obsidian';
+import { Notice, Setting, TFile } from 'obsidian';
 
-import { listBaseFiles, readBaseViews, type BaseViewInfo } from '../domain/bases/BasesDiscovery';
+import { type BaseViewInfo,listBaseFiles, readBaseViews } from '../domain/bases/BasesDiscovery';
 import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
 
 type BaseViewChoice = { view: string; label: string };

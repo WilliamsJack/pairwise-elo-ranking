@@ -1,4 +1,4 @@
-import { App, TFile } from 'obsidian';
+import type { App, TFile } from 'obsidian';
 
 // Matches HTML comments like: <!-- eloId: 123e4567-e89b-12d3-a456-426614174000 -->
 const ELO_ID_COMMENT_BASE = /<!--\s*eloId\s*:\s*([0-9A-Za-z][0-9A-Za-z._-]*)\s*-->/;

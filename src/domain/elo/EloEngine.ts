@@ -1,5 +1,5 @@
 import type { EloHeuristicsSettings as EloHeuristics } from '../../settings';
-import { MatchResult } from '../../types';
+import type { MatchResult } from '../../types';
 
 export function expectedScore(rA: number, rB: number): number {
   return 1 / (1 + Math.pow(10, (rB - rA) / 400));

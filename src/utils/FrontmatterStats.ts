@@ -1,7 +1,8 @@
-import { App, Notice, TFile } from 'obsidian';
+import type { App, TFile } from 'obsidian';
+import { Notice } from 'obsidian';
 
-import { CohortData } from '../types';
 import type { FrontmatterPropertiesSettings } from '../settings';
+import type { CohortData } from '../types';
 import { getEloId } from './NoteIds';
 
 type PlayerStats = {

@@ -1,7 +1,8 @@
-import { App, Notice, ViewState, WorkspaceLeaf } from 'obsidian';
-import { attempt, attemptAsync } from '../utils/safe';
+import type { App, ViewState, WorkspaceLeaf } from 'obsidian';
+import { Notice } from 'obsidian';
 
 import type { SessionLayoutMode } from '../settings';
+import { attempt, attemptAsync } from '../utils/safe';
 
 export type ArenaLayoutHandle = {
   leftLeaf: WorkspaceLeaf;

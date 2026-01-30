@@ -1,10 +1,11 @@
-import { App, Notice, TFile } from 'obsidian';
+import type { App} from 'obsidian';
+import { Notice, TFile } from 'obsidian';
 
-import type { CohortDefinition } from '../types';
-import { PluginDataStore } from '../storage/PluginDataStore';
-import { ResolveMissingBaseModal } from '../ui/ResolveMissingBaseModal';
-import { makeCohortKey } from '../domain/cohort/CohortResolver';
 import { readBaseViews } from '../domain/bases/BasesDiscovery';
+import { makeCohortKey } from '../domain/cohort/CohortResolver';
+import type { PluginDataStore } from '../storage/PluginDataStore';
+import type { CohortDefinition } from '../types';
+import { ResolveMissingBaseModal } from '../ui/ResolveMissingBaseModal';
 
 function getBaseFile(app: App, basePath: string): TFile | undefined {
   const af = app.vault.getAbstractFileByPath(basePath);

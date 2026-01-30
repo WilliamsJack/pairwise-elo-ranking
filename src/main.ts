@@ -1,16 +1,18 @@
-import { EloSettings, effectiveFrontmatterProperties } from './settings';
-import { Notice, Plugin, TAbstractFile, TFile } from 'obsidian';
-import { computeRankMap, updateCohortFrontmatter } from './utils/FrontmatterStats';
+import type { TAbstractFile} from 'obsidian';
+import { Notice, Plugin, TFile } from 'obsidian';
 
-import ArenaSession from './ui/ArenaSession';
-import { CohortDefinition } from './types';
-import { CohortPicker } from './ui/CohortPicker';
-import EloSettingsTab from './settings/SettingsTab';
-import { PluginDataStore } from './storage/PluginDataStore';
-import { ensureBaseCohortTarget } from './utils/EnsureBaseCohort';
-import { ensureFolderCohortPath } from './utils/EnsureFolderCohort';
 import { reconcileCohortPlayersWithFiles } from './domain/cohort/CohortIntegrity';
 import { resolveFilesForCohort } from './domain/cohort/CohortResolver';
+import type { EloSettings} from './settings';
+import { effectiveFrontmatterProperties } from './settings';
+import EloSettingsTab from './settings/SettingsTab';
+import { PluginDataStore } from './storage/PluginDataStore';
+import type { CohortDefinition } from './types';
+import ArenaSession from './ui/ArenaSession';
+import { CohortPicker } from './ui/CohortPicker';
+import { ensureBaseCohortTarget } from './utils/EnsureBaseCohort';
+import { ensureFolderCohortPath } from './utils/EnsureFolderCohort';
+import { computeRankMap, updateCohortFrontmatter } from './utils/FrontmatterStats';
 
 export default class EloPlugin extends Plugin {
   dataStore: PluginDataStore;

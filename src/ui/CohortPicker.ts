@@ -1,20 +1,21 @@
-import { App, ButtonComponent, FuzzySuggestModal, Notice, Setting, TFile } from 'obsidian';
-import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
+import type { App, ButtonComponent, TFile } from 'obsidian';
+import { FuzzySuggestModal, Notice, Setting } from 'obsidian';
+
+import { listBaseFiles, readBaseViews } from '../domain/bases/BasesDiscovery';
 import {
   createDefinition,
   getFileTags,
   parseCohortKey,
   prettyCohortDefinition,
 } from '../domain/cohort/CohortResolver';
-import { listBaseFiles, readBaseViews } from '../domain/bases/BasesDiscovery';
-
-import { CohortDefinition } from '../types';
-import { CohortOptionsModal } from './CohortOptionsModal';
 import type EloPlugin from '../main';
-import { FolderSelectModal } from './FolderPicker';
 import type { FrontmatterPropertiesSettings } from '../settings';
+import type { CohortDefinition } from '../types';
 import type { ScrollStartMode } from '../types';
 import { normaliseTag } from '../utils/tags';
+import { CohortOptionsModal } from './CohortOptionsModal';
+import { FolderSelectModal } from './FolderPicker';
+import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
 
 type Action = 'vault-all' | 'active-folder' | 'pick-folder' | 'tag-dialog' | 'base-dialog';
 type Choice =

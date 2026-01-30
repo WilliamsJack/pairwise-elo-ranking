@@ -1,6 +1,6 @@
-import { App, TFile } from 'obsidian';
+import type { App, TFile } from 'obsidian';
 
-import { PluginDataStore } from '../../storage/PluginDataStore';
+import type { PluginDataStore } from '../../storage/PluginDataStore';
 import { getEloId } from '../../utils/NoteIds';
 
 /**

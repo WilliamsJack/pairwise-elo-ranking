@@ -1,5 +1,6 @@
-import type { MatchmakingSettings } from '../../settings';
 import type { TFile } from 'obsidian';
+
+import type { MatchmakingSettings } from '../../settings';
 import { pairSig as mkPairSig } from '../../utils/pair';
 
 export type RatingStats = { rating: number; matches: number };

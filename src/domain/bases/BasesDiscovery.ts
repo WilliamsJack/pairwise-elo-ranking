@@ -1,4 +1,5 @@
-import { App, TFile, parseYaml } from 'obsidian';
+import type { App, TFile} from 'obsidian';
+import { parseYaml } from 'obsidian';
 
 export type BaseViewInfo = {
   name: string;

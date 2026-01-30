@@ -1,22 +1,24 @@
-import { App, Notice, PluginSettingTab, Setting, SliderComponent, setIcon } from 'obsidian';
-import {
-  DEFAULT_SETTINGS,
-  FrontmatterPropertiesSettings,
-  SessionLayoutMode,
-  effectiveFrontmatterProperties,
-} from './settings';
+import type { App, SliderComponent} from 'obsidian';
+import { Notice, PluginSettingTab, setIcon,Setting } from 'obsidian';
+
+import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
+import type EloPlugin from '../main';
+import type { CohortData } from '../types';
+import { CohortOptionsModal } from '../ui/CohortOptionsModal';
 import { FM_PROP_KEYS, renderStandardFmPropertyRow } from '../ui/FrontmatterPropertyRow';
+import { BasePromiseModal } from '../ui/PromiseModal';
 import {
   computeRankMap,
   previewCohortFrontmatterPropertyUpdates,
   updateCohortFrontmatter,
 } from '../utils/FrontmatterStats';
-import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
-
-import { BasePromiseModal } from '../ui/PromiseModal';
-import type { CohortData } from '../types';
-import { CohortOptionsModal } from '../ui/CohortOptionsModal';
-import type EloPlugin from '../main';
+import type {
+  FrontmatterPropertiesSettings,
+  SessionLayoutMode} from './settings';
+import {
+  DEFAULT_SETTINGS,
+  effectiveFrontmatterProperties,
+} from './settings';
 
 type PropKey = keyof FrontmatterPropertiesSettings;
 

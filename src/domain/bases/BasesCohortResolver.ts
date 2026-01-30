@@ -1,4 +1,5 @@
-import { App, OpenViewState, TFile, WorkspaceLeaf } from 'obsidian';
+import type { App, OpenViewState, WorkspaceLeaf } from 'obsidian';
+import { TFile } from 'obsidian';
 
 const TIMEOUT_MS = 5_000;
 

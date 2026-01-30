@@ -1,4 +1,5 @@
-import { Setting, TextComponent, ToggleComponent } from 'obsidian';
+import type { TextComponent, ToggleComponent } from 'obsidian';
+import { Setting } from 'obsidian';
 
 export type FmPropKey = 'rating' | 'rank' | 'matches' | 'wins';
 export const FM_PROP_KEYS: readonly FmPropKey[] = ['rating', 'rank', 'matches', 'wins'] as const;
