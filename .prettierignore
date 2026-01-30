@@ -1,0 +1,8 @@
+node_modules
+dist
+main.js
+versions.json
+package.json
+package-lock.json
+versions.json
+manifest.json
