@@ -10,7 +10,7 @@ import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
 import { ensureEloId, getEloId } from '../utils/NoteIds';
 import { pairSig } from '../utils/pair';
 import { attempt, attemptAsync } from '../utils/safe';
-import type { ArenaLayoutHandle} from './LayoutManager';
+import type { ArenaLayoutHandle } from './LayoutManager';
 import { ArenaLayoutManager } from './LayoutManager';
 
 export default class ArenaSession {

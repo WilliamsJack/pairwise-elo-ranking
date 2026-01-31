@@ -1,4 +1,4 @@
-import type { App} from 'obsidian';
+import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { getEloId } from '../utils/NoteIds';

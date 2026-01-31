@@ -1,4 +1,4 @@
-import type { App} from 'obsidian';
+import type { App } from 'obsidian';
 import { Notice, TFolder } from 'obsidian';
 
 import { makeCohortKey } from '../domain/cohort/CohortResolver';

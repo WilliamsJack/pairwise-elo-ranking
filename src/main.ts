@@ -1,9 +1,9 @@
-import type { TAbstractFile} from 'obsidian';
+import type { TAbstractFile } from 'obsidian';
 import { Notice, Plugin, TFile } from 'obsidian';
 
 import { reconcileCohortPlayersWithFiles } from './domain/cohort/CohortIntegrity';
 import { resolveFilesForCohort } from './domain/cohort/CohortResolver';
-import type { EloSettings} from './settings';
+import type { EloSettings } from './settings';
 import { effectiveFrontmatterProperties } from './settings';
 import EloSettingsTab from './settings/SettingsTab';
 import { PluginDataStore } from './storage/PluginDataStore';

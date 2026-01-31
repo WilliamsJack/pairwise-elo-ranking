@@ -1,5 +1,5 @@
-import type { App, SliderComponent} from 'obsidian';
-import { Notice, PluginSettingTab, setIcon,Setting } from 'obsidian';
+import type { App, SliderComponent } from 'obsidian';
+import { Notice, PluginSettingTab, setIcon, Setting } from 'obsidian';
 
 import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 import type EloPlugin from '../main';
@@ -12,13 +12,8 @@ import {
   previewCohortFrontmatterPropertyUpdates,
   updateCohortFrontmatter,
 } from '../utils/FrontmatterStats';
-import type {
-  FrontmatterPropertiesSettings,
-  SessionLayoutMode} from './settings';
-import {
-  DEFAULT_SETTINGS,
-  effectiveFrontmatterProperties,
-} from './settings';
+import type { FrontmatterPropertiesSettings, SessionLayoutMode } from './settings';
+import { DEFAULT_SETTINGS, effectiveFrontmatterProperties } from './settings';
 
 type PropKey = keyof FrontmatterPropertiesSettings;
 

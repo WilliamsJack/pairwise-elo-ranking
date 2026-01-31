@@ -1,4 +1,4 @@
-import type { App} from 'obsidian';
+import type { App } from 'obsidian';
 import { Notice, TFile } from 'obsidian';
 
 import { readBaseViews } from '../domain/bases/BasesDiscovery';

@@ -1,4 +1,4 @@
-import type { App} from 'obsidian';
+import type { App } from 'obsidian';
 import { FuzzySuggestModal, Modal } from 'obsidian';
 
 // Base for standard Modals that return a value via a Promise.

@@ -1,4 +1,4 @@
-import type { App, TAbstractFile} from 'obsidian';
+import type { App, TAbstractFile } from 'obsidian';
 import { TFile, TFolder } from 'obsidian';
 
 import type { CohortDefinition, CohortKind, CohortParamsMap, CohortSpec } from '../../types';
