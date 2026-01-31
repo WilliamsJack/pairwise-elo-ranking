@@ -2,20 +2,36 @@
 
 Easily sort notes by any subjective standard - Rank cohorts of notes in your vault by pairwise comparisons using the Elo rating system.
 
+### Learn more about yourself and your preferences by seeing how you rank your own notes. Try these ideas in seconds:
+
+- Which book or movie is really your favourite? Rank your **Books#Read** or **Movies#Watched** Base views.
+- Which project ideas are most worth pursuing? Rank your **#idea** tag.
+- Which purchase is the highest priority for you right now? Rank your **#to-buy** tag.
+- Which recipes should become your go-to staples? Rank your **Recipes** Base.
+- Which museums, hikes, or travel destinations should you explore next? Rank your **Places** Base.
+- Which research papers are most relevant to your work? Rank your **sources** folder.
+- Which people should you cut from your life?\* Rank your **People** Base. _Ooh, spicy!_
+
 ![colour_base_example](docs/images/colour_base_example.webp)
 
-**How would you sort these notes by colour without manually assigning them all a rank? What if you needed to do this for hundreds of notes?**
+_Other comparison arena UI options are available in Settings - shown here is **right-split**, useful if you'd like to watch your Base update as your ranks change, but I personally use **new window/popout**_.
 
-Pairwise comparisons are much easier: given two notes, which do you prefer? By repeatedly choosing between pairs, a meaningful ranking quickly emerges.
+## Overview
 
-This plugin works especially well with **Obsidian Bases**: pick a **Base** and a **view** to define the cohort, then rank the notes it returns using pairwise Elo comparisons. If you do not use Bases, you can define cohorts by folder, tags, or the whole vault.
-
-- Start quickly from the ribbon icon or Command Palette
+- Define the cohort of notes to rank - works especially well with **Obsidian Bases**: pick a **Base** and a **view** to define your cohort dynamically
 - Efficiently review and pick a winner with keyboard shortcuts and an unobtrusive on-screen bar
-- Per-cohort stats can be written to frontmatter
+- Per-cohort stats and rankings can be written to frontmatter
 - Advanced convergence and matchmaking heuristics you can tune
 - Robust to renames and moves via stable per-note Elo IDs
 - Cohorts are saved so you can resume ranking sessions, picking up where you left off
+
+## Motivation
+
+It can be difficult to give a note a rating in a vacuum. What happens if you rate it ten stars, and then find something better later? Do you have to readjust your previous ratings? Do you have to add an eleventh star?
+
+_"Why don't you just make ten better and make ten be the top number and make that a little better?"_
+
+That's essentially what this plugin does. Given two notes, it's much easier to choose a preference between them than to rate them on their own. By comparing notes directly, you avoid the ambiguity of absolute ratings and create a dynamic ranking that adjusts as you add more comparisons.
 
 ## Quick start
 
@@ -134,28 +150,6 @@ Because the plugin can write Elo stats into frontmatter, you can use those prope
 - Filter by experience - only include notes with at least N matches, or rating above a threshold.
 - Display columns/cards - show Rank, Rating, Matches or Wins as columns in a table or as badges on cards.
 
-Demo Rainbow Base used in these screenshots:
-
-```yaml
-filters:
-  and:
-    - file.ext.lower() == "md"
-    - file.inFolder("EloColours")
-formulas:
-  firstImageEmbed: file.embeds.filter(value.asFile() && ["png","jpg","jpeg","gif","webp","svg","bmp","avif","tif","tiff"].contains(value.asFile().ext.lower()))[0]
-  cover: if(formula.firstImageEmbed, image(formula.firstImageEmbed.asFile()))
-views:
-  - type: cards
-    name: Colours
-    order:
-      - file.name
-      - Rank
-    sort:
-      - property: Rank
-        direction: ASC
-    image: formula.cover
-```
-
 This closes the loop:
 
 - Bases define the cohort
@@ -179,14 +173,8 @@ This closes the loop:
 - Ask for per-cohort overrides when creating a cohort (on by default)
 - Cohorts section: rename a cohort and change its frontmatter overrides. The plugin can preview and perform bulk updates (write, rename, remove) across the cohort.
 
-# Motivation
-
-It can be difficult to give a note a rating in a vacuum. What happens if you rate it ten stars, and then find something better later? Do you have to readjust your previous ratings? Do you have to add an eleventh star?
-
-"Why don't you just make ten better and make ten be the top number and make that a little better?"
-
-That's essentially what this plugin does. Given two notes, it's much easier to choose a preference between them than to rate them on their own. By comparing notes directly, you avoid the ambiguity of absolute ratings and create a dynamic ranking that adjusts as you add more comparisons.
-
 ---
 
 If you've made it this far: start a session, pick a small cohort, and do a dozen comparisons. You'll be surprised how quickly a meaningful order appears.
+
+\*Disclaimer: I have not used this plugin to end any friendships. If you try it out, please let me know how it goes! Although I accept no responsibility for any fallout. :)
