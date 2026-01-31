@@ -29,6 +29,8 @@ _Other comparison arena UI options are available in Settings - shown here is **r
 
 It can be difficult to give a note a rating in a vacuum. What happens if you rate it ten stars, and then find something better later? Do you have to readjust your previous ratings? Do you have to add an eleventh star?
 
+![eleven](docs/images/eleven.webp)
+
 _"Why don't you just make ten better and make ten be the top number and make that a little better?"_
 
 That's essentially what this plugin does. Given two notes, it's much easier to choose a preference between them than to rate them on their own. By comparing notes directly, you avoid the ambiguity of absolute ratings and create a dynamic ranking that adjusts as you add more comparisons.
