@@ -1,4 +1,4 @@
-import builtins from 'builtin-modules';
+import { builtinModules } from 'node:module';
 import esbuild from 'esbuild';
 import process from 'process';
 
@@ -10,10 +10,16 @@ if you want to view the source, please visit the github repository of this plugi
 
 const prod = process.argv[2] === 'production';
 
+const nodeBuiltins = [
+  ...new Set(
+    builtinModules.flatMap((m) =>
+      m.startsWith('node:') ? [m, m.slice('node:'.length)] : [m, `node:${m}`],
+    ),
+  ),
+];
+
 const context = await esbuild.context({
-  banner: {
-    js: banner,
-  },
+  banner: { js: banner },
   entryPoints: ['src/main.ts'],
   bundle: true,
   external: [
@@ -30,7 +36,7 @@ const context = await esbuild.context({
     '@lezer/common',
     '@lezer/highlight',
     '@lezer/lr',
-    ...builtins,
+    ...nodeBuiltins,
   ],
   format: 'cjs',
   target: 'es2018',

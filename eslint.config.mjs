@@ -6,43 +6,42 @@ import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import tseslint from 'typescript-eslint';
 import unusedImports from 'eslint-plugin-unused-imports';
 
-export default tseslint.config(
-  globalIgnores([
-    'node_modules',
-    'dist',
-    'main.js',
-    'versions.json',
-    'esbuild.config.mjs',
-    'version-bump.mjs',
-  ]),
+const tsFiles = ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'];
 
-  // TypeScript source
+// Ensure type-aware rules never run on JSON (or JS)
+const typeCheckedTsOnly = tseslint.configs.recommendedTypeChecked.map((c) => ({
+  ...c,
+  files: tsFiles,
+}));
+
+export default tseslint.config(
   {
-    files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       globals: {
         ...globals.browser,
       },
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['manifest.json'],
+          allowDefaultProject: ['eslint.config.mjs', 'manifest.json'],
         },
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.json'],
       },
     },
-    plugins: {
-      'simple-import-sort': simpleImportSort,
-      'unused-imports': unusedImports,
-    },
   },
-
-  // TypeScript ESLint - correctness
-  ...tseslint.configs.recommendedTypeChecked,
 
   // Obsidian-specific linting (UI text, etc)
   ...obsidianmd.configs.recommended,
+
+  ...typeCheckedTsOnly,
+
   {
+    files: tsFiles,
+    plugins: {
+      obsidianmd,
+      'simple-import-sort': simpleImportSort,
+      'unused-imports': unusedImports,
+    },
     rules: {
       'obsidianmd/ui/sentence-case': [
         'warn',
@@ -55,7 +54,6 @@ export default tseslint.config(
       // ---- Promise discipline ----
       '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: true }],
       '@typescript-eslint/await-thenable': 'error',
-
       '@typescript-eslint/no-misused-promises': [
         'error',
         {
@@ -79,10 +77,7 @@ export default tseslint.config(
 
       '@typescript-eslint/consistent-type-imports': [
         'warn',
-        {
-          prefer: 'type-imports',
-          fixStyle: 'separate-type-imports',
-        },
+        { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
       ],
 
       'simple-import-sort/imports': 'warn',
@@ -90,12 +85,12 @@ export default tseslint.config(
 
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'no-debugger': 'error',
-
       'no-empty': ['warn', { allowEmptyCatch: true }],
       '@typescript-eslint/no-empty-function': ['warn', { allow: ['arrowFunctions'] }],
     },
   },
 
+  // Node globals for config/build scripts
   {
     files: ['**/*.mjs', '**/*.cjs', '**/*.js'],
     languageOptions: {
@@ -104,5 +99,15 @@ export default tseslint.config(
       },
     },
   },
+
   prettierConfig,
+
+  globalIgnores([
+    'node_modules',
+    'dist',
+    'main.js',
+    'versions.json',
+    'esbuild.config.mjs',
+    'version-bump.mjs',
+  ]),
 );
