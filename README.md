@@ -1,6 +1,8 @@
 # Pairwise Elo ranking for your notes
 
-Easily sort notes by any subjective standard - Rank cohorts of notes in your vault by pairwise comparisons using the Elo rating system.
+Easily sort notes by any subjective criteria using the **Elo rating system**.
+
+It's basically "which one wins?" instead of trying to assign absolute scores. Rather than asking "how does this note compare to every other note?", you only answer: "which of these two do I prefer?"
 
 ### Learn more about yourself and your preferences by seeing how you rank your own notes. Try these ideas in seconds:
 
@@ -16,6 +18,21 @@ Easily sort notes by any subjective standard - Rank cohorts of notes in your vau
 
 _Other comparison arena UI options are available in Settings - shown here is **right-split**, useful if you'd like to watch your Base update as your ranks change, but I personally use **new window/popout**_.
 
+## Try it in two minutes
+
+1. Install: Not yet in the Community Plugins list, so first install [BRAT](https://obsidian.md/plugins?id=obsidian42-brat)
+2. Add the Pairwise Elo Ranking repo - `https://github.com/WilliamsJack/pairwise-elo-ranking` and enable the plugin
+3. Run the **Pairwise Elo Ranking: Start rating session** command (or click the trophy icon)
+4. Pick a small cohort (10 notes is perfect)
+5. Do ~10-20 comparisons and you'll see an order emerge surprisingly fast
+
+## How it works
+
+- Pick a **cohort** of notes to rank (vault, folder, tags, or (my favourite way) - Bases).
+- The plugin opens **two notes side-by-side** and you choose a winner (keyboard shortcuts supported).
+- Optionally write stats to frontmatter (property names are configurable, including per-cohort): **Rank** (1 = best in cohort), **Rating**, **Matches**, **Wins**.
+- Your Bases can then sort or filter by those properties, so you can rank by subjective criteria without having to decide what star rating a note "deserves".
+
 ## Overview
 
 - Define the cohort of notes to rank - works especially well with **Obsidian Bases**: pick a **Base** and a **view** to define your cohort dynamically
@@ -27,6 +44,8 @@ _Other comparison arena UI options are available in Settings - shown here is **r
 
 ## Motivation
 
+I originally built this because I had a Base of photos I'd taken and wanted to sort them by quality, showing the best photos first. But that's a subjective sorting system - a computer can't do it for me.
+
 It can be difficult to give a note a rating in a vacuum. What happens if you rate it ten stars, and then find something better later? Do you have to readjust your previous ratings? Do you have to add an eleventh star?
 
 ![eleven](docs/images/eleven.webp)
@@ -35,13 +54,13 @@ _"Why don't you just make ten better and make ten be the top number and make tha
 
 That's essentially what this plugin does. Given two notes, it's much easier to choose a preference between them than to rate them on their own. By comparing notes directly, you avoid the ambiguity of absolute ratings and create a dynamic ranking that adjusts as you add more comparisons.
 
-## Quick start
+## Workflow
 
 ### Start a session
 
 ![cohort_creator](docs/images/cohort_creator.webp)
 
-- Click the trophy icon in the left ribbon, or run the command "Start rating session".
+- Click the trophy icon in the left ribbon, or run the command **"Pairwise Elo Ranking: Start rating session"**.
 - Create a cohort in the picker:
   - Vault: all notes
   - From a Base (.base file + view)
@@ -66,9 +85,9 @@ A toast shows the winner after each comparison (toggle in Settings).
 
 ### End the session
 
-Press Escape or run "End current session". If you've enabled a Rank property for this cohort, the plugin recomputes ranks across the cohort and writes them to frontmatter.
+Press Escape or run **"Pairwise Elo Ranking: End current session"**. If you've enabled a Rank property for this cohort, the plugin recomputes ranks across the cohort and writes them to frontmatter.
 
-### Configurable Frontmatter Output
+### Configurable frontmatter output
 
 ![cohort_options](docs/images/cohort_options.webp)
 
@@ -92,7 +111,9 @@ If a folder cohort is later moved or renamed, the plugin will prompt you to poin
 
 If a Base cohort's **.base file** is moved/renamed, or the **view name** no longer exists, the plugin will prompt you to pick the Base and/or view again and will migrate the cohort's saved ratings to the updated definition.
 
-## Frontmatter and Elo IDs
+## Frontmatter
+
+### Elo IDs
 
 Each note that participates in a session gets a stable Elo ID so your ratings survive file moves and renames.
 
@@ -104,10 +125,6 @@ Example (frontmatter):
 ```yaml
 ---
 eloId: 123e4567-e89b-12d3-a456-426614174000
-eloRank: 7
-eloRating: 1612
-eloMatches: 19
-eloWins: 12
 ---
 ```
 
@@ -117,7 +134,9 @@ Example (anywhere in the body of a note, but appended to the end by default):
 <!-- eloId: 123e4567-e89b-12d3-a456-426614174000 -->
 ```
 
-Per-note statistics you can write to frontmatter (all optional, names customisable):
+### Stored properties
+
+The plugin can write the following properties to frontmatter (configurable per-cohort, all optional, names customisable):
 
 - Rating
 - Rank (1 = highest within the cohort)
@@ -127,36 +146,6 @@ Per-note statistics you can write to frontmatter (all optional, names customisab
 Stats are written to just the two notes involved after each match. Rank across the whole cohort is recomputed and written when you end the session (if enabled for that cohort).
 
 **Tip:** Configure global defaults in Settings, and (optionally) set per-cohort overrides when creating or editing a cohort. When you change property names or enable/disable them, the plugin can bulk-update, rename or remove the affected properties across the cohort with a confirmation preview.
-
-## Matchmaking and convergence
-
-You can get good rankings faster with a few simple heuristics. All have sensible defaults and can be toggled in Settings.
-
-- K-factor: base speed of rating changes (default 24)
-- Provisional boost: use a higher K for a note's first N matches (default on)
-- Decay with experience: gradually reduce K as a note gains matches (optional)
-- Upset boost: increase K when a much lower-rated note wins (default on)
-- Big-gap draw boost: increase K for draws across a large rating gap (default on)
-
-Pair selection heuristics (default on):
-
-- Prefer similar ratings: sample candidates and pick the closest rating
-- Bias towards fewer matches: give newer notes slightly more airtime to help them find their place quickly
-- Occasional upset probes: every so often, try a large rating gap to flush out surprises
-
-## Use Elo properties in Bases
-
-Because the plugin can write Elo stats into frontmatter, you can use those properties inside Bases to filter, sort and display your lists.
-
-- Sort by your subjective rank - in a view's ordering, sort by Rank to show best-ranked first.
-- Filter by experience - only include notes with at least N matches, or rating above a threshold.
-- Display columns/cards - show Rank, Rating, Matches or Wins as columns in a table or as badges on cards.
-
-This closes the loop:
-
-- Bases define the cohort
-- Pairwise Elo Ranking computes your subjective item rankings
-- Bases then use those properties to sort, filter and display your lists
 
 ## Data and integrity
 
