@@ -463,6 +463,18 @@ export default class ArenaSession {
     }
     this.shortcutsPausedToastShown = false;
 
+    // Ignore auto-repeat for voting keys (prevents accidental multi-votes if a key is held).
+    if (
+      ev.repeat &&
+      (ev.key === 'ArrowLeft' ||
+        ev.key === 'ArrowRight' ||
+        ev.key === 'ArrowUp' ||
+        ev.key === 'ArrowDown')
+    ) {
+      ev.preventDefault();
+      return;
+    }
+
     if (ev.key === 'ArrowLeft') {
       ev.preventDefault();
       this.flashPressed(this.leftBtn);
