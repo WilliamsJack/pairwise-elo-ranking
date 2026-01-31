@@ -40,6 +40,15 @@ export default class ArenaSession {
 
   private shortcutsPausedToastShown = false;
 
+  // Button refs for keyboard "press-in" flash
+  private leftBtn?: HTMLButtonElement;
+  private drawBtn?: HTMLButtonElement;
+  private rightBtn?: HTMLButtonElement;
+  private undoBtn?: HTMLButtonElement;
+  private endBtn?: HTMLButtonElement;
+
+  private pressTimers = new WeakMap<HTMLButtonElement, number>();
+
   constructor(app: App, plugin: EloPlugin, cohortKey: string, files: TFile[]) {
     this.app = app;
     this.plugin = plugin;
@@ -341,19 +350,40 @@ export default class ArenaSession {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  private flashPressed(btn?: HTMLButtonElement, durationMs = 110): void {
+    if (!btn) return;
+
+    const win = btn.ownerDocument.defaultView ?? window;
+
+    btn.classList.add('elo-pressed');
+
+    const existing = this.pressTimers.get(btn);
+    if (typeof existing === 'number') win.clearTimeout(existing);
+
+    const tid = win.setTimeout(
+      () => {
+        btn.classList.remove('elo-pressed');
+      },
+      Math.max(0, Math.round(durationMs)),
+    );
+
+    this.pressTimers.set(btn, tid);
+  }
+
   private mountOverlay(doc: Document = document) {
     const el = doc.body.createDiv({ cls: 'elo-session-bar' });
 
     el.createDiv({ cls: 'elo-side left' });
 
     const controls = el.createDiv({ cls: 'elo-controls' });
-    controls.append(
-      this.makeButton(doc, '← Left', () => void this.choose('A')),
-      this.makeButton(doc, '↑ Draw', () => void this.choose('D')),
-      this.makeButton(doc, '→ Right', () => void this.choose('B')),
-      this.makeButton(doc, 'Undo ⌫', () => this.undo()),
-      this.makeButton(doc, 'End Esc', () => void this.plugin.endSession()),
-    );
+
+    this.leftBtn = this.makeButton(doc, '← Left', () => void this.choose('A'));
+    this.drawBtn = this.makeButton(doc, '↑ Draw', () => void this.choose('D'));
+    this.rightBtn = this.makeButton(doc, '→ Right', () => void this.choose('B'));
+    this.undoBtn = this.makeButton(doc, 'Undo ⌫', () => this.undo());
+    this.endBtn = this.makeButton(doc, 'End Esc', () => void this.plugin.endSession());
+
+    controls.append(this.leftBtn, this.drawBtn, this.rightBtn, this.undoBtn, this.endBtn);
 
     el.createDiv({ cls: 'elo-side right' });
 
@@ -435,18 +465,23 @@ export default class ArenaSession {
 
     if (ev.key === 'ArrowLeft') {
       ev.preventDefault();
+      this.flashPressed(this.leftBtn);
       void this.choose('A');
     } else if (ev.key === 'ArrowRight') {
       ev.preventDefault();
+      this.flashPressed(this.rightBtn);
       void this.choose('B');
     } else if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
       ev.preventDefault();
+      this.flashPressed(this.drawBtn);
       void this.choose('D');
     } else if (ev.key === 'Backspace') {
       ev.preventDefault();
+      this.flashPressed(this.undoBtn);
       this.undo();
     } else if (ev.key === 'Escape') {
       ev.preventDefault();
+      this.flashPressed(this.endBtn);
       void this.plugin.endSession();
     }
   }
