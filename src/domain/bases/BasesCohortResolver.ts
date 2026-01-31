@@ -105,6 +105,7 @@ function controllerHasViewName(controller: BasesControllerLike, viewName: string
 }
 
 async function awaitControllerReady(
+  leaf: WorkspaceLeaf,
   controller: BasesControllerLike,
   basePath: string,
   viewName: string,
@@ -114,15 +115,31 @@ async function awaitControllerReady(
   const started = nowMs();
 
   while (true) {
+    let leafOk = false;
+    try {
+      const vsUnknown: unknown = leaf.getViewState?.();
+      if (isRecord(vsUnknown) && vsUnknown['type'] === 'bases') {
+        const stUnknown: unknown = vsUnknown['state'];
+        if (isRecord(stUnknown)) {
+          const fileUnknown: unknown = stUnknown['file'];
+          const viewNameUnknown: unknown = stUnknown['viewName'];
+          leafOk = fileUnknown === basePath && viewNameUnknown === viewName;
+        }
+      }
+    } catch {
+      leafOk = false;
+    }
+
+    // Bases does not always populate currentFile - treat null as acceptable.
     const curFile = controller.currentFile;
-    const curFileOk = curFile instanceof TFile && curFile.path === basePath;
+    const curFileOk = curFile == null || (curFile instanceof TFile && curFile.path === basePath);
 
     const hasQuery = typeof controller.query !== 'undefined';
     const hasQueryState =
       typeof controller.queryState === 'string' && controller.queryState.length > 0;
     const viewNameOk = controllerHasViewName(controller, viewName);
 
-    if (curFileOk && hasQuery && hasQueryState && viewNameOk) return;
+    if (leafOk && curFileOk && hasQuery && hasQueryState && viewNameOk) return;
 
     if (nowMs() - started >= timeoutMs) break;
     await sleep(pollMs);
@@ -212,7 +229,7 @@ export async function resolveFilesFromBaseView(
     const controller = getBasesControllerFromLeaf(leaf);
     if (!controller) throw new Error('[Elo][Bases] Bases controller missing on view');
 
-    await awaitControllerReady(controller, baseFile.path, viewName, timeoutMs, pollMs);
+    await awaitControllerReady(leaf, controller, baseFile.path, viewName, timeoutMs, pollMs);
 
     await waitForResultsToSettle(controller, timeoutMs, pollMs);
 
