@@ -1,4 +1,4 @@
-export type EloIdLocation = 'frontmatter' | 'html';
+export type EloIdLocation = 'frontmatter' | 'end';
 export type SessionLayoutMode = 'reuse-active' | 'right-split' | 'new-tab' | 'new-window';
 
 export interface FrontmatterPropertyConfig {

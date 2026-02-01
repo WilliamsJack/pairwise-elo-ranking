@@ -157,12 +157,12 @@ export default class EloSettingsTab extends PluginSettingTab {
       .addDropdown((dd) => {
         dd.addOptions({
           frontmatter: 'Frontmatter (YAML)',
-          html: 'End of note (HTML comment)',
+          end: 'End of note (HTML comment)',
         })
           .setValue(this.plugin.settings.eloIdLocation ?? 'frontmatter')
           .onChange(async (v) => {
             const oldLoc: EloIdLocation = this.plugin.settings.eloIdLocation ?? 'frontmatter';
-            const newLoc: EloIdLocation = v === 'html' ? 'html' : 'frontmatter';
+            const newLoc: EloIdLocation = v === 'end' ? 'end' : 'frontmatter';
             if (newLoc === oldLoc) return;
 
             this.plugin.settings.eloIdLocation = newLoc;

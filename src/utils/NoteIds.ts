@@ -244,7 +244,7 @@ export async function getEloId(app: App, file: TFile): Promise<string | undefine
 export async function ensureEloId(
   app: App,
   file: TFile,
-  preferredLocation: 'frontmatter' | 'html' = 'frontmatter',
+  preferredLocation: 'frontmatter' | 'end' = 'frontmatter',
 ): Promise<string> {
   const existing = await getEloId(app, file);
   if (existing) return existing;
@@ -252,7 +252,7 @@ export async function ensureEloId(
   const id =
     window.crypto && 'randomUUID' in window.crypto ? window.crypto.randomUUID() : fallbackUUID();
 
-  if (preferredLocation === 'html') {
+  if (preferredLocation === 'end') {
     await setEloIdInHtmlComment(app, file, id);
   } else {
     await setEloIdInFrontmatter(app, file, id);

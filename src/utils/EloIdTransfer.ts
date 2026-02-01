@@ -45,13 +45,13 @@ async function planForFile(
   const fmId = getEloIdFromFrontmatterCache(app, file);
 
   // Frontmatter -> HTML: frontmatter is source of truth - overwrite HTML comment, then delete frontmatter.
-  if (from === 'frontmatter' && to === 'html') {
+  if (from === 'frontmatter' && to === 'end') {
     if (!fmId) return undefined;
     return { file, deleteHtmlComment: true, setHtmlCommentId: fmId, deleteFrontmatter: true };
   }
 
   // HTML -> frontmatter: read the body to find a HTML comment id (if any).
-  if (from === 'html' && to === 'frontmatter') {
+  if (from === 'end' && to === 'frontmatter') {
     let htmlCommentId: string | undefined;
     try {
       const text = await app.vault.cachedRead(file);
@@ -95,7 +95,7 @@ export async function planEloIdTransfer(
   // Candidate reduction for frontmatter -> html:
   // only files with frontmatter eloId need work.
   const candidates =
-    from === 'frontmatter' && to === 'html'
+    from === 'frontmatter' && to === 'end'
       ? files.filter((f) => !!getEloIdFromFrontmatterCache(app, f))
       : files;
 
