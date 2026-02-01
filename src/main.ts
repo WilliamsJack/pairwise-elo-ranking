@@ -12,6 +12,7 @@ import ArenaSession from './ui/ArenaSession';
 import { CohortPicker } from './ui/CohortPicker';
 import { ensureBaseCohortTarget } from './utils/EnsureBaseCohort';
 import { ensureFolderCohortPath } from './utils/EnsureFolderCohort';
+import { ensureUniqueEloIds } from './utils/EnsureUniqueEloIds';
 import { computeRankMap, updateCohortFrontmatter } from './utils/FrontmatterStats';
 
 export default class EloPlugin extends Plugin {
@@ -101,6 +102,9 @@ export default class EloPlugin extends Plugin {
     _opts?: { saveDef?: boolean },
   ) {
     await this.endSession();
+
+    const ok = await ensureUniqueEloIds(this.app, files);
+    if (!ok) return;
 
     this.currentSession = new ArenaSession(this.app, this, def.key, files);
     this.register(() => this.endSession({ forUnload: true }));

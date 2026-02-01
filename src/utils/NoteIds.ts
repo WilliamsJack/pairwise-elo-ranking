@@ -226,6 +226,12 @@ export async function removeEloIdHtmlComments(app: App, file: TFile): Promise<bo
   return changed;
 }
 
+export async function removeEloIdEverywhere(app: App, file: TFile): Promise<boolean> {
+  const removedFrontmatter = await removeEloIdFromFrontmatter(app, file);
+  const removedHtml = await removeEloIdHtmlComments(app, file);
+  return removedFrontmatter || removedHtml;
+}
+
 export async function getEloId(app: App, file: TFile): Promise<string | undefined> {
   // Prefer frontmatter
   const fmId = getEloIdFromFrontmatterCache(app, file);
