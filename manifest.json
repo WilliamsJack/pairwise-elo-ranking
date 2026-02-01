@@ -3,7 +3,7 @@
 	"name": "Pairwise Elo Ranking",
 	"version": "1.3.3",
 	"minAppVersion": "1.10.0",
-	"description": "Easily sort notes by any subjective standard - Rank cohorts of notes in your vault by pairwise comparisons using the Elo rating system.",
+	"description": "Easily sort notes by any subjective criteria - Rank cohorts of notes in your vault by pairwise comparisons using the Elo rating system.",
 	"author": "Jack Williams",
 	"authorUrl": "https://github.com/WilliamsJack",
 	"fundingUrl": "https://github.com/sponsors/WilliamsJack",
