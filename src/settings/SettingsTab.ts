@@ -7,11 +7,13 @@ import type { CohortData } from '../types';
 import { CohortOptionsModal } from '../ui/CohortOptionsModal';
 import { FM_PROP_KEYS, renderStandardFmPropertyRow } from '../ui/FrontmatterPropertyRow';
 import { BasePromiseModal } from '../ui/PromiseModal';
+import { applyEloIdTransferPlan, planEloIdTransfer } from '../utils/EloIdTransfer';
 import {
   computeRankMap,
   previewCohortFrontmatterPropertyUpdates,
   updateCohortFrontmatter,
 } from '../utils/FrontmatterStats';
+import type { EloIdLocation } from './settings';
 import type { FrontmatterPropertiesSettings, SessionLayoutMode } from './settings';
 import { DEFAULT_SETTINGS, effectiveFrontmatterProperties } from './settings';
 
@@ -148,18 +150,71 @@ export default class EloSettingsTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Elo ID location')
       .setDesc(
-        'Where to store the Elo ID. Changing this setting will not move existing IDs, but they will continue to work. Default: frontmatter.',
+        `Where to store the Elo ID. When you change this setting, you can optionally move existing IDs to the new location.
+        If you choose not to move them, IDs left in the old location will continue to work.
+        The frontmatter ID is always used if it exists.`,
       )
       .addDropdown((dd) => {
         dd.addOptions({
           frontmatter: 'Frontmatter (YAML)',
-          end: 'End of note (HTML comment)',
+          html: 'End of note (HTML comment)',
         })
           .setValue(this.plugin.settings.eloIdLocation ?? 'frontmatter')
           .onChange(async (v) => {
-            const val = v === 'end' ? 'end' : 'frontmatter';
-            this.plugin.settings.eloIdLocation = val;
+            const oldLoc: EloIdLocation = this.plugin.settings.eloIdLocation ?? 'frontmatter';
+            const newLoc: EloIdLocation = v === 'html' ? 'html' : 'frontmatter';
+            if (newLoc === oldLoc) return;
+
+            this.plugin.settings.eloIdLocation = newLoc;
             await this.plugin.saveSettings();
+
+            const files = this.app.vault.getMarkdownFiles();
+            if (files.length === 0) return;
+
+            const scanning = new Notice('Scanning notes for Elo IDs...', 0);
+            let plan;
+            try {
+              plan = await planEloIdTransfer(this.app, files, oldLoc, newLoc);
+            } catch (e) {
+              console.error('[Elo] Failed to plan Elo ID transfer', e);
+              new Notice('Failed to scan notes for Elo IDs.');
+              return;
+            } finally {
+              scanning?.hide?.();
+            }
+
+            if (plan.wouldUpdate === 0) return;
+
+            const locLabel = (loc: EloIdLocation) =>
+              loc === 'frontmatter' ? 'frontmatter' : 'end-of-note HTML comment';
+
+            const msg =
+              `Move Elo IDs from ${locLabel(oldLoc)} to ${locLabel(newLoc)} for ${plan.wouldUpdate} note${plan.wouldUpdate === 1 ? '' : 's'}?` +
+              (plan.mismatches > 0
+                ? `\n\n${plan.mismatches} note${plan.mismatches === 1 ? ' has' : 's have'} differing IDs in frontmatter and the end-of-note HTML comment.
+                The ID in the end-of-note HTML comment will be removed, and the frontmatter ID will be ${newLoc === 'frontmatter' ? 'kept' : 'moved to the end-of-note HTML comment'}.`
+                : '');
+
+            const ok = await new ConfirmModal(
+              this.app,
+              'Move Elo IDs?',
+              msg,
+              'Yes, move',
+              'No, leave as-is',
+            ).openAndConfirm();
+
+            if (!ok) return;
+
+            const res = await applyEloIdTransferPlan(this.app, plan, {
+              noticeMessage: 'Moving Elo IDs...',
+            });
+
+            new Notice(
+              `Moved Elo IDs in ${res.updated} note${res.updated === 1 ? '' : 's'}` +
+                (res.mismatches > 0
+                  ? ` (${res.mismatches} mismatch${res.mismatches === 1 ? '' : 'es'} resolved).`
+                  : '.'),
+            );
           });
       });
 
