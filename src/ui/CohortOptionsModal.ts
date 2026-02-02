@@ -182,9 +182,8 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
       if (!conflict) return;
 
       warningEl.createEl('p', {
-        text:
-        `Auto-scroll and synchronised scrolling are both enabled. These settings can conflict with each other if your notes have embedded content that loads slowly.
-        If the notes jump unexpectedly, either disable synchronised scrolling or set auto-scroll to "no auto-scroll".`
+        text: `Auto-scroll and synchronised scrolling are both enabled. These settings can conflict with each other if your notes have embedded content that loads slowly.
+        If the notes jump unexpectedly, either disable synchronised scrolling or set auto-scroll to "no auto-scroll".`,
       });
     };
 

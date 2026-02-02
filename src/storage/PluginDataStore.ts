@@ -37,6 +37,18 @@ function normaliseSessionLayout(val: unknown, fallback: SessionLayoutMode): Sess
   }
 }
 
+function normaliseTemplatesFolderPath(val: unknown): string {
+  if (typeof val !== 'string') return '';
+  let p = val.trim();
+
+  if (p === '/') p = '';
+
+  // Remove leading/trailing slashes for prefix checks
+  p = p.replace(/^\/+/, '').replace(/\/+$/, '');
+
+  return p;
+}
+
 function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
   const base: EloSettings = { ...DEFAULT_SETTINGS };
 
@@ -46,6 +58,8 @@ function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
 
   // Validate session layout
   out.sessionLayout = normaliseSessionLayout(raw?.sessionLayout, base.sessionLayout);
+
+  out.templatesFolderPath = normaliseTemplatesFolderPath(raw?.templatesFolderPath);
 
   if (raw.heuristics) {
     out.heuristics = {

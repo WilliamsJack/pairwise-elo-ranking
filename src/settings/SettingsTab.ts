@@ -5,6 +5,7 @@ import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/
 import type EloPlugin from '../main';
 import type { CohortData } from '../types';
 import { CohortOptionsModal } from '../ui/CohortOptionsModal';
+import { FolderSelectModal } from '../ui/FolderPicker';
 import { FM_PROP_KEYS, renderStandardFmPropertyRow } from '../ui/FrontmatterPropertyRow';
 import { BasePromiseModal } from '../ui/PromiseModal';
 import { applyEloIdTransferPlan, planEloIdTransfer } from '../utils/EloIdTransfer';
@@ -220,6 +221,39 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     // Cohort configuration
     new Setting(containerEl).setName('Cohorts').setHeading();
+
+    new Setting(containerEl)
+      .setName('Templates folder')
+      .setDesc(
+        'Excludes your templates from cohorts. Prevents Elo IDs from appearing on templates.',
+      )
+      .addText((t) => {
+        t.setPlaceholder('Templates')
+          .setValue(this.plugin.settings.templatesFolderPath ?? '')
+          .onChange(async (v) => {
+            this.plugin.settings.templatesFolderPath = (v ?? '').trim();
+            await this.plugin.saveSettings();
+          });
+      })
+      .addButton((b) =>
+        b.setButtonText('Browse...').onClick(async () => {
+          const folder = await new FolderSelectModal(this.app).openAndGetSelection();
+          if (!folder) return;
+
+          // Disallow vault root as a "templates folder" (treat as disabled)
+          const picked = (folder.path ?? '').trim();
+          this.plugin.settings.templatesFolderPath = picked.length > 0 ? picked : '';
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      )
+      .addButton((b) =>
+        b.setButtonText('Clear').onClick(async () => {
+          this.plugin.settings.templatesFolderPath = '';
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      );
 
     containerEl.createEl('p', {
       text: "Configure existing cohorts' frontmatter properties or delete a cohort.",
@@ -808,7 +842,9 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     if (changed.length === 0) return;
 
-    const files = await resolveFilesForCohort(this.app, def);
+    const files = await resolveFilesForCohort(this.app, def, {
+      excludeFolderPath: this.plugin.settings.templatesFolderPath,
+    });
     if (files.length === 0) return;
 
     const cohort: CohortData | undefined = this.plugin.dataStore.store.cohorts[cohortKey];

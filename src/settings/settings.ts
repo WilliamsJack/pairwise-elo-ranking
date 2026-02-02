@@ -64,6 +64,7 @@ export interface EloSettings {
   askForOverridesOnCohortCreation: boolean;
   heuristics: EloHeuristicsSettings;
   matchmaking: MatchmakingSettings;
+  templatesFolderPath: string;
 }
 
 export const DEFAULT_SETTINGS: EloSettings = {
@@ -120,6 +121,8 @@ export const DEFAULT_SETTINGS: EloSettings = {
       minGap: 300,
     },
   },
+
+  templatesFolderPath: '',
 };
 
 // Merge global defaults with optional overrides (per-property)

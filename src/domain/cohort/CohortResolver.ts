@@ -17,6 +17,21 @@ function getAllFolders(app: App): TFolder[] {
   return out;
 }
 
+function normaliseFolderPathForPrefix(pathRaw: string | undefined): string {
+  let p = (pathRaw ?? '').trim();
+  if (p === '/') p = '';
+  p = p.replace(/^\/+/, '').replace(/\/+$/, '');
+  return p;
+}
+
+function excludeFolderFromFiles(files: TFile[], folderPathRaw?: string): TFile[] {
+  const folderPath = normaliseFolderPathForPrefix(folderPathRaw);
+  if (!folderPath) return files;
+
+  const prefix = folderPath + '/';
+  return files.filter((f) => !f.path.startsWith(prefix));
+}
+
 export function getFileTags(app: App, file: TFile): string[] {
   const cache = app.metadataCache.getFileCache(file);
   const set = new Set<string>();
@@ -273,8 +288,10 @@ export function createDefinition<K extends CohortKind>(
 export async function resolveFilesForCohort<K extends CohortKind>(
   app: App,
   def: KindAndParams<K>,
+  opts?: { excludeFolderPath?: string },
 ): Promise<TFile[]> {
-  return await getHandler(def.kind).resolve(app, def.params);
+  const files = await getHandler(def.kind).resolve(app, def.params);
+  return excludeFolderFromFiles(files, opts?.excludeFolderPath);
 }
 
 export function allFolderChoices(app: App): TFolder[] {
