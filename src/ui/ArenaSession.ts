@@ -95,6 +95,7 @@ export default class ArenaSession {
   }
 
   async end(opts?: { forUnload?: boolean }) {
+    this.clearScrollSync();
     // Remove listeners from the correct window
     if (this.overlayWin) {
       this.overlayWin.removeEventListener('keydown', this.keydownHandler, true);
@@ -164,7 +165,9 @@ export default class ArenaSession {
       this.openInReadingMode(this.rightLeaf, this.rightFile),
     ]);
 
-    this.installScrollSync();
+    if (this.getCohortSyncScrollEnabled()) {
+      this.installScrollSync();
+    }
   }
 
   private getCohortScrollStart(): ScrollStartMode {
@@ -366,6 +369,11 @@ export default class ArenaSession {
     this.scrollSyncCleanup = undefined;
   }
 
+  private getCohortSyncScrollEnabled(): boolean {
+    const def = this.plugin.dataStore.getCohortDef(this.cohortKey);
+    return def?.syncScroll ?? true;
+  }
+
   private clampScrollTop(el: HTMLElement, top: number): number {
     const maxTop = Math.max(0, el.scrollHeight - el.clientHeight);
     return Math.max(0, Math.min(maxTop, top));
@@ -420,7 +428,6 @@ export default class ArenaSession {
 
       const delta = cur - leftLast;
       leftLast = cur;
-
       if (delta === 0) return;
 
       suppressSide('right');
@@ -437,7 +444,6 @@ export default class ArenaSession {
 
       const delta = cur - rightLast;
       rightLast = cur;
-
       if (delta === 0) return;
 
       suppressSide('left');

@@ -171,6 +171,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
         overrides?: Partial<FrontmatterPropertiesSettings>;
         name?: string;
         scrollStart?: ScrollStartMode;
+        syncScroll?: boolean;
       }
     | undefined
   > {
@@ -198,6 +199,8 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     if (newName.length > 0) def.label = newName;
 
     def.scrollStart = res.scrollStart && res.scrollStart !== 'none' ? res.scrollStart : undefined;
+
+    def.syncScroll = res.syncScroll ?? true;
 
     return def;
   }

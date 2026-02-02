@@ -47,6 +47,7 @@ type CohortDefBase<K extends CohortKind> = {
   params: CohortParamsMap[K];
   frontmatterOverrides?: Partial<FrontmatterPropertiesSettings>;
   scrollStart?: ScrollStartMode;
+  syncScroll?: boolean;
   createdAt: number;
   updatedAt: number;
 };

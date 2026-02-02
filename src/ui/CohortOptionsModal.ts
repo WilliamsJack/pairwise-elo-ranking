@@ -22,6 +22,7 @@ export type CohortOptionsResult = {
   overrides: Partial<FrontmatterPropertiesSettings>;
   name?: string;
   scrollStart?: ScrollStartMode;
+  syncScroll?: boolean;
 };
 
 export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | undefined> {
@@ -32,9 +33,11 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
   private initial?: Partial<FrontmatterPropertiesSettings>;
   private initialName?: string;
   private initialScrollStart?: ScrollStartMode;
+  private initialSyncScroll?: boolean;
 
   private nameWorking = '';
   private scrollWorking: ScrollStartMode = 'none';
+  private syncScrollWorking = true;
 
   private working: Record<Key, RowState>;
 
@@ -46,6 +49,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
       initial?: Partial<FrontmatterPropertiesSettings>;
       initialName?: string;
       initialScrollStart?: ScrollStartMode;
+      initialSyncScroll?: boolean;
     },
   ) {
     super(app);
@@ -58,6 +62,9 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
 
     this.initialScrollStart = opts?.initialScrollStart;
     this.scrollWorking = this.initialScrollStart ?? 'none';
+
+    this.initialSyncScroll = opts?.initialSyncScroll;
+    this.syncScrollWorking = this.initialSyncScroll ?? true;
 
     const mk = (k: Key): RowState => {
       const baseCfg = this.base[k];
@@ -148,8 +155,40 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
             } else {
               this.scrollWorking = 'none';
             }
+            updateWarning();
           });
       });
+
+    new Setting(contentEl)
+      .setName('Synchronised scrolling')
+      .setDesc('Scroll both panes together during the session.')
+      .addToggle((t) =>
+        t.setValue(this.syncScrollWorking).onChange((v) => {
+          this.syncScrollWorking = !!v;
+          updateWarning();
+        }),
+      );
+
+    const warningEl = contentEl.createDiv({ cls: 'elo-warning' });
+
+    warningEl.setCssProps({ '--elo-warning-display': 'none' });
+
+    const updateWarning = () => {
+      const conflict = this.syncScrollWorking === true && this.scrollWorking !== 'none';
+
+      warningEl.empty();
+      warningEl.setCssProps({ '--elo-warning-display': conflict ? 'block' : 'none' });
+
+      if (!conflict) return;
+
+      warningEl.createEl('p', {
+        text:
+        `Auto-scroll and synchronised scrolling are both enabled. These settings can conflict with each other if your notes have embedded content that loads slowly.
+        If the notes jump unexpectedly, either disable synchronised scrolling or set auto-scroll to "no auto-scroll".`
+      });
+    };
+
+    updateWarning();
 
     for (const key of FM_PROP_KEYS) {
       const row = this.working[key];
@@ -182,6 +221,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
             overrides: this.buildOverridesPayload(),
             name: this.nameWorking || undefined,
             scrollStart: this.scrollWorking,
+            syncScroll: this.syncScrollWorking,
           };
           this.finish(result);
         }),

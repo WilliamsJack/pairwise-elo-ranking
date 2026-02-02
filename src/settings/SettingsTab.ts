@@ -752,6 +752,7 @@ export default class EloSettingsTab extends PluginSettingTab {
       initial: def.frontmatterOverrides,
       initialName: def.label ?? '',
       initialScrollStart: def.scrollStart,
+      initialSyncScroll: def.syncScroll ?? true,
     }).openAndGetOptions();
 
     if (!res) return;
@@ -771,6 +772,8 @@ export default class EloSettingsTab extends PluginSettingTab {
     def.label = newName.length > 0 ? newName : undefined;
 
     def.scrollStart = res.scrollStart && res.scrollStart !== 'none' ? res.scrollStart : undefined;
+
+    def.syncScroll = res.syncScroll ?? true;
 
     this.plugin.dataStore.upsertCohortDef(def);
     await this.plugin.dataStore.saveStore();

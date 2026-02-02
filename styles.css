@@ -105,3 +105,27 @@
 .elo-static {
   cursor: default;
 }
+
+/* Cohort options: warning callout */
+.elo-warning {
+  display: var(--elo-warning-display, none);
+
+  margin-top: var(--size-4-2); /* 8px */
+  padding: var(--size-4-2) var(--size-4-3); /* 8px 12px */
+
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+
+  border: 1px solid var(--background-modifier-border);
+  border-left: 4px solid var(--text-accent);
+  border-radius: var(--radius-s);
+
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-normal);
+
+  white-space: pre-wrap;
+}
+
+.elo-warning p {
+  margin: 0;
+}
