@@ -4,7 +4,6 @@ import { FuzzySuggestModal, Notice, Setting } from 'obsidian';
 import { listBaseFiles, readBaseViews } from '../domain/bases/BasesDiscovery';
 import {
   createDefinition,
-  getFileTags,
   parseCohortKey,
   prettyCohortDefinition,
 } from '../domain/cohort/CohortResolver';
@@ -409,11 +408,12 @@ class TagCohortModal extends BasePromiseModal<CohortDefinition | undefined> {
   }
 
   private collectVaultTags(): string[] {
-    const set = new Set<string>();
-    for (const f of this.app.vault.getMarkdownFiles()) {
-      for (const t of getFileTags(this.app, f)) set.add(t);
-    }
-    return Array.from(set).filter(Boolean).sort();
+    const tagCounts = this.app.metadataCache.getTags();
+
+    return Object.keys(tagCounts)
+      .map((t) => normaliseTag(t))
+      .filter((t): t is string => !!t)
+      .sort((a, b) => a.localeCompare(b));
   }
 
   private renderSelectedTags(): void {
