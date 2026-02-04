@@ -1,51 +1,9 @@
 import type { App } from 'obsidian';
 import { Notice, Setting, TFile } from 'obsidian';
 
-import { type BaseViewInfo, listBaseFiles, readBaseViews } from '../domain/bases/BasesDiscovery';
-import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
-
-type BaseViewChoice = { view: string; label: string };
-
-class BaseFileSelectModal extends BasePromiseFuzzyModal<TFile> {
-  private files: TFile[];
-
-  constructor(app: App, files: TFile[]) {
-    super(app);
-    this.files = files.slice().sort((a, b) => a.path.localeCompare(b.path));
-    this.setPlaceholder('Pick a ".base" file...');
-  }
-
-  getItems(): TFile[] {
-    return this.files;
-  }
-
-  getItemText(item: TFile): string {
-    return item.path;
-  }
-}
-
-class BaseViewSelectModal extends BasePromiseFuzzyModal<BaseViewChoice> {
-  private choices: BaseViewChoice[];
-
-  constructor(app: App, views: BaseViewInfo[]) {
-    super(app);
-
-    this.choices = views.map((v) => ({
-      view: v.name,
-      label: v.type ? `${v.name} (${v.type})` : v.name,
-    }));
-
-    this.setPlaceholder('Pick a view...');
-  }
-
-  getItems(): BaseViewChoice[] {
-    return this.choices;
-  }
-
-  getItemText(item: BaseViewChoice): string {
-    return item.label;
-  }
-}
+import { listBaseFiles, readBaseViews } from '../domain/bases/BasesDiscovery';
+import { BaseFileSelectModal, BaseViewSelectModal } from './BasePicker';
+import { BasePromiseModal } from './PromiseModal';
 
 export class ResolveMissingBaseModal extends BasePromiseModal<
   { basePath: string; view: string } | undefined

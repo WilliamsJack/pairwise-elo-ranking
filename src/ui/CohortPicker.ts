@@ -1,4 +1,4 @@
-import type { App, ButtonComponent, TFile } from 'obsidian';
+import type { App, ButtonComponent } from 'obsidian';
 import { FuzzySuggestModal, Notice, Setting } from 'obsidian';
 
 import { listBaseFiles, readBaseViews } from '../domain/bases/BasesDiscovery';
@@ -12,6 +12,7 @@ import type { FrontmatterPropertiesSettings } from '../settings';
 import type { CohortDefinition } from '../types';
 import type { ScrollStartMode } from '../types';
 import { normaliseTag } from '../utils/tags';
+import { BaseFileSelectModal, BaseViewSelectModal } from './BasePicker';
 import { CohortOptionsModal } from './CohortOptionsModal';
 import { FolderSelectModal } from './FolderPicker';
 import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
@@ -127,7 +128,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
         return undefined;
       }
 
-      const viewChoice = await new BaseViewSelectModal(this.app, baseFile, views).openAndGetValue();
+      const viewChoice = await new BaseViewSelectModal(this.app, views).openAndGetValue();
       if (!viewChoice) return undefined;
 
       const baseId = baseFile.path;
@@ -344,49 +345,6 @@ class TagSelectFuzzyModal extends BasePromiseFuzzyModal<string> {
 
   getItemText(item: string): string {
     return item;
-  }
-}
-
-class BaseFileSelectModal extends BasePromiseFuzzyModal<TFile> {
-  private files: TFile[];
-
-  constructor(app: App, files: TFile[]) {
-    super(app);
-    this.files = files.slice().sort((a, b) => a.path.localeCompare(b.path));
-    this.setPlaceholder('Pick a ".base" file...');
-  }
-
-  getItems(): TFile[] {
-    return this.files;
-  }
-
-  getItemText(item: TFile): string {
-    return item.path;
-  }
-}
-
-type BaseViewChoice = { view: string; label: string };
-
-class BaseViewSelectModal extends BasePromiseFuzzyModal<BaseViewChoice> {
-  private choices: BaseViewChoice[];
-
-  constructor(app: App, _baseFile: TFile, views: Array<{ name: string; type?: string }>) {
-    super(app);
-
-    this.choices = views.map((v) => ({
-      view: v.name,
-      label: v.type ? `${v.name} (${v.type})` : v.name,
-    }));
-
-    this.setPlaceholder('Pick a view...');
-  }
-
-  getItems(): BaseViewChoice[] {
-    return this.choices;
-  }
-
-  getItemText(item: BaseViewChoice): string {
-    return item.label;
   }
 }
 
