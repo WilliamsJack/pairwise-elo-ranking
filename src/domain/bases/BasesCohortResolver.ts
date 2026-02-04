@@ -1,8 +1,7 @@
-import type { App, OpenViewState, WorkspaceLeaf } from 'obsidian';
+import type { App, OpenViewState, ViewState, WorkspaceLeaf } from 'obsidian';
 import { TFile } from 'obsidian';
 
 const TIMEOUT_MS = 5_000;
-
 const DEFAULT_POLL_MS = 50;
 
 type ResolveOpts = {
@@ -22,13 +21,36 @@ async function sleep(ms: number): Promise<void> {
   await new Promise<void>((resolve) => window.setTimeout(resolve, Math.max(0, Math.round(ms))));
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object';
+// ---- Minimal models of Bases internals ----
+
+type BasesControllerLike = {
+  results?: unknown;
+  initialScan?: unknown;
+};
+
+type BasesViewLike = {
+  getViewType: () => string;
+  controller?: BasesControllerLike;
+};
+
+type BasesViewState = { file?: string; viewName?: string };
+
+function getBasesView(leaf: WorkspaceLeaf): BasesViewLike | undefined {
+  const view = leaf.view as unknown as BasesViewLike;
+  return typeof view?.getViewType === 'function' && view.getViewType() === 'bases'
+    ? view
+    : undefined;
 }
 
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+function leafMatchesBase(leaf: WorkspaceLeaf, basePath: string, viewName: string): boolean {
+  const vs: ViewState = leaf.getViewState();
+  if (vs.type !== 'bases') return false;
+
+  const st = (vs.state ?? {}) as BasesViewState;
+  return st.file === basePath && st.viewName === viewName;
 }
+
+// ---- Results extraction ----
 
 type ResultsLike = {
   size: number;
@@ -44,37 +66,16 @@ function isResultsLike(value: unknown): value is ResultsLike {
   );
 }
 
-// Minimal model of Bases controller internals
-type BasesControllerLike = {
-  currentFile?: unknown;
-  query?: unknown;
-  queryState?: unknown;
-  results?: unknown;
-
-  // True while Bases is scanning/building results, false once done.
-  initialScan?: unknown;
-
-  getQueryViewNames?: () => unknown;
-};
-
-function getBasesControllerFromLeaf(leaf: WorkspaceLeaf): BasesControllerLike | undefined {
-  const viewUnknown: unknown = leaf.view;
-  if (!isRecord(viewUnknown)) return undefined;
-
-  const controllerUnknown = viewUnknown['controller'];
-  if (!isRecord(controllerUnknown)) return undefined;
-
-  return controllerUnknown as BasesControllerLike;
-}
-
 function getUserLeaf(app: App): WorkspaceLeaf | null {
-  return app.workspace.getMostRecentLeaf?.() ?? app.workspace.getLeaf(false);
+  return app.workspace.getMostRecentLeaf() ?? app.workspace.getLeaf(false);
 }
 
-async function openBaseLeaf(app: App, baseFile: TFile, viewName: string): Promise<WorkspaceLeaf> {
-  const leaf = app.workspace.getLeaf('tab');
-  if (!leaf) throw new Error('[Elo][Bases] Could not create a workspace leaf');
-
+async function openBaseIntoLeaf(
+  app: App,
+  leaf: WorkspaceLeaf,
+  baseFile: TFile,
+  viewName: string,
+): Promise<void> {
   // Make the target leaf active so openLinkText opens into it.
   app.workspace.setActiveLeaf(leaf, { focus: true });
   await nextFrame();
@@ -87,65 +88,28 @@ async function openBaseLeaf(app: App, baseFile: TFile, viewName: string): Promis
   // Give Obsidian time to attach the view and controller.
   await nextFrame();
   await nextFrame();
-
-  return leaf;
 }
 
-function controllerHasViewName(controller: BasesControllerLike, viewName: string): boolean {
-  if (typeof controller.getQueryViewNames !== 'function') return true;
-
-  try {
-    const names = controller.getQueryViewNames();
-    if (!isStringArray(names)) return false;
-    if (names.length === 0) return true;
-    return names.includes(viewName);
-  } catch {
-    return false;
-  }
-}
-
-async function awaitControllerReady(
+async function awaitBasesControllerReady(
   leaf: WorkspaceLeaf,
-  controller: BasesControllerLike,
+  basesView: BasesViewLike,
   basePath: string,
   viewName: string,
   timeoutMs: number,
   pollMs: number,
-): Promise<void> {
+): Promise<BasesControllerLike> {
   const started = nowMs();
+  const deadline = started + timeoutMs;
 
-  while (true) {
-    let leafOk = false;
-    try {
-      const vsUnknown: unknown = leaf.getViewState?.();
-      if (isRecord(vsUnknown) && vsUnknown['type'] === 'bases') {
-        const stUnknown: unknown = vsUnknown['state'];
-        if (isRecord(stUnknown)) {
-          const fileUnknown: unknown = stUnknown['file'];
-          const viewNameUnknown: unknown = stUnknown['viewName'];
-          leafOk = fileUnknown === basePath && viewNameUnknown === viewName;
-        }
-      }
-    } catch {
-      leafOk = false;
+  while (nowMs() < deadline) {
+    if (leafMatchesBase(leaf, basePath, viewName)) {
+      const controller = basesView.controller;
+      if (controller) return controller;
     }
-
-    // Bases does not always populate currentFile - treat null as acceptable.
-    const curFile = controller.currentFile;
-    const curFileOk = curFile == null || (curFile instanceof TFile && curFile.path === basePath);
-
-    const hasQuery = typeof controller.query !== 'undefined';
-    const hasQueryState =
-      typeof controller.queryState === 'string' && controller.queryState.length > 0;
-    const viewNameOk = controllerHasViewName(controller, viewName);
-
-    if (leafOk && curFileOk && hasQuery && hasQueryState && viewNameOk) return;
-
-    if (nowMs() - started >= timeoutMs) break;
     await sleep(pollMs);
   }
 
-  throw new Error('[Elo][Bases] Timed out waiting for Bases controller readiness');
+  throw new Error('[Elo][Bases] Timed out waiting for Bases controller');
 }
 
 /**
@@ -219,17 +183,25 @@ export async function resolveFilesFromBaseView(
   let leaf: WorkspaceLeaf | null = null;
 
   try {
-    leaf = await openBaseLeaf(app, baseFile, viewName);
+    leaf = app.workspace.getLeaf('tab');
+    if (!leaf) throw new Error('[Elo][Bases] Could not create a workspace leaf');
 
-    const viewType = leaf.view?.getViewType?.();
-    if (viewType !== 'bases') {
+    await openBaseIntoLeaf(app, leaf, baseFile, viewName);
+
+    const basesView = getBasesView(leaf);
+    if (!basesView) {
+      const viewType = (leaf.view as { getViewType?: () => unknown })?.getViewType?.();
       throw new Error(`[Elo][Bases] Unexpected view type: ${String(viewType)}`);
     }
 
-    const controller = getBasesControllerFromLeaf(leaf);
-    if (!controller) throw new Error('[Elo][Bases] Bases controller missing on view');
-
-    await awaitControllerReady(leaf, controller, baseFile.path, viewName, timeoutMs, pollMs);
+    const controller = await awaitBasesControllerReady(
+      leaf,
+      basesView,
+      baseFile.path,
+      viewName,
+      timeoutMs,
+      pollMs,
+    );
 
     await waitForResultsToSettle(controller, timeoutMs, pollMs);
 
