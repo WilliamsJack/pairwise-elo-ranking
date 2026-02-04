@@ -2,7 +2,7 @@ import type { App, TAbstractFile } from 'obsidian';
 import { TFile, TFolder } from 'obsidian';
 
 import type { CohortDefinition, CohortKind, CohortParamsMap, CohortSpec } from '../../types';
-import { normaliseTag } from '../../utils/tags';
+import { expandTagHierarchy, normaliseTag } from '../../utils/tags';
 import { resolveFilesFromBaseView } from '../bases/BasesCohortResolver';
 
 function getAllFolders(app: App): TFolder[] {
@@ -36,20 +36,26 @@ export function getFileTags(app: App, file: TFile): string[] {
   const cache = app.metadataCache.getFileCache(file);
   const set = new Set<string>();
 
+  const addTag = (raw: string) => {
+    for (const t of expandTagHierarchy(raw)) {
+      if (t && t !== '#') set.add(t);
+    }
+  };
+
   // Body tags
   if (cache?.tags) {
-    for (const t of cache.tags) if (t?.tag) set.add(normaliseTag(t.tag));
+    for (const t of cache.tags) if (t?.tag) addTag(t.tag);
   }
 
   // Frontmatter tags (string | string[] | unknown)
   const fmTags: unknown = cache?.frontmatter?.tags;
   if (Array.isArray(fmTags)) {
-    for (const t of fmTags) if (typeof t === 'string') set.add(normaliseTag(t));
+    for (const t of fmTags) if (typeof t === 'string') addTag(t);
   } else if (typeof fmTags === 'string') {
     // Split by commas or whitespace
     for (const t of fmTags.split(/[,\s]+/g)) {
       const n = normaliseTag(t);
-      if (n && n !== '#') set.add(n);
+      if (n && n !== '#') addTag(n);
     }
   }
 
