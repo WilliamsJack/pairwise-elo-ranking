@@ -44,7 +44,7 @@ export function getFileTags(app: App, file: TFile): string[] {
 
   // Body tags
   if (cache?.tags) {
-    for (const t of cache.tags) if (t?.tag) addTag(t.tag);
+    for (const t of cache.tags) if (t.tag) addTag(t.tag);
   }
 
   // Frontmatter tags (string | string[] | unknown)

@@ -68,8 +68,8 @@ export default class ArenaSession {
 
     // Resolve the correct document/window for UI and keyboard capture.
     const doc =
-      this.leftLeaf.view?.containerEl?.ownerDocument ??
-      this.rightLeaf.view?.containerEl?.ownerDocument ??
+      this.leftLeaf.view.containerEl.ownerDocument ??
+      this.rightLeaf.view.containerEl.ownerDocument ??
       this.layoutHandle.doc ??
       document;
     const win = doc.defaultView ?? this.layoutHandle.win ?? window;
@@ -103,7 +103,7 @@ export default class ArenaSession {
         this.overlayWin.removeEventListener('beforeunload', this.popoutUnloadHandler);
         // Hide any toast we created while in the popout (so they don't reattach to the main window)
         for (const n of this.liveNotices) {
-          n?.hide?.();
+          n.hide();
         }
       }
     }
@@ -554,18 +554,18 @@ export default class ArenaSession {
     const isTextEntryEl = (el: HTMLElement | null): boolean => {
       if (!el) return false;
 
-      const tag = el.tagName?.toLowerCase();
+      const tag = el.tagName.toLowerCase();
       if (tag === 'input' || tag === 'textarea') return true;
 
       // Any contenteditable region should also suppress shortcuts.
       if (el.isContentEditable) return true;
 
-      if (el.closest?.('.cm-editor')) return true;
+      if (el.closest('.cm-editor')) return true;
 
       return false;
     };
 
-    const isAnyCmFocused = !!activeEl?.closest?.('.cm-editor');
+    const isAnyCmFocused = !!activeEl?.closest('.cm-editor');
 
     const blockedByEditing = isTextEntryEl(target) || isTextEntryEl(activeEl) || isAnyCmFocused;
     if (blockedByEditing) {

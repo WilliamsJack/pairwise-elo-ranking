@@ -5,7 +5,7 @@ import { removeEloIdEverywhere } from '../utils/NoteIds';
 import { BasePromiseModal } from './PromiseModal';
 
 function formatCreatedTime(file: TFile): string {
-  const ctime = file.stat?.ctime;
+  const ctime = file.stat.ctime;
   if (!ctime || !Number.isFinite(ctime)) return 'Unknown';
   try {
     return new Date(ctime).toLocaleString('en-AU', {
@@ -46,8 +46,8 @@ export class ResolveDuplicateEloIdsModal extends BasePromiseModal<boolean> {
 
   private sortedByCreatedAsc(files: TFile[]): TFile[] {
     return files.slice().sort((a, b) => {
-      const ac = a.stat?.ctime ?? 0;
-      const bc = b.stat?.ctime ?? 0;
+      const ac = a.stat.ctime;
+      const bc = b.stat.ctime;
       return ac - bc || a.path.localeCompare(b.path);
     });
   }
@@ -64,7 +64,7 @@ export class ResolveDuplicateEloIdsModal extends BasePromiseModal<boolean> {
         if (changed) removed += 1;
       }
     } finally {
-      workingNotice?.hide?.();
+      workingNotice.hide();
     }
 
     new Notice(
@@ -98,7 +98,7 @@ export class ResolveDuplicateEloIdsModal extends BasePromiseModal<boolean> {
     const listWrap = contentEl.createDiv();
 
     const sorted = this.sortedByCreatedAsc(this.files);
-    const oldestPath = sorted[0]?.path;
+    const oldestPath = sorted[0].path;
 
     for (const f of sorted) {
       const row = new Setting(listWrap).setName('');

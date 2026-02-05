@@ -57,9 +57,9 @@ function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
   const out: EloSettings = { ...base, ...raw };
 
   // Validate session layout
-  out.sessionLayout = normaliseSessionLayout(raw?.sessionLayout, base.sessionLayout);
+  out.sessionLayout = normaliseSessionLayout(raw.sessionLayout, base.sessionLayout);
 
-  out.templatesFolderPath = normaliseTemplatesFolderPath(raw?.templatesFolderPath);
+  out.templatesFolderPath = normaliseTemplatesFolderPath(raw.templatesFolderPath);
 
   if (raw.heuristics) {
     out.heuristics = {

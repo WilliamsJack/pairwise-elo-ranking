@@ -60,7 +60,7 @@ export function renderStandardFmPropertyRow(
       t.setValue(cur.enabled).onChange((v) => {
         cur.enabled = !!v;
         if (mode === 'cohort') {
-          textRef?.setDisabled(!cur.enabled);
+          textRef.setDisabled(!cur.enabled);
         }
         void opts.onChange({ ...cur });
       });

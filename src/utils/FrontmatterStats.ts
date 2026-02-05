@@ -13,9 +13,7 @@ type PlayerStats = {
 };
 
 function anyEnabled(fm: FrontmatterPropertiesSettings): boolean {
-  return (
-    !!fm?.rating?.enabled || !!fm?.rank?.enabled || !!fm?.matches?.enabled || !!fm?.wins?.enabled
-  );
+  return !!fm.rating.enabled || !!fm.rank.enabled || !!fm.matches.enabled || !!fm.wins.enabled;
 }
 
 // Standard competition ranking ("1224" style)
@@ -249,7 +247,7 @@ export async function updateCohortFrontmatter(
       oldPropName,
     );
   } finally {
-    working?.hide?.();
+    working.hide();
   }
 }
 

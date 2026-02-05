@@ -57,7 +57,7 @@ export async function ensureUniqueEloIds(app: App, files: TFile[]): Promise<bool
     try {
       dupes = await findDuplicateEloIds(app, files);
     } finally {
-      scanning?.hide?.();
+      scanning.hide();
     }
 
     if (dupes.size === 0) return true;

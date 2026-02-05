@@ -160,7 +160,7 @@ export async function applyEloIdTransferPlan(
       updated += 1;
     }
   } finally {
-    working?.hide?.();
+    working.hide();
   }
 
   return { updated, mismatches };

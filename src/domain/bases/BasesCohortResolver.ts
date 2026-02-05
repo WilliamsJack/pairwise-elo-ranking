@@ -31,9 +31,7 @@ type BasesViewState = { file?: string; viewName?: string };
 
 function getBasesView(leaf: WorkspaceLeaf): BasesViewLike | undefined {
   const view = leaf.view as unknown as BasesViewLike;
-  return typeof view?.getViewType === 'function' && view.getViewType() === 'bases'
-    ? view
-    : undefined;
+  return view.getViewType() === 'bases' ? view : undefined;
 }
 
 function leafMatchesBase(leaf: WorkspaceLeaf, basePath: string, viewName: string): boolean {
@@ -184,7 +182,7 @@ export async function resolveFilesFromBaseView(
 
     const basesView = getBasesView(leaf);
     if (!basesView) {
-      const viewType = (leaf.view as { getViewType?: () => unknown })?.getViewType?.();
+      const viewType = leaf.view.getViewType();
       throw new Error(`[Elo][Bases] Unexpected view type: ${String(viewType)}`);
     }
 

@@ -13,7 +13,7 @@ export async function ensureFolderCohortPath(
 ): Promise<CohortDefinition | undefined> {
   if (def.kind !== 'folder' && def.kind !== 'folder-recursive') return def;
 
-  const path: string = def.params?.path ?? '';
+  const path = def.params.path;
   const af = app.vault.getAbstractFileByPath(path);
   if (af instanceof TFolder) return def;
 

@@ -85,7 +85,7 @@ export default class EloSettingsTab extends PluginSettingTab {
     if (!Number.isFinite(initialK)) initialK = 24;
     initialK = Math.min(maxK, Math.max(minK, Math.round(initialK)));
 
-    let minKSlider: SliderComponent | undefined;
+    let minKSlider: SliderComponent;
 
     // General
     new Setting(containerEl)
@@ -106,8 +106,8 @@ export default class EloSettingsTab extends PluginSettingTab {
             if (dec.minK > value) dec.minK = value;
 
             // Update the UI control if it exists
-            minKSlider?.setLimits(4, value, 1);
-            if (minKSlider && minKSlider.getValue() > value) minKSlider.setValue(value);
+            minKSlider.setLimits(4, value, 1);
+            if (minKSlider.getValue() > value) minKSlider.setValue(value);
 
             await this.plugin.saveSettings();
           });
@@ -181,7 +181,7 @@ export default class EloSettingsTab extends PluginSettingTab {
               new Notice('Failed to scan notes for Elo IDs.');
               return;
             } finally {
-              scanning?.hide?.();
+              scanning.hide();
             }
 
             if (plan.wouldUpdate === 0) return;
@@ -393,8 +393,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         t.setValue(hs.provisional.enabled).onChange(async (v) => {
           hs.provisional.enabled = v;
           await this.plugin.saveSettings();
-          provMatchesSlider?.setDisabled(!v);
-          provMultSlider?.setDisabled(!v);
+          provMatchesSlider.setDisabled(!v);
+          provMultSlider.setDisabled(!v);
         }),
       );
 
@@ -440,7 +440,7 @@ export default class EloSettingsTab extends PluginSettingTab {
         'Effective K follows k = baseK / (1 + matches / halfLife).',
     });
 
-    let halfSlider: SliderComponent | undefined;
+    let halfSlider: SliderComponent;
 
     new Setting(advBody)
       .setName('Enable K decay')
@@ -449,8 +449,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         t.setValue(hs.decay.enabled).onChange(async (v) => {
           hs.decay.enabled = v;
           await this.plugin.saveSettings();
-          halfSlider?.setDisabled(!v);
-          minKSlider?.setDisabled(!v);
+          halfSlider.setDisabled(!v);
+          minKSlider.setDisabled(!v);
         }),
       );
 
@@ -507,8 +507,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         t.setValue(hs.upsetBoost.enabled).onChange(async (v) => {
           hs.upsetBoost.enabled = v;
           await this.plugin.saveSettings();
-          upsetGapSlider?.setDisabled(!v);
-          upsetMultSlider?.setDisabled(!v);
+          upsetGapSlider.setDisabled(!v);
+          upsetMultSlider.setDisabled(!v);
         }),
       );
 
@@ -564,8 +564,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         t.setValue(hs.drawGapBoost.enabled).onChange(async (v) => {
           hs.drawGapBoost.enabled = v;
           await this.plugin.saveSettings();
-          drawGapSlider?.setDisabled(!v);
-          drawMultSlider?.setDisabled(!v);
+          drawGapSlider.setDisabled(!v);
+          drawMultSlider.setDisabled(!v);
         }),
       );
 
@@ -641,7 +641,7 @@ export default class EloSettingsTab extends PluginSettingTab {
         t.setValue(mm.similarRatings.enabled).onChange(async (v) => {
           mm.similarRatings.enabled = v;
           await this.plugin.saveSettings();
-          sampleSlider?.setDisabled(!v);
+          sampleSlider.setDisabled(!v);
         }),
       );
 
@@ -676,7 +676,7 @@ export default class EloSettingsTab extends PluginSettingTab {
         t.setValue(mm.lowMatchesBias.enabled).onChange(async (v) => {
           mm.lowMatchesBias.enabled = v;
           await this.plugin.saveSettings();
-          exponentSlider?.setDisabled(!v);
+          exponentSlider.setDisabled(!v);
         }),
       );
 
@@ -712,8 +712,8 @@ export default class EloSettingsTab extends PluginSettingTab {
         t.setValue(mm.upsetProbes.enabled).onChange(async (v) => {
           mm.upsetProbes.enabled = v;
           await this.plugin.saveSettings();
-          probeProbSlider?.setDisabled(!v);
-          probeGapSlider?.setDisabled(!v);
+          probeProbSlider.setDisabled(!v);
+          probeGapSlider.setDisabled(!v);
         }),
       );
 

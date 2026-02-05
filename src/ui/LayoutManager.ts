@@ -52,7 +52,7 @@ export class ArenaLayoutManager {
 
   private resolveDocWinFromLeaf(leaf: WorkspaceLeaf): { doc: Document; win: Window } {
     const doc =
-      leaf.view?.containerEl?.ownerDocument ??
+      leaf.view.containerEl.ownerDocument ??
       this.app.workspace.containerEl.ownerDocument ??
       document;
     const win = doc.defaultView ?? window;

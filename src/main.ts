@@ -61,7 +61,7 @@ export default class EloPlugin extends Plugin {
 
   onunload(): void {
     void this.endSession({ forUnload: true });
-    void this.dataStore.saveAllImmediate?.();
+    void this.dataStore.saveAllImmediate();
   }
 
   async saveSettings() {
@@ -142,8 +142,8 @@ export default class EloPlugin extends Plugin {
       this.settings.frontmatterProperties,
       def.frontmatterOverrides,
     );
-    const rankCfg = fm?.rank;
-    if (!rankCfg?.enabled || !rankCfg.property) return;
+    const rankCfg = fm.rank;
+    if (!rankCfg.enabled || !rankCfg.property) return;
 
     const files = await resolveFilesForCohort(this.app, def, {
       excludeFolderPath: this.settings.templatesFolderPath,

@@ -20,8 +20,8 @@ export async function ensureBaseCohortTarget(
 ): Promise<CohortDefinition | undefined> {
   if (def.kind !== 'base') return def;
 
-  const basePath = String(def.params?.baseId ?? '');
-  const view = String(def.params?.view ?? '');
+  const basePath = String(def.params.baseId);
+  const view = String(def.params.view);
 
   const baseFile = getBaseFile(app, basePath);
 

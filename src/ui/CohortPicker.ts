@@ -19,7 +19,7 @@ import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
 
 type Action = 'vault-all' | 'active-folder' | 'pick-folder' | 'tag-dialog' | 'base-dialog';
 type Choice =
-  | { kind: 'saved'; key: string; label: string; def?: CohortDefinition }
+  | { kind: 'saved'; key: string; label: string; def: CohortDefinition }
   | { kind: 'action'; action: Action; label: string };
 
 export class CohortPicker extends FuzzySuggestModal<Choice> {
@@ -71,7 +71,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     }
 
     // Add "Vault: all notes" only if not already present
-    if (!items.some((item) => item.kind === 'saved' && item.def?.key === 'vault:all')) {
+    if (!items.some((item) => item.kind === 'saved' && item.def.key === 'vault:all')) {
       items.push({ kind: 'action', action: 'vault-all', label: 'Vault: all notes' });
     }
 
