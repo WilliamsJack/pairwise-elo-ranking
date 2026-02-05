@@ -476,12 +476,7 @@ export default class ArenaSession {
     const existing = this.pressTimers.get(btn);
     if (typeof existing === 'number') win.clearTimeout(existing);
 
-    const tid = win.setTimeout(
-      () => {
-        btn.classList.remove('elo-pressed');
-      },
-      Math.max(0, Math.round(durationMs)),
-    );
+    const tid = win.setTimeout(() => btn.classList.remove('elo-pressed'), durationMs);
 
     this.pressTimers.set(btn, tid);
   }

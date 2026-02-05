@@ -9,17 +9,11 @@ type ResolveOpts = {
   pollMs?: number;
 };
 
-function nowMs(): number {
-  return window.performance?.now?.() ?? Date.now();
-}
+const nextFrame = (): Promise<void> =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-async function nextFrame(): Promise<void> {
-  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-}
-
-async function sleep(ms: number): Promise<void> {
-  await new Promise<void>((resolve) => window.setTimeout(resolve, Math.max(0, Math.round(ms))));
-}
+const sleep = (ms: number): Promise<void> =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // ---- Minimal models of Bases internals ----
 
@@ -98,10 +92,10 @@ async function awaitBasesControllerReady(
   timeoutMs: number,
   pollMs: number,
 ): Promise<BasesControllerLike> {
-  const started = nowMs();
+  const started = performance.now();
   const deadline = started + timeoutMs;
 
-  while (nowMs() < deadline) {
+  while (performance.now() < deadline) {
     if (leafMatchesBase(leaf, basePath, viewName)) {
       const controller = basesView.controller;
       if (controller) return controller;
@@ -128,7 +122,7 @@ async function waitForResultsToSettle(
   timeoutMs: number,
   pollMs: number,
 ): Promise<{ settled: boolean }> {
-  const started = nowMs();
+  const started = performance.now();
   const deadline = started + timeoutMs;
 
   while (true) {
@@ -138,7 +132,7 @@ async function waitForResultsToSettle(
 
     if (resultsOk && scanOk && scan === false) return { settled: true };
 
-    if (nowMs() >= deadline) {
+    if (performance.now() >= deadline) {
       if (resultsOk) return { settled: false };
       throw new Error('[Elo][Bases] Timed out waiting for Bases results container');
     }

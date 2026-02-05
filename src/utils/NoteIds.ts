@@ -249,8 +249,7 @@ export async function ensureEloId(
   const existing = await getEloId(app, file);
   if (existing) return existing;
 
-  const id =
-    window.crypto && 'randomUUID' in window.crypto ? window.crypto.randomUUID() : fallbackUUID();
+  const id = crypto.randomUUID();
 
   if (preferredLocation === 'end') {
     await setEloIdInHtmlComment(app, file, id);
@@ -259,12 +258,4 @@ export async function ensureEloId(
   }
 
   return id;
-}
-
-function fallbackUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
 }
