@@ -13,7 +13,7 @@ const nextFrame = (): Promise<void> =>
   new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
 const sleep = (ms: number): Promise<void> =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
+  new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
 // ---- Minimal models of Bases internals ----
 

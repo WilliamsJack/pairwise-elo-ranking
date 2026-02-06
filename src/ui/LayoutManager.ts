@@ -103,7 +103,7 @@ export class ArenaLayoutManager {
       // Return focus to the user's leaf
       attempt(() => this.app.workspace.setActiveLeaf(leftLeaf, { focus: true }));
       // Yield so UI teardown and any notices can settle
-      await new Promise<void>((r) => setTimeout(r, 0));
+      await new Promise<void>((r) => window.setTimeout(r, 0));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(leftLeaf);
@@ -137,7 +137,7 @@ export class ArenaLayoutManager {
       // Return focus to the reference
       attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
       // Yield so UI teardown and any notices can settle
-      await new Promise<void>((r) => setTimeout(r, 0));
+      await new Promise<void>((r) => window.setTimeout(r, 0));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(arenaLeft);
@@ -164,7 +164,7 @@ export class ArenaLayoutManager {
       attempt(() => left.detach());
       attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
       // Yield so UI teardown and any notices can settle
-      await new Promise<void>((r) => setTimeout(r, 0));
+      await new Promise<void>((r) => window.setTimeout(r, 0));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(left);
@@ -204,7 +204,7 @@ export class ArenaLayoutManager {
       attempt(() => popLeft.detach());
       attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
       // Yield so UI teardown and any notices can settle
-      await new Promise<void>((r) => setTimeout(r, 0));
+      await new Promise<void>((r) => window.setTimeout(r, 0));
     };
 
     const { doc, win } = this.resolveDocWinFromLeaf(popLeft);

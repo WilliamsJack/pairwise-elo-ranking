@@ -74,7 +74,7 @@ export abstract class BasePromiseFuzzyModal<T> extends FuzzySuggestModal<T> {
 
   // Use a microtask delay to avoid racing selection/close flows.
   onClose(): void {
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (!this._resolved) {
         this.finish(undefined);
       }

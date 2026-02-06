@@ -270,7 +270,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
   }
 
   onClose(): void {
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (!this.resolved && !this.awaitingChild) {
         this.emit(undefined);
       }
