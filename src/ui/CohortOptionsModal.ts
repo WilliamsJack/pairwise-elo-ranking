@@ -170,21 +170,15 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
       );
 
     const warningEl = contentEl.createDiv({ cls: 'elo-warning' });
-
-    warningEl.setCssProps({ '--elo-warning-display': 'none' });
+    warningEl.createEl('p', {
+      text:
+        'Auto-scroll and synchronised scrolling are both enabled. These settings can conflict with each other if your notes have embedded content that loads slowly. ' +
+        'If the notes jump unexpectedly, either disable synchronised scrolling or set auto-scroll to "no auto-scroll".',
+    });
 
     const updateWarning = () => {
       const conflict = this.syncScrollWorking === true && this.scrollWorking !== 'none';
-
-      warningEl.empty();
-      warningEl.setCssProps({ '--elo-warning-display': conflict ? 'block' : 'none' });
-
-      if (!conflict) return;
-
-      warningEl.createEl('p', {
-        text: `Auto-scroll and synchronised scrolling are both enabled. These settings can conflict with each other if your notes have embedded content that loads slowly.
-        If the notes jump unexpectedly, either disable synchronised scrolling or set auto-scroll to "no auto-scroll".`,
-      });
+      warningEl.toggleClass('is-visible', conflict);
     };
 
     updateWarning();

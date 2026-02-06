@@ -106,26 +106,41 @@
   cursor: default;
 }
 
-/* Cohort options: warning callout */
 .elo-warning {
-  display: var(--elo-warning-display, none);
+  display: block;
+  box-sizing: border-box;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
 
-  margin-top: var(--size-4-2); /* 8px */
   padding: var(--size-4-2) var(--size-4-3); /* 8px 12px */
-
   background-color: var(--background-secondary);
   color: var(--text-normal);
-
-  border: 1px solid var(--background-modifier-border);
-  border-left: 4px solid var(--text-accent);
   border-radius: var(--radius-s);
+
+  outline: 1px solid var(--background-modifier-border);
+  box-shadow: inset 4px 0 0 var(--text-accent);
 
   font-size: var(--font-ui-small);
   line-height: var(--line-height-normal);
-
   white-space: pre-wrap;
+
+  transition:
+    max-height 220ms ease,
+    opacity 160ms ease;
+}
+
+.elo-warning.is-visible {
+  max-height: 10rem;
+  opacity: 1;
 }
 
 .elo-warning p {
   margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .elo-warning {
+    transition: none;
+  }
 }
