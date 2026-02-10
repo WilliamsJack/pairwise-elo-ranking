@@ -144,3 +144,48 @@
     transition: none;
   }
 }
+
+/* Phone layout: stack title + controls, stretch to screen width */
+.elo-session-bar.is-mobile {
+  left: var(--size-4-2);
+  right: var(--size-4-2);
+  transform: none;
+
+  width: auto;
+  max-width: none;
+
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--size-4-2);
+
+  padding: var(--size-4-2);
+
+  bottom: calc(var(--size-4-4) + var(--view-bottom-spacing)); /* 16px + mobile safe area */
+}
+
+/* Title line for mobile session bar */
+.elo-mobile-title {
+  text-align: center;
+  font-weight: var(--font-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hide left/right labels on mobile */
+.elo-session-bar.is-mobile .elo-side {
+  display: none;
+}
+
+/* Mobile-friendly buttons */
+.elo-session-bar.is-mobile .elo-controls {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.elo-session-bar.is-mobile button {
+  min-height: 44px;
+  padding: var(--size-4-2) var(--size-4-3);
+  font-size: var(--font-ui-medium);
+  flex: 1 1 7rem;
+}

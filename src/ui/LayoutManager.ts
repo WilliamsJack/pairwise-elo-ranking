@@ -1,5 +1,5 @@
 import type { App, ViewState, WorkspaceLeaf } from 'obsidian';
-import { Notice } from 'obsidian';
+import { Notice, Platform } from 'obsidian';
 
 import type { SessionLayoutMode } from '../settings';
 import { attempt, attemptAsync } from '../utils/safe';
@@ -176,12 +176,18 @@ export class ArenaLayoutManager {
   private async createNewWindow(): Promise<ArenaLayoutHandle> {
     const referenceLeaf = this.getUserLeaf();
 
-    const wsWithFn = this.app.workspace as { openPopoutLeaf: () => WorkspaceLeaf | undefined };
-    const popLeft: WorkspaceLeaf | undefined = wsWithFn.openPopoutLeaf();
+    const ws = this.app.workspace as unknown as {
+      openPopoutLeaf?: () => WorkspaceLeaf | undefined;
+    };
+    if (!Platform.isDesktopApp || typeof ws.openPopoutLeaf !== 'function') {
+      new Notice('Pop-out windows are not available on this platform. Using tabs instead.');
+      return this.createNewTab();
+    }
+    const popLeft = ws.openPopoutLeaf();
 
     if (!popLeft) {
-      new Notice('Failed to open a new window. Using right-side split instead.');
-      return this.createRightSplit();
+      new Notice('Failed to open a new window. Using tabs instead.');
+      return this.createNewTab();
     }
 
     await this.waitForPopoutLeafAttachment(popLeft);

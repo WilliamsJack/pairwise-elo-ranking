@@ -1,5 +1,5 @@
-import type { App, WorkspaceLeaf } from 'obsidian';
-import { MarkdownView, Notice, TFile } from 'obsidian';
+import type { App, EventRef, WorkspaceLeaf } from 'obsidian';
+import { MarkdownView, Notice, Platform, TFile } from 'obsidian';
 
 import { pickNextPairIndices } from '../domain/matchmaking/Matchmaker';
 import type EloPlugin from '../main';
@@ -40,12 +40,21 @@ export default class ArenaSession {
 
   private shortcutsPausedToastShown = false;
 
+  // Mobile (phone) mode: two tabs + switch/win bar
+  private lastVisibleSide: 'left' | 'right' = 'left';
+  private activeLeafChangeRef?: EventRef;
+
   // Button refs for keyboard "press-in" flash
   private leftBtn?: HTMLButtonElement;
   private drawBtn?: HTMLButtonElement;
   private rightBtn?: HTMLButtonElement;
   private undoBtn?: HTMLButtonElement;
   private endBtn?: HTMLButtonElement;
+
+  // Mobile-only buttons
+  private switchBtn?: HTMLButtonElement;
+  private winBtn?: HTMLButtonElement;
+  private mobileTitleEl?: HTMLElement;
 
   private pressTimers = new WeakMap<HTMLButtonElement, number>();
 
@@ -59,9 +68,14 @@ export default class ArenaSession {
   }
 
   async start() {
-    // Create arena layout per settings
+    // Create arena layout per settings and platform
+    const requested = this.plugin.settings.sessionLayout ?? 'new-tab';
+
+    const layoutMode = Platform.isPhone ? 'new-tab' : requested;
+
+    // Create arena layout
     const mgr = new ArenaLayoutManager(this.app);
-    this.layoutHandle = await mgr.create(this.plugin.settings.sessionLayout ?? 'new-tab');
+    this.layoutHandle = await mgr.create(layoutMode);
 
     this.leftLeaf = this.layoutHandle.leftLeaf;
     this.rightLeaf = this.layoutHandle.rightLeaf;
@@ -83,6 +97,13 @@ export default class ArenaSession {
     this.mountOverlay(doc);
     this.plugin.registerDomEvent(win, 'keydown', this.keydownHandler, true);
 
+    // Mobile: Update bar to reflect the currently visible note
+    if (Platform.isPhone) {
+      this.activeLeafChangeRef = this.app.workspace.on('active-leaf-change', () =>
+        this.updateOverlay(),
+      );
+    }
+
     // If the user closes a pop-out window, end the session automatically.
     if (win !== window) {
       this.popoutUnloadHandler = () => void this.plugin.endSession();
@@ -90,12 +111,23 @@ export default class ArenaSession {
     }
 
     this.pickNextPair();
-    this.updateOverlay();
     await this.openCurrent();
+    this.updateOverlay();
   }
 
   async end(opts?: { forUnload?: boolean }) {
     this.clearScrollSync();
+
+    // Remove mobile UI workspace listeners
+    if (this.activeLeafChangeRef) {
+      try {
+        this.app.workspace.offref(this.activeLeafChangeRef);
+      } catch {
+        // ignore
+      }
+      this.activeLeafChangeRef = undefined;
+    }
+
     // Remove listeners from the correct window
     if (this.overlayWin) {
       this.overlayWin.removeEventListener('keydown', this.keydownHandler, true);
@@ -129,6 +161,7 @@ export default class ArenaSession {
     this.overlayWin = undefined;
     this.liveNotices = [];
     this.undoStack = [];
+    this.lastVisibleSide = 'left';
   }
 
   public getCohortKey(): string {
@@ -165,8 +198,14 @@ export default class ArenaSession {
       this.openInReadingMode(this.rightLeaf, this.rightFile),
     ]);
 
-    if (this.getCohortSyncScrollEnabled()) {
+    if (this.getCohortSyncScrollEnabled() && !Platform.isPhone) {
       this.installScrollSync();
+    }
+
+    // Phone UX: start a new pair on the left note
+    if (Platform.isPhone) {
+      attempt(() => this.app.workspace.setActiveLeaf(this.leftLeaf, { focus: true }));
+      this.lastVisibleSide = 'left';
     }
   }
 
@@ -481,20 +520,67 @@ export default class ArenaSession {
     this.pressTimers.set(btn, tid);
   }
 
+  private getVisibleSide(): 'left' | 'right' | undefined {
+    const active = this.app.workspace.getActiveViewOfType(MarkdownView)?.leaf;
+    if (active === this.leftLeaf) {
+      this.lastVisibleSide = 'left';
+      return 'left';
+    }
+    if (active === this.rightLeaf) {
+      this.lastVisibleSide = 'right';
+      return 'right';
+    }
+    return undefined;
+  }
+
+  private switchNote(): void {
+    const side = this.getVisibleSide() ?? this.lastVisibleSide;
+    const target = side === 'left' ? this.rightLeaf : this.leftLeaf;
+
+    attempt(() => this.app.workspace.setActiveLeaf(target, { focus: true }));
+    this.lastVisibleSide = side === 'left' ? 'right' : 'left';
+    this.updateOverlay();
+  }
+
+  private chooseCurrentWinner(): void {
+    const side = this.getVisibleSide();
+    if (!side) {
+      this.showToast('Tap Switch to view a note, then choose a winner.');
+      return;
+    }
+    void this.choose(side === 'left' ? 'A' : 'B');
+  }
+
   private mountOverlay(doc: Document = document) {
     const el = doc.body.createDiv({ cls: 'elo-session-bar' });
+    if (Platform.isPhone) el.classList.add('is-mobile');
 
     el.createDiv({ cls: 'elo-side left' });
 
+    if (Platform.isPhone) {
+      this.mobileTitleEl = el.createDiv({ cls: 'elo-mobile-title' });
+    }
+
     const controls = el.createDiv({ cls: 'elo-controls' });
 
-    this.leftBtn = this.makeButton(doc, '← Left', () => void this.choose('A'));
-    this.drawBtn = this.makeButton(doc, '↑ Draw', () => void this.choose('D'));
-    this.rightBtn = this.makeButton(doc, '→ Right', () => void this.choose('B'));
-    this.undoBtn = this.makeButton(doc, 'Undo ⌫', () => this.undo());
-    this.endBtn = this.makeButton(doc, 'End Esc', () => void this.plugin.endSession());
+    if (Platform.isPhone) {
+      this.drawBtn = this.makeButton(doc, 'Draw', () => void this.choose('D'));
+      this.winBtn = this.makeButton(doc, 'Win ✓', () => this.chooseCurrentWinner());
+      this.switchBtn = this.makeButton(doc, '⇄ Switch', () => this.switchNote());
 
-    controls.append(this.leftBtn, this.drawBtn, this.rightBtn, this.undoBtn, this.endBtn);
+      this.undoBtn = this.makeButton(doc, 'Undo ⌫', () => this.undo());
+      this.endBtn = this.makeButton(doc, 'End Esc', () => void this.plugin.endSession());
+
+      controls.append(this.drawBtn, this.winBtn, this.switchBtn, this.undoBtn, this.endBtn);
+    } else {
+      this.leftBtn = this.makeButton(doc, '← Left', () => void this.choose('A'));
+      this.drawBtn = this.makeButton(doc, '↑ Draw', () => void this.choose('D'));
+      this.rightBtn = this.makeButton(doc, '→ Right', () => void this.choose('B'));
+      this.undoBtn = this.makeButton(doc, 'Undo ⌫', () => this.undo());
+      this.endBtn = this.makeButton(doc, 'End Esc', () => void this.plugin.endSession());
+
+      controls.append(this.leftBtn, this.drawBtn, this.rightBtn, this.undoBtn, this.endBtn);
+    }
 
     el.createDiv({ cls: 'elo-side right' });
 
@@ -505,10 +591,21 @@ export default class ArenaSession {
   private unmountOverlay() {
     if (this.overlayEl?.isConnected) this.overlayEl.remove();
     this.overlayEl = undefined;
+
+    this.switchBtn = undefined;
+    this.winBtn = undefined;
+    this.mobileTitleEl = undefined;
+
+    this.leftBtn = undefined;
+    this.drawBtn = undefined;
+    this.rightBtn = undefined;
+    this.undoBtn = undefined;
+    this.endBtn = undefined;
   }
 
   private makeButton(doc: Document, text: string, onClick: () => void) {
     const btn = doc.createElement('button');
+    btn.type = 'button';
     btn.textContent = text;
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -519,10 +616,24 @@ export default class ArenaSession {
 
   private updateOverlay() {
     if (!this.overlayEl) return;
+
     const left = this.overlayEl.querySelector('.elo-side.left') as HTMLElement;
     const right = this.overlayEl.querySelector('.elo-side.right') as HTMLElement;
     left.textContent = this.leftFile?.basename ?? 'Left';
     right.textContent = this.rightFile?.basename ?? 'Right';
+
+    if (!Platform.isPhone) return;
+
+    const visible = this.getVisibleSide();
+
+    const curFile =
+      visible === 'left' ? this.leftFile : visible === 'right' ? this.rightFile : undefined;
+
+    const title = curFile
+      ? `${visible === 'left' ? 'Left' : 'Right'}: ${curFile.basename}`
+      : `${this.leftFile?.basename ?? 'Left'} vs ${this.rightFile?.basename ?? 'Right'}`;
+
+    if (this.mobileTitleEl) this.mobileTitleEl.textContent = title;
   }
 
   private isArenaShortcutKey(ev: KeyboardEvent): boolean {
