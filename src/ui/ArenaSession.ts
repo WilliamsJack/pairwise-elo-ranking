@@ -225,7 +225,7 @@ export default class ArenaSession {
     );
 
     // Apply initial scroll behaviour
-    const mode = this.getCohortScrollStart();
+    const mode = Platform.isPhone ? 'none' : this.getCohortScrollStart();
     await this.applyInitialScroll(leaf, mode);
   }
 
