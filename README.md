@@ -16,7 +16,7 @@ It's basically "which one wins?" instead of trying to assign absolute scores. Ra
 
 ![colour_base_example](docs/images/colour_base_example.webp)
 
-_Other comparison arena UI options are available in Settings - shown here is **right-split**, useful if you'd like to watch your Base update as your ranks change, but I personally use **new window/popout**_.
+_Other comparison arena UI options are available in Settings - shown here is **right-split**, useful if you'd like to watch your Base update as your ranks change, but I personally use **new window/popout**_. Mobile devices are supported by an additional single-note layout type for phones with smaller screens.
 
 ## Try it in two minutes
 
@@ -92,6 +92,12 @@ Press Escape or run **"Pairwise Elo Ranking: End current session"**. If you've e
 ![cohort_options](docs/images/cohort_options.webp)
 
 Use the values computed by the plugin however you want. Choose which values get written to frontmatter and what their property names are.
+
+## Mobile support
+
+The plugin is fully functional on mobile devices, with support for all desktop layouts on tablets (except popout/new window), and an additional single-leaf layout for phones that allows comparison between two notes using a switch button.
+
+![colour_base_example_mobile](docs/images/colour_base_example_mobile.webp)
 
 ## What's a cohort?
 
