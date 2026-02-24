@@ -56,6 +56,14 @@ export default class EloPlugin extends Plugin {
       }),
     );
 
+    this.registerEvent(
+      this.app.vault.on('delete', (file: TAbstractFile) => {
+        if (file instanceof TFile && file.extension === 'md') {
+          this.currentSession?.onFileDeleted(file.path);
+        }
+      }),
+    );
+
     this.addSettingTab(new EloSettingsTab(this.app, this));
   }
 

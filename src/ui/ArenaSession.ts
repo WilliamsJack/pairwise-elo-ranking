@@ -185,6 +185,42 @@ export default class ArenaSession {
     this.updateOverlay();
   }
 
+  public onFileDeleted(deletedPath: string): void {
+    void this.handleFileDeleted(deletedPath);
+  }
+
+  private async handleFileDeleted(deletedPath: string): Promise<void> {
+    const before = this.files.length;
+
+    this.files = this.files.filter((f) => f.path !== deletedPath);
+    this.idByPath.delete(deletedPath);
+
+    const deletedWasVisible =
+      this.leftFile?.path === deletedPath || this.rightFile?.path === deletedPath;
+
+    if (this.files.length === before && !deletedWasVisible) return;
+
+    if (this.files.length < 2) {
+      this.showToast('Not enough notes left to continue - ending session.');
+      void this.plugin.endSession();
+      return;
+    }
+
+    // If the deleted note was one of the current pair, pick a new pair immediately
+    if (deletedWasVisible) {
+      this.lastPairSig = undefined;
+
+      // Wait to ensure deleted file is cleaned up before reusing leaf
+      await this.sleep(0);
+      await this.sleep(0);
+
+      this.pickNextPair();
+      await this.openCurrent();
+    }
+
+    this.updateOverlay();
+  }
+
   private async openCurrent() {
     if (!this.leftFile || !this.rightFile) return;
 
