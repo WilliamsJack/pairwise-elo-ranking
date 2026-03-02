@@ -139,8 +139,42 @@
   margin: 0;
 }
 
+/* Convergence stability progress bar */
+.elo-stability-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-m) var(--radius-m);
+  pointer-events: none;
+}
+
+.elo-stability-fill {
+  height: 100%;
+  width: var(--stability-width, 0%);
+  background-color: var(--text-accent);
+  border-radius: 0 0 var(--radius-m) var(--radius-m);
+  transition:
+    width 300ms ease,
+    background-color 300ms ease;
+}
+
+.elo-stability-fill.is-mid {
+  background-color: var(--color-yellow);
+}
+
+.elo-stability-fill.is-high {
+  background-color: var(--color-green);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .elo-warning {
+    transition: none;
+  }
+
+  .elo-stability-fill {
     transition: none;
   }
 }

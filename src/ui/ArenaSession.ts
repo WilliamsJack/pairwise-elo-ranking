@@ -1,6 +1,7 @@
 import type { App, EventRef, WorkspaceLeaf } from 'obsidian';
 import { MarkdownView, Notice, Platform, TFile } from 'obsidian';
 
+import { expectedScore } from '../domain/elo/EloEngine';
 import { pickNextPairIndices } from '../domain/matchmaking/Matchmaker';
 import type EloPlugin from '../main';
 import type { FrontmatterPropertiesSettings } from '../settings';
@@ -59,6 +60,9 @@ export default class ArenaSession {
   private pressTimers = new WeakMap<HTMLButtonElement, number>();
 
   private scrollSyncCleanup?: () => void;
+
+  private stabilityDeltas: number[] = [];
+  private stabilityBarFillEl?: HTMLElement;
 
   constructor(app: App, plugin: EloPlugin, cohortKey: string, files: TFile[]) {
     this.app = app;
@@ -160,6 +164,7 @@ export default class ArenaSession {
     this.overlayWin = undefined;
     this.liveNotices = [];
     this.undoStack = [];
+    this.stabilityDeltas = [];
     this.lastVisibleSide = 'left';
   }
 
@@ -439,6 +444,66 @@ export default class ArenaSession {
     this.scrollSyncCleanup = undefined;
   }
 
+  // ---- Helpers - Indicate convergence on stable ratings ----
+
+  private get stabilityWindowSize(): number {
+    return Math.max(10, Math.min(50, Math.round(this.files.length * 1.5)));
+  }
+
+  // How many matches before the ramp reaches 100% — scales with unique pair count
+  private get stabilityRampTarget(): number {
+    const n = this.files.length;
+    return Math.max(15, Math.min(60, Math.round((n * (n - 1)) / 2)));
+  }
+
+  private computeStabilityPercent(): number {
+    const total = this.stabilityDeltas.length;
+    if (total === 0) return 0;
+
+    const ws = this.stabilityWindowSize;
+    const start = Math.max(0, total - ws);
+    let sumSq = 0;
+    for (let i = start; i < total; i++) {
+      sumSq += this.stabilityDeltas[i] * this.stabilityDeltas[i];
+    }
+    const rms = Math.sqrt(sumSq / (total - start));
+
+    // Ramp linearly with total match count relative to unique-pair count
+    const ramp = Math.min(1, total / this.stabilityRampTarget);
+
+    const raw = Math.pow(Math.max(0, 1 - rms), 1.8);
+    return Math.max(0, Math.min(100, ramp * raw * 100));
+  }
+
+  // Measure "surprise" - how much the outcome deviated from what we would predict
+  private trackMatchDelta(undo: UndoFrame): void {
+    const E = expectedScore(undo.a.rating, undo.b.rating);
+    const S = undo.result === 'A' ? 1 : undo.result === 'D' ? 0.5 : 0;
+
+    const observed = Math.abs(S - E);
+    const baseline = 2 * E * (1 - E);
+    const surprise = Math.max(0, observed - baseline);
+
+    this.stabilityDeltas.push(surprise);
+
+    // Cap total history to prevent unbounded growth in long sessions
+    const maxHistory = Math.max(this.stabilityRampTarget, this.stabilityWindowSize) * 2;
+    while (this.stabilityDeltas.length > maxHistory) {
+      this.stabilityDeltas.shift();
+    }
+  }
+
+  private updateStabilityBar(): void {
+    if (!this.stabilityBarFillEl) return;
+
+    const pct = this.computeStabilityPercent();
+    this.stabilityBarFillEl.setCssProps({ '--stability-width': `${pct}%` });
+
+    // Colour tiers
+    this.stabilityBarFillEl.classList.toggle('is-mid', pct >= 60 && pct < 90);
+    this.stabilityBarFillEl.classList.toggle('is-high', pct >= 90);
+  }
+
   private getCohortSyncScrollEnabled(): boolean {
     const def = this.plugin.dataStore.getCohortDef(this.cohortKey);
     return def?.syncScroll ?? true;
@@ -615,6 +680,10 @@ export default class ArenaSession {
 
     el.createDiv({ cls: 'elo-side right' });
 
+    // Stability progress bar
+    const track = el.createDiv({ cls: 'elo-stability-track' });
+    this.stabilityBarFillEl = track.createDiv({ cls: 'elo-stability-fill' });
+
     this.overlayEl = el;
     this.updateOverlay();
   }
@@ -626,6 +695,8 @@ export default class ArenaSession {
     this.switchBtn = undefined;
     this.winBtn = undefined;
     this.mobileTitleEl = undefined;
+
+    this.stabilityBarFillEl = undefined;
 
     this.leftBtn = undefined;
     this.drawBtn = undefined;
@@ -774,6 +845,9 @@ export default class ArenaSession {
     const { undo } = this.plugin.dataStore.applyMatch(this.cohortKey, aId, bId, result);
     this.undoStack.push(undo);
 
+    this.trackMatchDelta(undo);
+    this.updateStabilityBar();
+
     if (this.plugin.settings.showToasts) {
       if (result === 'A') this.showToast(`Winner: ${this.leftFile.basename}`);
       else if (result === 'B') this.showToast(`Winner: ${this.rightFile.basename}`);
@@ -827,6 +901,9 @@ export default class ArenaSession {
 
     if (this.plugin.dataStore.revert(frame)) this.showToast('Undid last match.');
     void this.plugin.dataStore.saveStore();
+
+    this.stabilityDeltas.pop();
+    this.updateStabilityBar();
 
     // Update the two notes involved in the undone match, if we can find them
     const aFile = this.findFileById(frame.a.id);
