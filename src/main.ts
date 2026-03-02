@@ -117,7 +117,6 @@ export default class EloPlugin extends Plugin {
     if (!ok) return;
 
     this.currentSession = new ArenaSession(this.app, this, def.key, files);
-    this.register(() => this.endSession({ forUnload: true }));
 
     // Await the UI start so the currently displayed notes have IDs if needed
     await this.currentSession.start();
