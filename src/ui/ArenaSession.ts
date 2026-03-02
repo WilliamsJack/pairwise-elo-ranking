@@ -599,7 +599,7 @@ export default class ArenaSession {
       this.winBtn = this.makeButton(doc, 'Win ✓', () => this.chooseCurrentWinner());
       this.switchBtn = this.makeButton(doc, '⇄ Switch', () => this.switchNote());
 
-      this.undoBtn = this.makeButton(doc, 'Undo ⌫', () => this.undo());
+      this.undoBtn = this.makeButton(doc, 'Undo ⌫', () => void this.undo());
       this.endBtn = this.makeButton(doc, 'End Esc', () => void this.plugin.endSession());
 
       controls.append(this.drawBtn, this.winBtn, this.switchBtn, this.undoBtn, this.endBtn);
@@ -607,7 +607,7 @@ export default class ArenaSession {
       this.leftBtn = this.makeButton(doc, '← Left', () => void this.choose('A'));
       this.drawBtn = this.makeButton(doc, '↑ Draw', () => void this.choose('D'));
       this.rightBtn = this.makeButton(doc, '→ Right', () => void this.choose('B'));
-      this.undoBtn = this.makeButton(doc, 'Undo ⌫', () => this.undo());
+      this.undoBtn = this.makeButton(doc, 'Undo ⌫', () => void this.undo());
       this.endBtn = this.makeButton(doc, 'End Esc', () => void this.plugin.endSession());
 
       controls.append(this.leftBtn, this.drawBtn, this.rightBtn, this.undoBtn, this.endBtn);
@@ -743,7 +743,7 @@ export default class ArenaSession {
     } else if (ev.key === 'Backspace') {
       ev.preventDefault();
       this.flashPressed(this.undoBtn);
-      this.undo();
+      void this.undo();
     } else if (ev.key === 'Escape') {
       ev.preventDefault();
       this.flashPressed(this.endBtn);
@@ -818,7 +818,7 @@ export default class ArenaSession {
     return id;
   }
 
-  private undo() {
+  private async undo() {
     const frame = this.undoStack.pop();
     if (!frame) {
       this.showToast('Nothing to undo.');
@@ -834,6 +834,15 @@ export default class ArenaSession {
     const cohort = this.plugin.dataStore.store.cohorts[frame.cohortKey];
     const fm = this.getEffectiveFrontmatter();
     void writeFrontmatterStatsForPair(this.app, fm, cohort, aFile, frame.a.id, bFile, frame.b.id);
+
+    // Restore the undone pair so the user can re-evaluate
+    if (aFile && bFile) {
+      this.leftFile = aFile;
+      this.rightFile = bFile;
+      this.lastPairSig = pairSig(aFile.path, bFile.path);
+      await this.openCurrent();
+      this.updateOverlay();
+    }
   }
 
   private findFileById(id: string): TFile | undefined {
