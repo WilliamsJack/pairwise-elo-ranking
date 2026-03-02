@@ -142,7 +142,6 @@ export default class ArenaSession {
 
     this.popoutUnloadHandler = undefined;
 
-    this.clearScrollSync();
     this.unmountOverlay();
 
     // Unpin leaves
@@ -285,11 +284,7 @@ export default class ArenaSession {
   }
 
   private findFirstContentImage(root: HTMLElement): HTMLElement | null {
-    const imgs = root.querySelectorAll('img');
-    for (const img of Array.from(imgs)) {
-      return img as HTMLElement;
-    }
-    return null;
+    return root.querySelector('img') as HTMLElement | null;
   }
 
   private async scrollToFirstImageOrFallbackToHeading(view: MarkdownView): Promise<void> {
@@ -685,7 +680,7 @@ export default class ArenaSession {
 
   private showShortcutsPausedToast(ev: KeyboardEvent): void {
     if (!this.isArenaShortcutKey(ev)) return;
-    if (this.shortcutsPausedToastShown == true) return;
+    if (this.shortcutsPausedToastShown === true) return;
 
     this.shortcutsPausedToastShown = true;
     this.showToast('Elo keyboard shortcuts are paused while editing.');
