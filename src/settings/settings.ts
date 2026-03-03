@@ -37,24 +37,6 @@ export interface EloHeuristicsSettings {
   };
 }
 
-// Matchmaking (pair selection) settings
-export interface MatchmakingSettings {
-  enabled: boolean;
-  similarRatings: {
-    enabled: boolean;
-    sampleSize: number; // Number of opponents sampled when picking by rating similarity
-  };
-  lowMatchesBias: {
-    enabled: boolean;
-    exponent: number; // Strength of bias towards fewer matches (0 = none, higher = stronger)
-  };
-  upsetProbes: {
-    enabled: boolean;
-    probability: number; // Chance to schedule a high-gap pair instead of similar ratings
-    minGap: number; // Minimum rating gap to qualify as a probe
-  };
-}
-
 export interface EloSettings {
   kFactor: number;
   showToasts: boolean;
@@ -63,7 +45,6 @@ export interface EloSettings {
   frontmatterProperties: FrontmatterPropertiesSettings;
   askForOverridesOnCohortCreation: boolean;
   heuristics: EloHeuristicsSettings;
-  matchmaking: MatchmakingSettings;
   templatesFolderPath: string;
 }
 
@@ -101,24 +82,6 @@ export const DEFAULT_SETTINGS: EloSettings = {
       enabled: true,
       threshold: 300,
       multiplier: 1.25,
-    },
-  },
-
-  // Matchmaking heuristics defaults
-  matchmaking: {
-    enabled: true,
-    similarRatings: {
-      enabled: true,
-      sampleSize: 12,
-    },
-    lowMatchesBias: {
-      enabled: true,
-      exponent: 1.0,
-    },
-    upsetProbes: {
-      enabled: true,
-      probability: 0.1,
-      minGap: 300,
     },
   },
 

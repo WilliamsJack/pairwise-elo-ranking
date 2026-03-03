@@ -6,6 +6,7 @@ export interface EloPlayer {
   rating: number;
   matches: number;
   wins: number;
+  sigma?: number;
 }
 
 export interface CohortData {
@@ -68,6 +69,7 @@ export interface PlayerSnapshot {
   rating: number;
   matches: number;
   wins: number;
+  sigma?: number;
 }
 
 export interface UndoFrame {

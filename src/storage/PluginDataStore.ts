@@ -1,6 +1,7 @@
 import type { Plugin } from 'obsidian';
 
 import { updateElo } from '../domain/elo/EloEngine';
+import { DEFAULT_SIGMA, updateSigma } from '../domain/matchmaking/InfoGain';
 import type { EloSettings, SessionLayoutMode } from '../settings';
 import { DEFAULT_SETTINGS } from '../settings';
 import type {
@@ -69,16 +70,6 @@ function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
       decay: { ...base.heuristics.decay, ...raw.heuristics.decay },
       upsetBoost: { ...base.heuristics.upsetBoost, ...raw.heuristics.upsetBoost },
       drawGapBoost: { ...base.heuristics.drawGapBoost, ...raw.heuristics.drawGapBoost },
-    };
-  }
-
-  if (raw.matchmaking) {
-    out.matchmaking = {
-      ...base.matchmaking,
-      ...raw.matchmaking,
-      similarRatings: { ...base.matchmaking.similarRatings, ...raw.matchmaking.similarRatings },
-      lowMatchesBias: { ...base.matchmaking.lowMatchesBias, ...raw.matchmaking.lowMatchesBias },
-      upsetProbes: { ...base.matchmaking.upsetProbes, ...raw.matchmaking.upsetProbes },
     };
   }
 
@@ -203,11 +194,16 @@ export class PluginDataStore {
 
     const undo: UndoFrame = {
       cohortKey,
-      a: snapshot(aId, a.rating, a.matches, a.wins),
-      b: snapshot(bId, b.rating, b.matches, b.wins),
+      a: snapshot(aId, a.rating, a.matches, a.wins, a.sigma),
+      b: snapshot(bId, b.rating, b.matches, b.wins, b.sigma),
       result,
       ts: Date.now(),
     };
+
+    const preRatingA = a.rating;
+    const preRatingB = b.rating;
+    const preSigmaA = a.sigma ?? DEFAULT_SIGMA;
+    const preSigmaB = b.sigma ?? DEFAULT_SIGMA;
 
     const hs = this.settings.heuristics;
 
@@ -228,6 +224,9 @@ export class PluginDataStore {
     if (result === 'A') a.wins += 1;
     if (result === 'B') b.wins += 1;
 
+    a.sigma = updateSigma(preRatingA, preRatingB, preSigmaA, preSigmaB);
+    b.sigma = updateSigma(preRatingB, preRatingA, preSigmaB, preSigmaA);
+
     const winnerId = result === 'A' ? aId : result === 'B' ? bId : undefined;
     return { winnerId, undo };
   }
@@ -243,10 +242,12 @@ export class PluginDataStore {
     a.rating = frame.a.rating;
     a.matches = frame.a.matches;
     a.wins = frame.a.wins;
+    a.sigma = frame.a.sigma;
 
     b.rating = frame.b.rating;
     b.matches = frame.b.matches;
     b.wins = frame.b.wins;
+    b.sigma = frame.b.sigma;
 
     return true;
   }
@@ -306,6 +307,12 @@ export class PluginDataStore {
   }
 }
 
-function snapshot(id: string, rating: number, matches: number, wins: number): PlayerSnapshot {
-  return { id, rating, matches, wins };
+function snapshot(
+  id: string,
+  rating: number,
+  matches: number,
+  wins: number,
+  sigma?: number,
+): PlayerSnapshot {
+  return { id, rating, matches, wins, sigma };
 }

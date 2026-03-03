@@ -934,17 +934,16 @@ export default class ArenaSession {
 
   // ---- Matchmaking helpers ----
 
-  private getStatsForFile(file: TFile): { rating: number; matches: number } {
+  private getStatsForFile(file: TFile): { rating: number; sigma?: number } {
     const id = this.idByPath.get(file.path);
     const cohort = this.plugin.dataStore.store.cohorts[this.cohortKey];
 
     if (id && cohort) {
       const p = cohort.players[id];
-      if (p) return { rating: p.rating, matches: p.matches };
+      if (p) return { rating: p.rating, sigma: p.sigma };
     }
 
-    // Unknown notes are treated as fresh
-    return { rating: 1500, matches: 0 };
+    return { rating: 1500 };
   }
 
   private pickNextPair() {
@@ -957,12 +956,7 @@ export default class ArenaSession {
       leftIndex,
       rightIndex,
       pairSig: sig,
-    } = pickNextPairIndices(
-      this.files,
-      (f) => this.getStatsForFile(f),
-      this.plugin.settings.matchmaking,
-      this.lastPairSig,
-    );
+    } = pickNextPairIndices(this.files, (f) => this.getStatsForFile(f), this.lastPairSig);
 
     if (leftIndex < 0 || rightIndex < 0) {
       this.leftFile = this.rightFile = undefined;
