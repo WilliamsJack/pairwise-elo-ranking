@@ -451,11 +451,6 @@ export default class ArenaSession {
 
   // ---- Helpers - Indicate convergence on stable ratings ----
 
-  // Sigma at which rankings are practically stable (well above the
-  // theoretical minimum (MIN_SIGMA = 30) but low enough that further
-  // matches produce negligible rating changes)
-  private static readonly STABLE_SIGMA = 150;
-
   private computeStabilityPercent(): number {
     const n = this.files.length;
     if (n < 2) return 0;
@@ -472,7 +467,8 @@ export default class ArenaSession {
     const unmatched = Math.max(0, n - players.length);
     const avgSigma = (playedSum + unmatched * DEFAULT_SIGMA) / n;
 
-    const range = DEFAULT_SIGMA - ArenaSession.STABLE_SIGMA;
+    const stableSigma = this.plugin.settings.stabilityThreshold ?? 150;
+    const range = DEFAULT_SIGMA - stableSigma;
     return Math.max(0, Math.min(100, ((DEFAULT_SIGMA - avgSigma) / range) * 100));
   }
 
@@ -506,36 +502,46 @@ export default class ArenaSession {
       this.stabilityJitterTimer = undefined;
     }
 
+    const jitterEnabled = this.plugin.settings.surpriseJitter ?? true;
     const prefersReduced = win.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
 
     // Jitter: slide back, overshoot forward, then settle at the true value.
     // Amplitude scales with surprise (0–1) so mild upsets barely wobble.
     const SURPRISE_THRESHOLD = 0.15;
-    if (surprise > SURPRISE_THRESHOLD && !prefersReduced) {
-      const amp = Math.min(8, surprise * 16);
-      const back1 = Math.max(0, pct - amp);
-      const fwd1 = Math.min(100, pct + amp * 0.6);
-      const back2 = Math.max(0, pct - amp * 0.5);
-      const fwd2 = Math.min(100, pct + amp * 0.3);
-      const step = 150;
-
-      const setWidth = (v: number) =>
-        this.stabilityBarFillEl?.setCssProps({ '--stability-width': `${v}%` });
-
-      setWidth(back1);
-      this.stabilityJitterTimer = win.setTimeout(() => {
-        setWidth(fwd1);
+    if (jitterEnabled && surprise > SURPRISE_THRESHOLD) {
+      if (prefersReduced) {
+        this.stabilityBarFillEl.setCssProps({ '--stability-width': `${pct}%` });
+        this.stabilityBarFillEl.classList.add('is-surprise');
         this.stabilityJitterTimer = win.setTimeout(() => {
-          setWidth(back2);
+          this.stabilityBarFillEl?.classList.remove('is-surprise');
+          this.stabilityJitterTimer = undefined;
+        }, 600);
+      } else {
+        const amp = Math.min(8, surprise * 16);
+        const back1 = Math.max(0, pct - amp);
+        const fwd1 = Math.min(100, pct + amp * 0.6);
+        const back2 = Math.max(0, pct - amp * 0.5);
+        const fwd2 = Math.min(100, pct + amp * 0.3);
+        const step = 150;
+
+        const setWidth = (v: number) =>
+          this.stabilityBarFillEl?.setCssProps({ '--stability-width': `${v}%` });
+
+        setWidth(back1);
+        this.stabilityJitterTimer = win.setTimeout(() => {
+          setWidth(fwd1);
           this.stabilityJitterTimer = win.setTimeout(() => {
-            setWidth(fwd2);
+            setWidth(back2);
             this.stabilityJitterTimer = win.setTimeout(() => {
-              setWidth(pct);
-              this.stabilityJitterTimer = undefined;
+              setWidth(fwd2);
+              this.stabilityJitterTimer = win.setTimeout(() => {
+                setWidth(pct);
+                this.stabilityJitterTimer = undefined;
+              }, step);
             }, step);
           }, step);
         }, step);
-      }, step);
+      }
     } else {
       this.stabilityBarFillEl.setCssProps({ '--stability-width': `${pct}%` });
     }

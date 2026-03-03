@@ -602,6 +602,43 @@ export default class EloSettingsTab extends PluginSettingTab {
           })
           .setDisabled(!hs.drawGapBoost.enabled);
       });
+
+    // Stability progress bar accordion
+    const stabAcc = containerEl.createEl('details', { cls: 'elo-settings-accordion' });
+    stabAcc.open = false;
+    stabAcc.createEl('summary', { text: 'Progress bar' });
+    const stabBody = stabAcc.createEl('div', { cls: 'elo-settings-body' });
+
+    new Setting(stabBody)
+      .setName('Highlight surprising results')
+      .setDesc(
+        `Wobble the progress bar when a match result is unexpected, alterting you that your choice was unexpected. Default: ${DEFAULT_SETTINGS.surpriseJitter ? 'On' : 'Off'}.`,
+      )
+      .addToggle((t) =>
+        t
+          .setValue(this.plugin.settings.surpriseJitter ?? DEFAULT_SETTINGS.surpriseJitter)
+          .onChange(async (v) => {
+            this.plugin.settings.surpriseJitter = v;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(stabBody)
+      .setName('Stability threshold')
+      .setDesc(
+        `Sigma value at which the progress bar reaches 100%. Lower values require more matches. Default: ${DEFAULT_SETTINGS.stabilityThreshold}.`,
+      )
+      .addSlider((sl) => {
+        const current =
+          this.plugin.settings.stabilityThreshold ?? DEFAULT_SETTINGS.stabilityThreshold;
+        sl.setLimits(80, 250, 10)
+          .setValue(Math.max(80, Math.min(250, current)))
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.stabilityThreshold = Math.round(value);
+            await this.plugin.saveSettings();
+          });
+      });
   }
 
   private async deleteCohortWithConfirm(cohortKey: string): Promise<void> {

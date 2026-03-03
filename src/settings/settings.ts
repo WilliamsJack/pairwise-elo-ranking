@@ -45,6 +45,8 @@ export interface EloSettings {
   frontmatterProperties: FrontmatterPropertiesSettings;
   askForOverridesOnCohortCreation: boolean;
   heuristics: EloHeuristicsSettings;
+  stabilityThreshold: number;
+  surpriseJitter: boolean;
   templatesFolderPath: string;
 }
 
@@ -84,6 +86,9 @@ export const DEFAULT_SETTINGS: EloSettings = {
       multiplier: 1.25,
     },
   },
+
+  stabilityThreshold: 150,
+  surpriseJitter: true,
 
   templatesFolderPath: '',
 };

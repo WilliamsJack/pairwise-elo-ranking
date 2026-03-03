@@ -169,6 +169,10 @@
   background-color: var(--color-green);
 }
 
+.elo-stability-fill.is-surprise {
+  background-color: var(--color-red);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .elo-warning {
     transition: none;
