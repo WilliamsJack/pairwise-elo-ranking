@@ -38,7 +38,9 @@ _Other comparison arena UI options are available in Settings - shown here is **r
 - Define the cohort of notes to rank - works especially well with **Obsidian Bases**: pick a **Base** and a **view** to define your cohort dynamically
 - Efficiently review and pick a winner with keyboard shortcuts and an unobtrusive on-screen bar
 - Per-cohort stats and rankings can be written to frontmatter
-- Advanced convergence and matchmaking heuristics you can tune
+- Information-gain matchmaking that automatically picks the most useful pairs to compare
+- A stability progress bar that shows how close your rankings are to converging
+- Advanced convergence heuristics you can tune
 - Robust to renames and moves via stable per-note Elo IDs
 - Cohorts are saved so you can resume ranking sessions, picking up where you left off
 
@@ -165,7 +167,7 @@ Stats are written to just the two notes involved after each match. Rank across t
 - K-factor and winner toasts
 - Where to store Elo IDs: frontmatter (default) or end-of-note comment
 - Advanced Elo heuristics (provisional boost, decay, upset boost, draw boost)
-- Matchmaking heuristics (similar ratings, low-matches bias, upset probes)
+- Progress bar settings (stability threshold, surprise highlight)
 - Default frontmatter properties (names and which to write)
 - Ask for per-cohort overrides when creating a cohort (on by default)
 - Cohorts section: rename a cohort and change its frontmatter overrides. The plugin can preview and perform bulk updates (write, rename, remove) across the cohort.
