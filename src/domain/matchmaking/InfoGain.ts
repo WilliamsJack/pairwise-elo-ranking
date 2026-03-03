@@ -1,14 +1,7 @@
-/**
- * Information-gain matchmaker
- *
- * Tracks per-player uncertainty (sigma) and picks the pair whose comparison
- * would most reduce overall ranking uncertainty.
- */
+// Information-gain matchmaker
+// Picks the pair whose comparison would most reduce overall ranking uncertainty.
 
-import { expectedScore } from '../elo/EloEngine';
-
-export const DEFAULT_SIGMA = 350;
-export const MIN_SIGMA = 30;
+import { expectedScore } from '../rating/GlickoEngine';
 
 export interface ScoredPlayer {
   index: number;
@@ -17,24 +10,6 @@ export interface ScoredPlayer {
 }
 
 type Rng = () => number;
-
-// ---- Glicko helpers ----
-
-const Q = Math.log(10) / 400;
-
-// Glicko g-function: dampens the influence of an opponent's uncertainty.
-export function gSigma(sigma: number): number {
-  return 1 / Math.sqrt(1 + (3 * Q * Q * sigma * sigma) / (Math.PI * Math.PI));
-}
-
-// Outcome-independent uncertainty (sigma) update for one player after a single comparison.
-export function updateSigma(rI: number, rJ: number, sigmaI: number, sigmaJ: number): number {
-  const g = gSigma(sigmaJ);
-  const E = 1 / (1 + Math.pow(10, (-g * (rI - rJ)) / 400));
-  const dSq = 1 / (Q * Q * g * g * E * (1 - E));
-  const newSigma = 1 / Math.sqrt(1 / (sigmaI * sigmaI) + 1 / dSq);
-  return Math.max(MIN_SIGMA, Math.min(DEFAULT_SIGMA, newSigma));
-}
 
 // ---- Information gain ----
 

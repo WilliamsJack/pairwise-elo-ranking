@@ -1,8 +1,9 @@
 import type { TFile } from 'obsidian';
 
 import { pairSig as mkPairSig } from '../../utils/pair';
+import { DEFAULT_SIGMA } from '../rating/GlickoEngine';
 import type { ScoredPlayer } from './InfoGain';
-import { DEFAULT_SIGMA, pickMaxInfoGainPair } from './InfoGain';
+import { pickMaxInfoGainPair } from './InfoGain';
 
 export type RatingStats = { rating: number; sigma?: number };
 

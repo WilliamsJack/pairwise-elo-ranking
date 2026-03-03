@@ -1,9 +1,8 @@
 import type { App, EventRef, WorkspaceLeaf } from 'obsidian';
 import { MarkdownView, Notice, Platform, TFile } from 'obsidian';
 
-import { expectedScore } from '../domain/elo/EloEngine';
-import { DEFAULT_SIGMA } from '../domain/matchmaking/InfoGain';
 import { pickNextPairIndices } from '../domain/matchmaking/Matchmaker';
+import { DEFAULT_SIGMA, expectedScore } from '../domain/rating/GlickoEngine';
 import type EloPlugin from '../main';
 import type { FrontmatterPropertiesSettings } from '../settings';
 import { effectiveFrontmatterProperties } from '../settings';

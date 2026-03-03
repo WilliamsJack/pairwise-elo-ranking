@@ -1,7 +1,6 @@
 import type { Plugin } from 'obsidian';
 
-import { updateElo } from '../domain/elo/EloEngine';
-import { DEFAULT_SIGMA, updateSigma } from '../domain/matchmaking/InfoGain';
+import { DEFAULT_SIGMA, glickoUpdate } from '../domain/rating/GlickoEngine';
 import type { EloSettings, SessionLayoutMode } from '../settings';
 import { DEFAULT_SETTINGS } from '../settings';
 import type {
@@ -61,17 +60,6 @@ function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
   out.sessionLayout = normaliseSessionLayout(raw.sessionLayout, base.sessionLayout);
 
   out.templatesFolderPath = normaliseTemplatesFolderPath(raw.templatesFolderPath);
-
-  if (raw.heuristics) {
-    out.heuristics = {
-      ...base.heuristics,
-      ...raw.heuristics,
-      provisional: { ...base.heuristics.provisional, ...raw.heuristics.provisional },
-      decay: { ...base.heuristics.decay, ...raw.heuristics.decay },
-      upsetBoost: { ...base.heuristics.upsetBoost, ...raw.heuristics.upsetBoost },
-      drawGapBoost: { ...base.heuristics.drawGapBoost, ...raw.heuristics.drawGapBoost },
-    };
-  }
 
   return out;
 }
@@ -200,32 +188,23 @@ export class PluginDataStore {
       ts: Date.now(),
     };
 
-    const preRatingA = a.rating;
-    const preRatingB = b.rating;
     const preSigmaA = a.sigma ?? DEFAULT_SIGMA;
     const preSigmaB = b.sigma ?? DEFAULT_SIGMA;
 
-    const hs = this.settings.heuristics;
+    const sA = result === 'A' ? 1 : result === 'D' ? 0.5 : 0;
+    const resA = glickoUpdate(a.rating, b.rating, preSigmaA, preSigmaB, sA);
+    const resB = glickoUpdate(b.rating, a.rating, preSigmaB, preSigmaA, 1 - sA);
 
-    const { newA, newB } = updateElo(
-      a.rating,
-      b.rating,
-      result,
-      this.settings.kFactor,
-      a.matches,
-      b.matches,
-      hs,
-    );
-    a.rating = newA;
-    b.rating = newB;
+    a.rating = resA.newRating;
+    b.rating = resB.newRating;
 
     a.matches += 1;
     b.matches += 1;
     if (result === 'A') a.wins += 1;
     if (result === 'B') b.wins += 1;
 
-    a.sigma = updateSigma(preRatingA, preRatingB, preSigmaA, preSigmaB);
-    b.sigma = updateSigma(preRatingB, preRatingA, preSigmaB, preSigmaA);
+    a.sigma = resA.newSigma;
+    b.sigma = resB.newSigma;
 
     const winnerId = result === 'A' ? aId : result === 'B' ? bId : undefined;
     return { winnerId, undo };

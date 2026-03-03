@@ -40,7 +40,7 @@ _Other comparison arena UI options are available in Settings - shown here is **r
 - Per-cohort stats and rankings can be written to frontmatter
 - Information-gain matchmaking that automatically picks the most useful pairs to compare
 - A stability progress bar that shows how close your rankings are to converging
-- Advanced convergence heuristics you can tune
+- Glicko-1 rating updates - uncertainty (sigma) governs step sizes automatically, so new notes converge fast and experienced notes stay stable
 - Robust to renames and moves via stable per-note Elo IDs
 - Cohorts are saved so you can resume ranking sessions, picking up where you left off
 
@@ -164,9 +164,8 @@ Stats are written to just the two notes involved after each match. Rank across t
 
 ## Settings overview
 
-- K-factor and winner toasts
+- Winner toasts
 - Where to store Elo IDs: frontmatter (default) or end-of-note comment
-- Advanced Elo heuristics (provisional boost, decay, upset boost, draw boost)
 - Progress bar settings (stability threshold, surprise highlight)
 - Default frontmatter properties (names and which to write)
 - Ask for per-cohort overrides when creating a cohort (on by default)
