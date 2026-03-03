@@ -2,6 +2,7 @@ import type { App, EventRef, WorkspaceLeaf } from 'obsidian';
 import { MarkdownView, Notice, Platform, TFile } from 'obsidian';
 
 import { expectedScore } from '../domain/elo/EloEngine';
+import { DEFAULT_SIGMA } from '../domain/matchmaking/InfoGain';
 import { pickNextPairIndices } from '../domain/matchmaking/Matchmaker';
 import type EloPlugin from '../main';
 import type { FrontmatterPropertiesSettings } from '../settings';
@@ -117,6 +118,7 @@ export default class ArenaSession {
     this.pickNextPair();
     await this.openCurrent();
     this.updateOverlay();
+    this.updateStabilityBar();
   }
 
   async end(opts?: { forUnload?: boolean }) {
@@ -446,36 +448,33 @@ export default class ArenaSession {
 
   // ---- Helpers - Indicate convergence on stable ratings ----
 
-  private get stabilityWindowSize(): number {
-    return Math.max(10, Math.min(50, Math.round(this.files.length * 1.5)));
-  }
-
-  // How many matches before the ramp reaches 100% — scales with unique pair count
-  private get stabilityRampTarget(): number {
-    const n = this.files.length;
-    return Math.max(15, Math.min(60, Math.round((n * (n - 1)) / 2)));
-  }
+  // Sigma at which rankings are practically stable — well above the
+  // theoretical minimum (MIN_SIGMA = 30) but low enough that further
+  // matches produce negligible rating changes.
+  private static readonly STABLE_SIGMA = 150;
 
   private computeStabilityPercent(): number {
-    const total = this.stabilityDeltas.length;
-    if (total === 0) return 0;
+    const n = this.files.length;
+    if (n < 2) return 0;
 
-    const ws = this.stabilityWindowSize;
-    const start = Math.max(0, total - ws);
-    let sumSq = 0;
-    for (let i = start; i < total; i++) {
-      sumSq += this.stabilityDeltas[i] * this.stabilityDeltas[i];
+    const cohort = this.plugin.dataStore.store.cohorts[this.cohortKey];
+    const players = cohort ? Object.values(cohort.players) : [];
+
+    let playedSum = 0;
+    for (const p of players) {
+      playedSum += p.sigma ?? DEFAULT_SIGMA;
     }
-    const rms = Math.sqrt(sumSq / (total - start));
 
-    // Ramp linearly with total match count relative to unique-pair count
-    const ramp = Math.min(1, total / this.stabilityRampTarget);
+    // Files not yet in the player table carry full uncertainty
+    const unmatched = Math.max(0, n - players.length);
+    const avgSigma = (playedSum + unmatched * DEFAULT_SIGMA) / n;
 
-    const raw = Math.pow(Math.max(0, 1 - rms), 1.8);
-    return Math.max(0, Math.min(100, ramp * raw * 100));
+    const range = DEFAULT_SIGMA - ArenaSession.STABLE_SIGMA;
+    return Math.max(0, Math.min(100, ((DEFAULT_SIGMA - avgSigma) / range) * 100));
   }
 
-  // Measure "surprise" - how much the outcome deviated from what we would predict
+  // Measure "surprise" - how much the outcome deviated from what we would predict.
+  // Not used for the progress bar, but retained for future configurable alerts.
   private trackMatchDelta(undo: UndoFrame): void {
     const E = expectedScore(undo.a.rating, undo.b.rating);
     const S = undo.result === 'A' ? 1 : undo.result === 'D' ? 0.5 : 0;
@@ -487,7 +486,7 @@ export default class ArenaSession {
     this.stabilityDeltas.push(surprise);
 
     // Cap total history to prevent unbounded growth in long sessions
-    const maxHistory = Math.max(this.stabilityRampTarget, this.stabilityWindowSize) * 2;
+    const maxHistory = 200;
     while (this.stabilityDeltas.length > maxHistory) {
       this.stabilityDeltas.shift();
     }
