@@ -157,7 +157,7 @@
   background-color: var(--text-accent);
   border-radius: 0 0 var(--radius-m) var(--radius-m);
   transition:
-    width 300ms ease,
+    width 150ms ease,
     background-color 300ms ease;
 }
 

@@ -62,7 +62,6 @@ export default class ArenaSession {
 
   private scrollSyncCleanup?: () => void;
 
-  private stabilityDeltas: number[] = [];
   private stabilityBarFillEl?: HTMLElement;
 
   constructor(app: App, plugin: EloPlugin, cohortKey: string, files: TFile[]) {
@@ -163,10 +162,14 @@ export default class ArenaSession {
       }
     }
 
+    if (this.stabilityJitterTimer != null) {
+      (this.overlayWin ?? window).clearTimeout(this.stabilityJitterTimer);
+      this.stabilityJitterTimer = undefined;
+    }
+
     this.overlayWin = undefined;
     this.liveNotices = [];
     this.undoStack = [];
-    this.stabilityDeltas = [];
     this.lastVisibleSide = 'left';
   }
 
@@ -448,9 +451,9 @@ export default class ArenaSession {
 
   // ---- Helpers - Indicate convergence on stable ratings ----
 
-  // Sigma at which rankings are practically stable — well above the
+  // Sigma at which rankings are practically stable (well above the
   // theoretical minimum (MIN_SIGMA = 30) but low enough that further
-  // matches produce negligible rating changes.
+  // matches produce negligible rating changes)
   private static readonly STABLE_SIGMA = 150;
 
   private computeStabilityPercent(): number {
@@ -474,33 +477,68 @@ export default class ArenaSession {
   }
 
   // Measure "surprise" - how much the outcome deviated from what we would predict.
-  // Not used for the progress bar, but retained for future configurable alerts.
-  private trackMatchDelta(undo: UndoFrame): void {
+  // Used to trigger a visual jitter on the stability bar.
+  private computeSurprise(undo: UndoFrame): number {
     const E = expectedScore(undo.a.rating, undo.b.rating);
     const S = undo.result === 'A' ? 1 : undo.result === 'D' ? 0.5 : 0;
 
     const observed = Math.abs(S - E);
     const baseline = 2 * E * (1 - E);
-    const surprise = Math.max(0, observed - baseline);
-
-    this.stabilityDeltas.push(surprise);
-
-    // Cap total history to prevent unbounded growth in long sessions
-    const maxHistory = 200;
-    while (this.stabilityDeltas.length > maxHistory) {
-      this.stabilityDeltas.shift();
-    }
+    return Math.max(0, observed - baseline);
   }
 
-  private updateStabilityBar(): void {
+  private stabilityJitterTimer?: number;
+
+  private updateStabilityBar(surprise = 0): void {
     if (!this.stabilityBarFillEl) return;
 
     const pct = this.computeStabilityPercent();
-    this.stabilityBarFillEl.setCssProps({ '--stability-width': `${pct}%` });
 
     // Colour tiers
     this.stabilityBarFillEl.classList.toggle('is-mid', pct >= 60 && pct < 90);
     this.stabilityBarFillEl.classList.toggle('is-high', pct >= 90);
+
+    const win = this.overlayWin ?? window;
+
+    // Cancel any in-flight jitter so we don't fight with a new update
+    if (this.stabilityJitterTimer != null) {
+      win.clearTimeout(this.stabilityJitterTimer);
+      this.stabilityJitterTimer = undefined;
+    }
+
+    const prefersReduced = win.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+
+    // Jitter: slide back, overshoot forward, then settle at the true value.
+    // Amplitude scales with surprise (0–1) so mild upsets barely wobble.
+    const SURPRISE_THRESHOLD = 0.15;
+    if (surprise > SURPRISE_THRESHOLD && !prefersReduced) {
+      const amp = Math.min(8, surprise * 16);
+      const back1 = Math.max(0, pct - amp);
+      const fwd1 = Math.min(100, pct + amp * 0.6);
+      const back2 = Math.max(0, pct - amp * 0.5);
+      const fwd2 = Math.min(100, pct + amp * 0.3);
+      const step = 150;
+
+      const setWidth = (v: number) =>
+        this.stabilityBarFillEl?.setCssProps({ '--stability-width': `${v}%` });
+
+      setWidth(back1);
+      this.stabilityJitterTimer = win.setTimeout(() => {
+        setWidth(fwd1);
+        this.stabilityJitterTimer = win.setTimeout(() => {
+          setWidth(back2);
+          this.stabilityJitterTimer = win.setTimeout(() => {
+            setWidth(fwd2);
+            this.stabilityJitterTimer = win.setTimeout(() => {
+              setWidth(pct);
+              this.stabilityJitterTimer = undefined;
+            }, step);
+          }, step);
+        }, step);
+      }, step);
+    } else {
+      this.stabilityBarFillEl.setCssProps({ '--stability-width': `${pct}%` });
+    }
   }
 
   private getCohortSyncScrollEnabled(): boolean {
@@ -844,8 +882,8 @@ export default class ArenaSession {
     const { undo } = this.plugin.dataStore.applyMatch(this.cohortKey, aId, bId, result);
     this.undoStack.push(undo);
 
-    this.trackMatchDelta(undo);
-    this.updateStabilityBar();
+    const surprise = this.computeSurprise(undo);
+    this.updateStabilityBar(surprise);
 
     if (this.plugin.settings.showToasts) {
       if (result === 'A') this.showToast(`Winner: ${this.leftFile.basename}`);
@@ -901,7 +939,6 @@ export default class ArenaSession {
     if (this.plugin.dataStore.revert(frame)) this.showToast('Undid last match.');
     void this.plugin.dataStore.saveStore();
 
-    this.stabilityDeltas.pop();
     this.updateStabilityBar();
 
     // Update the two notes involved in the undone match, if we can find them
