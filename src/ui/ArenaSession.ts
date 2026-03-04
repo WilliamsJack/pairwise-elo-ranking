@@ -9,7 +9,6 @@ import { effectiveFrontmatterProperties } from '../settings';
 import type { MatchResult, ScrollStartMode, UndoFrame } from '../types';
 import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
 import { ensureEloId, getEloId } from '../utils/NoteIds';
-import { pairSig } from '../utils/pair';
 import { attempt, attemptAsync } from '../utils/safe';
 import type { ArenaLayoutHandle } from './LayoutManager';
 import { ArenaLayoutManager } from './LayoutManager';
@@ -22,7 +21,7 @@ export default class ArenaSession {
 
   private leftFile?: TFile;
   private rightFile?: TFile;
-  private lastPairSig?: string;
+  private lastPair?: [string, string];
 
   private leftLeaf!: WorkspaceLeaf;
   private rightLeaf!: WorkspaceLeaf;
@@ -186,9 +185,9 @@ export default class ArenaSession {
     // Update labels if visible
     if (this.leftFile?.path === oldPath) this.leftFile = newFile;
     if (this.rightFile?.path === oldPath) this.rightFile = newFile;
-    this.lastPairSig =
+    this.lastPair =
       this.leftFile && this.rightFile
-        ? pairSig(this.leftFile.path, this.rightFile.path)
+        ? ([this.leftFile.path, this.rightFile.path].sort() as [string, string])
         : undefined;
     this.updateOverlay();
   }
@@ -216,7 +215,7 @@ export default class ArenaSession {
 
     // If the deleted note was one of the current pair, pick a new pair immediately
     if (deletedWasVisible) {
-      this.lastPairSig = undefined;
+      this.lastPair = undefined;
 
       // Wait to ensure deleted file is cleaned up before reusing leaf
       await this.sleep(0);
@@ -968,7 +967,7 @@ export default class ArenaSession {
     if (aFile && bFile) {
       this.leftFile = aFile;
       this.rightFile = bFile;
-      this.lastPairSig = pairSig(aFile.path, bFile.path);
+      this.lastPair = [aFile.path, bFile.path].sort() as [string, string];
       await this.openCurrent();
       this.updateOverlay();
     }
@@ -1004,11 +1003,11 @@ export default class ArenaSession {
       return;
     }
 
-    const {
-      leftIndex,
-      rightIndex,
-      pairSig: sig,
-    } = pickNextPairIndices(this.files, (f) => this.getStatsForFile(f), this.lastPairSig);
+    const { leftIndex, rightIndex } = pickNextPairIndices(
+      this.files,
+      (f) => this.getStatsForFile(f),
+      this.lastPair,
+    );
 
     if (leftIndex < 0 || rightIndex < 0) {
       this.leftFile = this.rightFile = undefined;
@@ -1017,6 +1016,6 @@ export default class ArenaSession {
 
     this.leftFile = this.files[leftIndex];
     this.rightFile = this.files[rightIndex];
-    this.lastPairSig = sig;
+    this.lastPair = [this.leftFile.path, this.rightFile.path].sort() as [string, string];
   }
 }
