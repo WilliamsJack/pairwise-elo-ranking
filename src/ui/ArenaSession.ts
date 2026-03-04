@@ -278,17 +278,16 @@ export default class ArenaSession {
     const v = leaf.view;
     if (!(v instanceof MarkdownView)) return;
 
-    if (mode === 'first-image') {
-      await this.scrollToFirstImageOrFallbackToHeading(v);
-      return;
-    }
-
-    // Retry briefly while content renders
-    const maxTries = 30;
-    const stepMs = 100;
-    for (let i = 0; i < maxTries; i++) {
-      if (this.tryScrollView(v, mode)) return;
-      await this.sleep(stepMs);
+    switch (mode) {
+      case 'first-image':
+        await this.scrollToFirstImage(v);
+        break;
+      case 'first-heading':
+        await this.scrollToFirstHeading(v);
+        break;
+      case 'after-frontmatter':
+        await this.scrollAfterFrontmatter(v);
+        break;
     }
   }
 
@@ -296,7 +295,7 @@ export default class ArenaSession {
     return root.querySelector('img') as HTMLElement | null;
   }
 
-  private async scrollToFirstImageOrFallbackToHeading(view: MarkdownView): Promise<void> {
+  private async scrollToFirstImage(view: MarkdownView): Promise<void> {
     const preview = this.getPreviewEl(view);
     if (!preview) return;
 
@@ -373,31 +372,51 @@ export default class ArenaSession {
     }
   }
 
-  private tryScrollView(view: MarkdownView, mode: ScrollStartMode): boolean {
+  private async scrollToFirstHeading(view: MarkdownView): Promise<void> {
     const preview = this.getPreviewEl(view);
-    if (!preview) return false;
+    if (!preview) return;
 
-    const root = this.getRenderedRoot(preview);
+    await this.retryUntil(
+      () => {
+        const root = this.getRenderedRoot(preview);
+        const heading = root.querySelector('h1, h2, h3, h4, h5, h6');
+        if (heading) {
+          heading.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+          return true;
+        }
+        return false;
+      },
+      30,
+      100,
+    );
+  }
 
-    const findHeading = (): HTMLElement | null => root.querySelector('h1, h2, h3, h4, h5, h6');
-    const findImage = (): HTMLElement | null => root.querySelector('img') as HTMLElement | null;
+  private async scrollAfterFrontmatter(view: MarkdownView): Promise<void> {
+    const preview = this.getPreviewEl(view);
+    if (!preview) return;
 
-    if (mode === 'after-frontmatter') {
-      return this.scrollPastFrontmatter(preview);
-    }
+    await this.retryUntil(
+      () => {
+        const root = this.getRenderedRoot(preview);
 
-    let target: HTMLElement | null = null;
-    if (mode === 'first-image') {
-      target = findImage() || findHeading();
-    } else if (mode === 'first-heading') {
-      target = findHeading();
-    }
+        // Scroll to the first real content element after the properties/frontmatter block
+        let next = root.querySelector(
+          ':scope > :has(.metadata-container, .frontmatter-container, .frontmatter, pre.frontmatter) ~ *',
+        );
 
-    if (target) {
-      target.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-      return true;
-    }
-    return false;
+        while (next && next.scrollHeight <= 0) {
+          next = next.nextElementSibling as HTMLElement | null;
+        }
+
+        if (next) {
+          next.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+          return true;
+        }
+        return false;
+      },
+      30,
+      100,
+    );
   }
 
   private getPreviewEl(view: MarkdownView): HTMLElement | null {
@@ -416,27 +435,19 @@ export default class ArenaSession {
     );
   }
 
-  private scrollPastFrontmatter(preview: HTMLElement): boolean {
-    const root = this.getRenderedRoot(preview);
-
-    // Scroll to the first real content element after the properties/frontmatter block
-    let next = root.querySelector(
-      ':scope > :has(.metadata-container, .frontmatter-container, .frontmatter, pre.frontmatter) ~ *',
-    );
-
-    while (next && next.scrollHeight <= 0) {
-      next = next.nextElementSibling as HTMLElement | null;
-    }
-
-    if (next) {
-      next.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-      return true;
-    }
-    return false;
-  }
-
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  private async retryUntil(
+    predicate: () => boolean,
+    maxTries: number,
+    stepMs: number,
+  ): Promise<void> {
+    for (let i = 0; i < maxTries; i++) {
+      if (predicate()) return;
+      await this.sleep(stepMs);
+    }
   }
 
   private clearScrollSync(): void {
