@@ -1,6 +1,6 @@
 import type { Plugin } from 'obsidian';
 
-import { DEFAULT_SIGMA, glickoUpdate } from '../domain/rating/GlickoEngine';
+import { DEFAULT_SIGMA, glickoUpdate, inflateSigma } from '../domain/rating/GlickoEngine';
 import type { EloSettings, SessionLayoutMode } from '../settings';
 import { DEFAULT_SETTINGS } from '../settings';
 import type {
@@ -180,16 +180,20 @@ export class PluginDataStore {
     const a = (cohort.players[aId] ??= { rating: 1500, matches: 0, wins: 0 });
     const b = (cohort.players[bId] ??= { rating: 1500, matches: 0, wins: 0 });
 
+    const now = Date.now();
+
     const undo: UndoFrame = {
       cohortKey,
-      a: snapshot(aId, a.rating, a.matches, a.wins, a.sigma),
-      b: snapshot(bId, b.rating, b.matches, b.wins, b.sigma),
+      a: snapshot(aId, a.rating, a.matches, a.wins, a.sigma, a.lastMatchAt),
+      b: snapshot(bId, b.rating, b.matches, b.wins, b.sigma, b.lastMatchAt),
       result,
-      ts: Date.now(),
+      ts: now,
     };
 
-    const preSigmaA = a.sigma ?? DEFAULT_SIGMA;
-    const preSigmaB = b.sigma ?? DEFAULT_SIGMA;
+    // Inflate sigma for staleness (Glicko-1 RD inflation)
+    const cap = this.settings.stabilityThreshold ?? 150;
+    const preSigmaA = inflateSigma(a.sigma ?? DEFAULT_SIGMA, now - (a.lastMatchAt ?? now), cap);
+    const preSigmaB = inflateSigma(b.sigma ?? DEFAULT_SIGMA, now - (b.lastMatchAt ?? now), cap);
 
     const sA = result === 'A' ? 1 : result === 'D' ? 0.5 : 0;
     const resA = glickoUpdate(a.rating, b.rating, preSigmaA, preSigmaB, sA);
@@ -205,6 +209,8 @@ export class PluginDataStore {
 
     a.sigma = resA.newSigma;
     b.sigma = resB.newSigma;
+    a.lastMatchAt = now;
+    b.lastMatchAt = now;
 
     const winnerId = result === 'A' ? aId : result === 'B' ? bId : undefined;
     return { winnerId, undo };
@@ -222,11 +228,13 @@ export class PluginDataStore {
     a.matches = frame.a.matches;
     a.wins = frame.a.wins;
     a.sigma = frame.a.sigma;
+    a.lastMatchAt = frame.a.lastMatchAt;
 
     b.rating = frame.b.rating;
     b.matches = frame.b.matches;
     b.wins = frame.b.wins;
     b.sigma = frame.b.sigma;
+    b.lastMatchAt = frame.b.lastMatchAt;
 
     return true;
   }
@@ -292,6 +300,7 @@ function snapshot(
   matches: number,
   wins: number,
   sigma?: number,
+  lastMatchAt?: number,
 ): PlayerSnapshot {
-  return { id, rating, matches, wins, sigma };
+  return { id, rating, matches, wins, sigma, lastMatchAt };
 }

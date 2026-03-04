@@ -13,6 +13,23 @@ export function gSigma(sigma: number): number {
 }
 
 /**
+ * Glicko-1 RD inflation.
+ *
+ * σ_new = min(cap, sqrt(σ^2 + c^2 × t))
+ * where t = elapsed days, c = sqrt((cap^2 - MIN_SIGMA^2) / T_MAX).
+ * T_MAX = 90 days (full inflation back to cap after 3 months of inactivity).
+ */
+const T_MAX_DAYS = 90;
+const MS_PER_DAY = 86_400_000;
+
+export function inflateSigma(sigma: number, elapsedMs: number, cap: number): number {
+  if (elapsedMs <= 0 || sigma >= cap) return sigma;
+  const cSq = (cap * cap - MIN_SIGMA * MIN_SIGMA) / T_MAX_DAYS;
+  const t = elapsedMs / MS_PER_DAY;
+  return Math.min(cap, Math.sqrt(sigma * sigma + cSq * t));
+}
+
+/**
  * Glicko-1 rating + sigma update for one player after a single comparison.
  *
  * Computes both the new rating and new sigma in one pass, sharing the
