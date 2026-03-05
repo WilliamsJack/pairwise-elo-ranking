@@ -5,9 +5,9 @@ import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/
 import type EloPlugin from '../main';
 import type { CohortData } from '../types';
 import { CohortOptionsModal } from '../ui/CohortOptionsModal';
+import { ConfirmModal } from '../ui/ConfirmModal';
 import { FolderSelectModal } from '../ui/FolderPicker';
 import { FM_PROP_KEYS, renderStandardFmPropertyRow } from '../ui/FrontmatterPropertyRow';
-import { BasePromiseModal } from '../ui/PromiseModal';
 import { applyEloIdTransferPlan, planEloIdTransfer } from '../utils/EloIdTransfer';
 import {
   computeRankMap,
@@ -19,51 +19,6 @@ import type { FrontmatterPropertiesSettings, SessionLayoutMode } from './setting
 import { DEFAULT_SETTINGS, effectiveFrontmatterProperties } from './settings';
 
 type PropKey = keyof FrontmatterPropertiesSettings;
-
-class ConfirmModal extends BasePromiseModal<boolean> {
-  private titleText: string;
-  private message: string;
-  private ctaText: string;
-  private cancelText: string;
-  private warningCta: boolean;
-
-  constructor(
-    app: App,
-    titleText: string,
-    message: string,
-    ctaText: string,
-    cancelText?: string,
-    warningCta = false,
-  ) {
-    super(app);
-    this.titleText = titleText;
-    this.message = message;
-    this.ctaText = ctaText;
-    this.cancelText = cancelText ? cancelText : 'Cancel';
-    this.warningCta = warningCta;
-  }
-
-  async openAndConfirm(): Promise<boolean> {
-    const v = await this.openAndGetValue();
-    return !!v;
-  }
-
-  onOpen(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.createEl('h3', { text: this.titleText });
-    const p = contentEl.createEl('p');
-    p.textContent = this.message;
-
-    const btns = new Setting(contentEl);
-    btns.addButton((b) => b.setButtonText(this.cancelText).onClick(() => this.finish(false)));
-    btns.addButton((b) => {
-      if (this.warningCta) b.setWarning();
-      else b.setCta();
-      b.setButtonText(this.ctaText).onClick(() => this.finish(true));
-    });
-  }
-}
 
 export default class EloSettingsTab extends PluginSettingTab {
   icon = 'trophy';

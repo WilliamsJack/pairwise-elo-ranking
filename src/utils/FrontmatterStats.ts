@@ -82,29 +82,10 @@ export async function writeFrontmatterStatsForPair(
   const tasks: Promise<void>[] = [];
 
   if (aFile && aId) {
-    const p = cohort.players[aId];
-    if (p) {
-      const props = buildProps(fm, {
-        rating: p.rating,
-        matches: p.matches,
-        wins: p.wins,
-        rank: rankMap.get(aId) ?? rankMap.size,
-      });
-      tasks.push(writeProps(app, aFile, props));
-    }
+    tasks.push(writeFrontmatterStatsForPlayer(app, fm, cohort, aFile, aId, rankMap));
   }
-
   if (bFile && bId) {
-    const p = cohort.players[bId];
-    if (p) {
-      const props = buildProps(fm, {
-        rating: p.rating,
-        matches: p.matches,
-        wins: p.wins,
-        rank: rankMap.get(bId) ?? rankMap.size,
-      });
-      tasks.push(writeProps(app, bFile, props));
-    }
+    tasks.push(writeFrontmatterStatsForPlayer(app, fm, cohort, bFile, bId, rankMap));
   }
 
   await Promise.all(tasks);
@@ -260,4 +241,25 @@ export async function updateCohortRanksInFrontmatter(
   if (!cohort) return { updated: 0 };
   const rankMap = computeRankMap(cohort);
   return updateCohortFrontmatterProperties(app, files, rankMap, newPropName);
+}
+
+export async function writeFrontmatterStatsForPlayer(
+  app: App,
+  fm: FrontmatterPropertiesSettings,
+  cohort: CohortData,
+  file: TFile,
+  playerId: string,
+  precomputedRankMap?: Map<string, number>,
+): Promise<void> {
+  if (!anyEnabled(fm)) return;
+  const p = cohort.players[playerId];
+  if (!p) return;
+  const rankMap = precomputedRankMap ?? computeRankMap(cohort);
+  const props = buildProps(fm, {
+    rating: p.rating,
+    matches: p.matches,
+    wins: p.wins,
+    rank: rankMap.get(playerId) ?? rankMap.size,
+  });
+  await writeProps(app, file, props);
 }

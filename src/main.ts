@@ -1,6 +1,7 @@
 import type { TAbstractFile } from 'obsidian';
 import { Notice, Plugin, TFile } from 'obsidian';
 
+import { resetNoteRating } from './commands/ResetNoteRating';
 import { reconcileCohortPlayersWithFiles } from './domain/cohort/CohortIntegrity';
 import { resolveFilesForCohort } from './domain/cohort/CohortResolver';
 import type { EloSettings } from './settings';
@@ -45,6 +46,17 @@ export default class EloPlugin extends Plugin {
         const has = !!this.currentSession;
         if (!checking && has) void this.endSession();
         return has;
+      },
+    });
+
+    this.addCommand({
+      id: 'elo-reset-note-rating',
+      name: 'Reset rating for active note',
+      checkCallback: (checking) => {
+        const file = this.app.workspace.getActiveFile();
+        if (!file || file.extension !== 'md') return false;
+        if (!checking) void resetNoteRating(this.app, this.dataStore, this.settings, file);
+        return true;
       },
     });
 

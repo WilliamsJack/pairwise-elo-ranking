@@ -163,6 +163,13 @@ export class PluginDataStore {
     }
   }
 
+  resetPlayer(cohortKey: string, playerId: string): boolean {
+    const cohort = this.store.cohorts[cohortKey];
+    if (!cohort?.players[playerId]) return false;
+    cohort.players[playerId] = { rating: 1500, matches: 0, wins: 0 };
+    return true;
+  }
+
   ensurePlayer(cohortKey: string, id: string) {
     const cohort = (this.store.cohorts[cohortKey] ??= { players: {} } as CohortData);
     const player = (cohort.players[id] ??= { rating: 1500, matches: 0, wins: 0 });
