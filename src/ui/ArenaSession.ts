@@ -9,6 +9,7 @@ import { effectiveFrontmatterProperties } from '../settings';
 import type { MatchResult, ScrollStartMode, UndoFrame } from '../types';
 import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
 import { applyInitialScroll, getPreviewEl } from '../utils/InitialScroll';
+import { debugWarn } from '../utils/logger';
 import { ensureEloId, getEloId } from '../utils/NoteIds';
 import { attempt, attemptAsync } from '../utils/safe';
 import { installScrollSync } from '../utils/ScrollSync';
@@ -95,8 +96,8 @@ export default class ArenaSession {
     this.overlayWin = win;
 
     // Pin both leaves during the session
-    attempt(() => this.leftLeaf.setPinned(true));
-    attempt(() => this.rightLeaf.setPinned(true));
+    this.leftLeaf.setPinned(true);
+    this.rightLeaf.setPinned(true);
 
     this.mountOverlay(doc);
     this.plugin.registerDomEvent(win, 'keydown', this.keydownHandler, true);
@@ -127,8 +128,8 @@ export default class ArenaSession {
     if (this.activeLeafChangeRef) {
       try {
         this.app.workspace.offref(this.activeLeafChangeRef);
-      } catch {
-        // ignore
+      } catch (e) {
+        debugWarn('Failed to unregister active-leaf-change listener', e);
       }
       this.activeLeafChangeRef = undefined;
     }
@@ -150,15 +151,15 @@ export default class ArenaSession {
     this.unmountOverlay();
 
     // Unpin leaves
-    attempt(() => this.leftLeaf.setPinned(false));
-    attempt(() => this.rightLeaf.setPinned(false));
+    attempt(() => this.leftLeaf.setPinned(false), 'Unpin left leaf');
+    attempt(() => this.rightLeaf.setPinned(false), 'Unpin right leaf');
 
     // Only detach/cleanup panes when not unloading the plugin (as per guidelines)
     if (!opts?.forUnload) {
       try {
         await this.layoutHandle?.cleanup();
-      } catch {
-        // Non-fatal: cleanup is best-effort; panes may already be detached. Ignore.
+      } catch (e) {
+        debugWarn('Layout cleanup failed (panes may already be detached)', e);
       }
     }
 
@@ -257,7 +258,7 @@ export default class ArenaSession {
 
     // Phone UX: start a new pair on the left note
     if (Platform.isPhone) {
-      attempt(() => this.app.workspace.setActiveLeaf(this.leftLeaf, { focus: true }));
+      this.app.workspace.setActiveLeaf(this.leftLeaf, { focus: true });
       this.lastVisibleSide = 'left';
     }
   }
@@ -269,12 +270,14 @@ export default class ArenaSession {
 
   private async openInReadingMode(leaf: WorkspaceLeaf, file: TFile) {
     // Force Reading Mode
-    await attemptAsync(() =>
-      leaf.setViewState({
-        type: 'markdown',
-        state: { file: file.path, mode: 'preview' },
-        active: false,
-      }),
+    await attemptAsync(
+      () =>
+        leaf.setViewState({
+          type: 'markdown',
+          state: { file: file.path, mode: 'preview' },
+          active: false,
+        }),
+      `Open file in reading mode: ${file.path}`,
     );
 
     // Apply initial scroll behaviour
@@ -285,8 +288,8 @@ export default class ArenaSession {
   private clearScrollSync(): void {
     try {
       this.scrollSyncCleanup?.();
-    } catch {
-      // ignore
+    } catch (e) {
+      debugWarn('Scroll sync cleanup failed', e);
     }
     this.scrollSyncCleanup = undefined;
   }
@@ -426,7 +429,7 @@ export default class ArenaSession {
     const side = this.getVisibleSide() ?? this.lastVisibleSide;
     const target = side === 'left' ? this.rightLeaf : this.leftLeaf;
 
-    attempt(() => this.app.workspace.setActiveLeaf(target, { focus: true }));
+    this.app.workspace.setActiveLeaf(target, { focus: true });
     this.lastVisibleSide = side === 'left' ? 'right' : 'left';
     this.updateOverlay();
   }
@@ -616,7 +619,7 @@ export default class ArenaSession {
   }
 
   private showToast(message: string, timeout = 4000): void {
-    attempt(() => this.liveNotices.push(new Notice(message, timeout)));
+    this.liveNotices.push(new Notice(message, timeout));
   }
 
   private getEffectiveFrontmatter(): FrontmatterPropertiesSettings {

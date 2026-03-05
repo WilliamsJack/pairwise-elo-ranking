@@ -15,6 +15,7 @@ import { ensureBaseCohortTarget } from './utils/EnsureBaseCohort';
 import { ensureFolderCohortPath } from './utils/EnsureFolderCohort';
 import { ensureUniqueEloIds } from './utils/EnsureUniqueEloIds';
 import { computeRankMap, updateCohortFrontmatter } from './utils/FrontmatterStats';
+import { debugWarn, setDebugLogging } from './utils/logger';
 
 export default class EloPlugin extends Plugin {
   dataStore: PluginDataStore;
@@ -26,6 +27,7 @@ export default class EloPlugin extends Plugin {
     this.dataStore = new PluginDataStore(this);
     await this.dataStore.load();
     this.settings = this.dataStore.settings;
+    setDebugLogging(this.settings.debugLogging);
 
     this.addRibbonIcon('trophy', 'Start Elo rating session', async () => {
       await this.selectCohortAndStart();
@@ -85,6 +87,7 @@ export default class EloPlugin extends Plugin {
   }
 
   async saveSettings() {
+    setDebugLogging(this.settings.debugLogging);
     await this.dataStore.saveSettings();
   }
 
@@ -137,7 +140,9 @@ export default class EloPlugin extends Plugin {
     void this.dataStore.saveStore();
 
     // Run cohort integrity scan after start()
-    void reconcileCohortPlayersWithFiles(this.app, this.dataStore, def.key, files).catch(() => {});
+    void reconcileCohortPlayersWithFiles(this.app, this.dataStore, def.key, files).catch((e) => {
+      debugWarn('Cohort integrity reconciliation failed', e);
+    });
   }
 
   public async endSession(opts?: { forUnload?: boolean }) {

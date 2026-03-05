@@ -276,6 +276,18 @@ export default class EloSettingsTab extends PluginSettingTab {
     // Advanced section
     new Setting(containerEl).setName('Advanced').setHeading();
 
+    new Setting(containerEl)
+      .setName('Debug logging')
+      .setDesc(
+        'Log detailed debug information to the developer console. Useful for troubleshooting.',
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.debugLogging).onChange(async (v) => {
+          this.plugin.settings.debugLogging = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
     const fmAcc = containerEl.createEl('details', { cls: 'elo-settings-accordion' });
     fmAcc.open = false;
     fmAcc.createEl('summary', { text: 'Default frontmatter properties' });

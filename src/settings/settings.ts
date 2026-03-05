@@ -22,6 +22,7 @@ export interface EloSettings {
   stabilityThreshold: number;
   surpriseJitter: boolean;
   templatesFolderPath: string;
+  debugLogging: boolean;
 }
 
 export const DEFAULT_SETTINGS: EloSettings = {
@@ -40,6 +41,7 @@ export const DEFAULT_SETTINGS: EloSettings = {
   surpriseJitter: true,
 
   templatesFolderPath: '',
+  debugLogging: false,
 };
 
 // Merge global defaults with optional overrides (per-property)

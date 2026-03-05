@@ -1,5 +1,7 @@
 import type { App, TFile } from 'obsidian';
 
+import { debugWarn } from './logger';
+
 // Matches HTML comments like: <!-- eloId: 123e4567-e89b-12d3-a456-426614174000 -->
 const ELO_ID_HTML_COMMENT_BASE = /<!--\s*eloId\s*:\s*([0-9A-Za-z][0-9A-Za-z._-]*)\s*-->/;
 
@@ -27,7 +29,8 @@ export async function getEloIdFromHtmlComment(app: App, file: TFile): Promise<st
   try {
     const text = await app.vault.cachedRead(file);
     return extractEloIdFromHtmlComment(text);
-  } catch {
+  } catch (e) {
+    debugWarn(`Failed to read HTML comment eloId from ${file.path}`, e);
     return undefined;
   }
 }

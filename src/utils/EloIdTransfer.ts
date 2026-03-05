@@ -2,6 +2,7 @@ import type { App, TFile } from 'obsidian';
 import { Notice } from 'obsidian';
 
 import type { EloIdLocation } from '../settings';
+import { debugWarn } from './logger';
 import {
   extractEloIdFromHtmlComment,
   getEloIdFromFrontmatterCache,
@@ -56,7 +57,8 @@ async function planForFile(
     try {
       const text = await app.vault.cachedRead(file);
       htmlCommentId = extractEloIdFromHtmlComment(text);
-    } catch {
+    } catch (e) {
+      debugWarn(`Failed to read file for eloId transfer plan: ${file.path}`, e);
       htmlCommentId = undefined;
     }
 

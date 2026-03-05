@@ -1,6 +1,8 @@
 import type { App, TFile } from 'obsidian';
 import { parseYaml } from 'obsidian';
 
+import { debugWarn } from '../../utils/logger';
+
 export type BaseViewInfo = {
   name: string;
   type?: string;
@@ -34,7 +36,8 @@ export async function readBaseViews(app: App, baseFile: TFile): Promise<BaseView
     }
 
     return out;
-  } catch {
+  } catch (e) {
+    debugWarn(`Failed to read base views from ${baseFile.path}`, e);
     return [];
   }
 }

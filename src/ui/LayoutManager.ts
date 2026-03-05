@@ -87,21 +87,27 @@ export class ArenaLayoutManager {
     const leftLeaf = this.getUserLeaf();
     const originalLeftViewState = this.snapshot(leftLeaf.getViewState());
 
-    attempt(() => this.app.workspace.setActiveLeaf(leftLeaf, { focus: false }));
+    this.app.workspace.setActiveLeaf(leftLeaf, { focus: false });
 
     const rightLeaf = this.app.workspace.getLeaf('split');
 
     const cleanup = async () => {
       // Restore the user's original tab state
       if (originalLeftViewState) {
-        await attemptAsync(() => leftLeaf.setViewState({ ...originalLeftViewState, active: true }));
+        await attemptAsync(
+          () => leftLeaf.setViewState({ ...originalLeftViewState, active: true }),
+          'Reuse-active: restore left view state',
+        );
       }
       // Close the right leaf if we created it
       if (rightLeaf && rightLeaf !== leftLeaf) {
-        attempt(() => rightLeaf.detach());
+        attempt(() => rightLeaf.detach(), 'Reuse-active: detach right leaf');
       }
       // Return focus to the user's leaf
-      attempt(() => this.app.workspace.setActiveLeaf(leftLeaf, { focus: true }));
+      attempt(
+        () => this.app.workspace.setActiveLeaf(leftLeaf, { focus: true }),
+        'Reuse-active: return focus',
+      );
       // Yield so UI teardown and any notices can settle
       await new Promise<void>((r) => window.setTimeout(r, 0));
     };
@@ -116,26 +122,29 @@ export class ArenaLayoutManager {
     const referenceLeaf = this.getUserLeaf();
 
     // First split: create arena-right to the right
-    attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: false }));
+    this.app.workspace.setActiveLeaf(referenceLeaf, { focus: false });
     const arenaRight = this.app.workspace.getLeaf('split');
 
     // Second split: split the arena-right to create arena-left
-    attempt(() => this.app.workspace.setActiveLeaf(arenaRight, { focus: false }));
+    this.app.workspace.setActiveLeaf(arenaRight, { focus: false });
     const arenaLeft = this.app.workspace.getLeaf('split');
 
     // Focus the arena so keyboard works immediately
-    attempt(() => this.app.workspace.setActiveLeaf(arenaLeft, { focus: true }));
+    this.app.workspace.setActiveLeaf(arenaLeft, { focus: true });
 
     const cleanup = async () => {
       // Close the two arena panes we created
       if (arenaRight && arenaRight !== arenaLeft) {
-        attempt(() => arenaRight.detach());
+        attempt(() => arenaRight.detach(), 'Right-split: detach arena-right');
       }
       if (arenaLeft && arenaLeft !== referenceLeaf) {
-        attempt(() => arenaLeft.detach());
+        attempt(() => arenaLeft.detach(), 'Right-split: detach arena-left');
       }
       // Return focus to the reference
-      attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
+      attempt(
+        () => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }),
+        'Right-split: return focus',
+      );
       // Yield so UI teardown and any notices can settle
       await new Promise<void>((r) => window.setTimeout(r, 0));
     };
@@ -151,18 +160,21 @@ export class ArenaLayoutManager {
 
     const left = this.app.workspace.getLeaf('tab');
 
-    attempt(() => this.app.workspace.setActiveLeaf(left, { focus: false }));
+    this.app.workspace.setActiveLeaf(left, { focus: false });
     const right = this.app.workspace.getLeaf('split');
 
     // Focus the arena
-    attempt(() => this.app.workspace.setActiveLeaf(left, { focus: true }));
+    this.app.workspace.setActiveLeaf(left, { focus: true });
 
     const cleanup = async () => {
       if (right && right !== left) {
-        attempt(() => right.detach());
+        attempt(() => right.detach(), 'New-tab: detach right');
       }
-      attempt(() => left.detach());
-      attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
+      attempt(() => left.detach(), 'New-tab: detach left');
+      attempt(
+        () => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }),
+        'New-tab: return focus',
+      );
       // Yield so UI teardown and any notices can settle
       await new Promise<void>((r) => window.setTimeout(r, 0));
     };
@@ -193,7 +205,7 @@ export class ArenaLayoutManager {
     await this.waitForPopoutLeafAttachment(popLeft);
 
     // Make sure subsequent splits happen in the pop-out
-    attempt(() => this.app.workspace.setActiveLeaf(popLeft, { focus: true }));
+    this.app.workspace.setActiveLeaf(popLeft, { focus: true });
 
     let popRight = this.app.workspace.getLeaf('split');
     const createdRight = !!popRight && popRight !== popLeft;
@@ -205,10 +217,13 @@ export class ArenaLayoutManager {
     const cleanup = async () => {
       // Detach inside the popout; detaching the last leaf should close the window.
       if (popRight && popRight !== popLeft) {
-        attempt(() => popRight.detach());
+        attempt(() => popRight.detach(), 'New-window: detach pop-out right');
       }
-      attempt(() => popLeft.detach());
-      attempt(() => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }));
+      attempt(() => popLeft.detach(), 'New-window: detach pop-out left');
+      attempt(
+        () => this.app.workspace.setActiveLeaf(referenceLeaf, { focus: true }),
+        'New-window: return focus',
+      );
       // Yield so UI teardown and any notices can settle
       await new Promise<void>((r) => window.setTimeout(r, 0));
     };

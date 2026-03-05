@@ -1,6 +1,7 @@
 import type { App, TFile } from 'obsidian';
 import { Notice, Setting } from 'obsidian';
 
+import { debugWarn } from '../utils/logger';
 import { removeEloIdEverywhere } from '../utils/NoteIds';
 import { BasePromiseModal } from './PromiseModal';
 
@@ -15,7 +16,8 @@ function formatCreatedTime(file: TFile): string {
       hour: '2-digit',
       minute: '2-digit',
     });
-  } catch {
+  } catch (e) {
+    debugWarn('Failed to format created time', e);
     return new Date(ctime).toString();
   }
 }

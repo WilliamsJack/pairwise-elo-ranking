@@ -1,6 +1,8 @@
 import type { App, OpenViewState, ViewState, WorkspaceLeaf } from 'obsidian';
 import { TFile } from 'obsidian';
 
+import { debugWarn } from '../../utils/logger';
+
 const TIMEOUT_MS = 5_000;
 const DEFAULT_POLL_MS = 50;
 
@@ -205,14 +207,14 @@ export async function resolveFilesFromBaseView(
         app.workspace.setActiveLeaf(previousLeaf, { focus: true });
         await nextFrame();
       }
-    } catch {
-      // ignore
+    } catch (e) {
+      debugWarn('Bases resolver: failed to restore previous leaf', e);
     }
 
     try {
       leaf?.detach();
-    } catch {
-      // ignore
+    } catch (e) {
+      debugWarn('Bases resolver: failed to detach temporary leaf', e);
     }
   }
 }
