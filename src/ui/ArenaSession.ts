@@ -8,8 +8,10 @@ import type { FrontmatterPropertiesSettings } from '../settings';
 import { effectiveFrontmatterProperties } from '../settings';
 import type { MatchResult, ScrollStartMode, UndoFrame } from '../types';
 import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
+import { applyInitialScroll, getPreviewEl } from '../utils/InitialScroll';
 import { ensureEloId, getEloId } from '../utils/NoteIds';
 import { attempt, attemptAsync } from '../utils/safe';
+import { installScrollSync } from '../utils/ScrollSync';
 import type { ArenaLayoutHandle } from './LayoutManager';
 import { ArenaLayoutManager } from './LayoutManager';
 
@@ -218,8 +220,8 @@ export default class ArenaSession {
       this.lastPair = undefined;
 
       // Wait to ensure deleted file is cleaned up before reusing leaf
-      await this.sleep(0);
-      await this.sleep(0);
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
 
       this.pickNextPair();
       await this.openCurrent();
@@ -242,7 +244,15 @@ export default class ArenaSession {
     ]);
 
     if (this.getCohortSyncScrollEnabled() && !Platform.isPhone) {
-      this.installScrollSync();
+      const leftView = this.leftLeaf.view;
+      const rightView = this.rightLeaf.view;
+      if (leftView instanceof MarkdownView && rightView instanceof MarkdownView) {
+        const leftEl = getPreviewEl(leftView);
+        const rightEl = getPreviewEl(rightView);
+        if (leftEl && rightEl) {
+          this.scrollSyncCleanup = installScrollSync(leftEl, rightEl);
+        }
+      }
     }
 
     // Phone UX: start a new pair on the left note
@@ -269,184 +279,7 @@ export default class ArenaSession {
 
     // Apply initial scroll behaviour
     const mode = Platform.isPhone ? 'none' : this.getCohortScrollStart();
-    await this.applyInitialScroll(leaf, mode);
-  }
-
-  private async applyInitialScroll(leaf: WorkspaceLeaf, mode: ScrollStartMode): Promise<void> {
-    if (mode === 'none') return;
-    const v = leaf.view;
-    if (!(v instanceof MarkdownView)) return;
-
-    switch (mode) {
-      case 'first-image':
-        await this.scrollToFirstImage(v);
-        break;
-      case 'first-heading':
-        await this.scrollToFirstHeading(v);
-        break;
-      case 'after-frontmatter':
-        await this.scrollAfterFrontmatter(v);
-        break;
-    }
-  }
-
-  private findFirstContentImage(root: HTMLElement): HTMLElement | null {
-    return root.querySelector('img') as HTMLElement | null;
-  }
-
-  private async scrollToFirstImage(view: MarkdownView): Promise<void> {
-    const preview = this.getPreviewEl(view);
-    if (!preview) return;
-
-    preview.scrollTop = 0;
-
-    const findHeading = (): HTMLElement | null => {
-      const root = this.getRenderedRoot(preview);
-      return root.querySelector('h1, h2, h3, h4, h5, h6');
-    };
-
-    const findImage = (): HTMLElement | null => {
-      const root = this.getRenderedRoot(preview);
-      return this.findFirstContentImage(root);
-    };
-
-    // Phase 1: normal short retry (lets the initial viewport render)
-    const initialTries = 5;
-    const initialStepMs = 50;
-    for (let i = 0; i < initialTries; i++) {
-      const img = findImage();
-      if (img) {
-        img.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-        return;
-      }
-      await this.sleep(initialStepMs);
-    }
-
-    // Phase 2: progressive scroll to force render in long lazily rendered notes
-    const stepPx = Math.max(200, Math.floor(preview.clientHeight * 0.8));
-    const maxSteps = 250;
-    let stalled = 0;
-
-    for (let i = 0; i < maxSteps; i++) {
-      const img = findImage();
-      if (img) {
-        img.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-        return;
-      }
-
-      const maxTop = Math.max(0, preview.scrollHeight - preview.clientHeight);
-      const atBottom = preview.scrollTop >= maxTop - 2;
-
-      if (atBottom) {
-        // Give Obsidian a moment in case scrollHeight is still expanding as it renders
-        await this.sleep(100);
-        const newMaxTop = Math.max(0, preview.scrollHeight - preview.clientHeight);
-        const stillAtBottom = preview.scrollTop >= newMaxTop - 2;
-        if (stillAtBottom) break;
-        continue;
-      }
-
-      const nextTop = Math.min(preview.scrollTop + stepPx, maxTop);
-
-      // If we cannot make progress, wait a bit and then give up after a few stalls
-      if (nextTop <= preview.scrollTop + 1) {
-        stalled++;
-        if (stalled >= 5) break;
-        await this.sleep(50);
-        continue;
-      }
-
-      stalled = 0;
-      preview.scrollTop = nextTop;
-      await this.sleep(50);
-    }
-
-    // Phase 3: fall back to heading
-    preview.scrollTop = 0;
-    await this.sleep(0);
-
-    const heading = findHeading();
-    if (heading) {
-      heading.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-    }
-  }
-
-  private async scrollToFirstHeading(view: MarkdownView): Promise<void> {
-    const preview = this.getPreviewEl(view);
-    if (!preview) return;
-
-    await this.retryUntil(
-      () => {
-        const root = this.getRenderedRoot(preview);
-        const heading = root.querySelector('h1, h2, h3, h4, h5, h6');
-        if (heading) {
-          heading.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-          return true;
-        }
-        return false;
-      },
-      30,
-      100,
-    );
-  }
-
-  private async scrollAfterFrontmatter(view: MarkdownView): Promise<void> {
-    const preview = this.getPreviewEl(view);
-    if (!preview) return;
-
-    await this.retryUntil(
-      () => {
-        const root = this.getRenderedRoot(preview);
-
-        // Scroll to the first real content element after the properties/frontmatter block
-        let next = root.querySelector(
-          ':scope > :has(.metadata-container, .frontmatter-container, .frontmatter, pre.frontmatter) ~ *',
-        );
-
-        while (next && next.scrollHeight <= 0) {
-          next = next.nextElementSibling as HTMLElement | null;
-        }
-
-        if (next) {
-          next.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-          return true;
-        }
-        return false;
-      },
-      30,
-      100,
-    );
-  }
-
-  private getPreviewEl(view: MarkdownView): HTMLElement | null {
-    const scope = view.contentEl ?? view.containerEl;
-    return (
-      scope.querySelector('.markdown-reading-view .markdown-preview-view') ??
-      scope.querySelector('.markdown-preview-view')
-    );
-  }
-
-  private getRenderedRoot(preview: HTMLElement): HTMLElement {
-    return (
-      preview.querySelector('.markdown-preview-sizer') ??
-      preview.querySelector('.markdown-rendered') ??
-      preview
-    );
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-  }
-
-  private async retryUntil(
-    predicate: () => boolean,
-    maxTries: number,
-    stepMs: number,
-  ): Promise<void> {
-    for (let i = 0; i < maxTries; i++) {
-      if (predicate()) return;
-      await this.sleep(stepMs);
-    }
+    await applyInitialScroll(leaf, mode);
   }
 
   private clearScrollSync(): void {
@@ -559,98 +392,6 @@ export default class ArenaSession {
   private getCohortSyncScrollEnabled(): boolean {
     const def = this.plugin.dataStore.getCohortDef(this.cohortKey);
     return def?.syncScroll ?? true;
-  }
-
-  private clampScrollTop(el: HTMLElement, top: number): number {
-    const maxTop = Math.max(0, el.scrollHeight - el.clientHeight);
-    return Math.max(0, Math.min(maxTop, top));
-  }
-
-  private installScrollSync(): void {
-    this.clearScrollSync();
-
-    const leftView = this.leftLeaf.view;
-    const rightView = this.rightLeaf.view;
-    if (!(leftView instanceof MarkdownView) || !(rightView instanceof MarkdownView)) return;
-
-    const leftEl = this.getPreviewEl(leftView);
-    const rightEl = this.getPreviewEl(rightView);
-    if (!leftEl || !rightEl) return;
-
-    const win = leftEl.ownerDocument.defaultView ?? window;
-
-    let leftLast = leftEl.scrollTop;
-    let rightLast = rightEl.scrollTop;
-
-    let suppressLeft = false;
-    let suppressRight = false;
-
-    let releaseLeftRaf: number | null = null;
-    let releaseRightRaf: number | null = null;
-
-    const suppressSide = (side: 'left' | 'right') => {
-      if (side === 'left') {
-        suppressLeft = true;
-        if (releaseLeftRaf != null) win.cancelAnimationFrame(releaseLeftRaf);
-        releaseLeftRaf = win.requestAnimationFrame(() => {
-          suppressLeft = false;
-          releaseLeftRaf = null;
-        });
-      } else {
-        suppressRight = true;
-        if (releaseRightRaf != null) win.cancelAnimationFrame(releaseRightRaf);
-        releaseRightRaf = win.requestAnimationFrame(() => {
-          suppressRight = false;
-          releaseRightRaf = null;
-        });
-      }
-    };
-
-    const onLeftScroll = () => {
-      const cur = leftEl.scrollTop;
-      if (suppressLeft) {
-        leftLast = cur;
-        return;
-      }
-
-      const delta = cur - leftLast;
-      leftLast = cur;
-      if (delta === 0) return;
-
-      suppressSide('right');
-      rightEl.scrollTop = this.clampScrollTop(rightEl, rightEl.scrollTop + delta);
-      rightLast = rightEl.scrollTop;
-    };
-
-    const onRightScroll = () => {
-      const cur = rightEl.scrollTop;
-      if (suppressRight) {
-        rightLast = cur;
-        return;
-      }
-
-      const delta = cur - rightLast;
-      rightLast = cur;
-      if (delta === 0) return;
-
-      suppressSide('left');
-      leftEl.scrollTop = this.clampScrollTop(leftEl, leftEl.scrollTop + delta);
-      leftLast = leftEl.scrollTop;
-    };
-
-    leftEl.addEventListener('scroll', onLeftScroll, { passive: true });
-    rightEl.addEventListener('scroll', onRightScroll, { passive: true });
-
-    this.scrollSyncCleanup = () => {
-      leftEl.removeEventListener('scroll', onLeftScroll);
-      rightEl.removeEventListener('scroll', onRightScroll);
-
-      if (releaseLeftRaf != null) win.cancelAnimationFrame(releaseLeftRaf);
-      if (releaseRightRaf != null) win.cancelAnimationFrame(releaseRightRaf);
-
-      releaseLeftRaf = null;
-      releaseRightRaf = null;
-    };
   }
 
   private flashPressed(btn?: HTMLButtonElement, durationMs = 110): void {
