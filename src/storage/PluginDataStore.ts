@@ -214,7 +214,11 @@ export class PluginDataStore {
       ts: now,
     };
 
-    // Inflate sigma for staleness (Glicko-1 RD inflation)
+    // Inflate sigma for staleness (Glicko-1 RD inflation).
+    // Cap is intentionally stabilityThreshold, not DEFAULT_SIGMA: notes don't
+    // "lose skill" like human players, so we only allow modest RD inflation to
+    // accommodate preference drift. This also prevents the stability progress
+    // bar from regressing after long gaps between sessions.
     const cap = this.settings.stabilityThreshold ?? 150;
     const preSigmaA = inflateSigma(a.sigma ?? DEFAULT_SIGMA, now - (a.lastMatchAt ?? now), cap);
     const preSigmaB = inflateSigma(b.sigma ?? DEFAULT_SIGMA, now - (b.lastMatchAt ?? now), cap);

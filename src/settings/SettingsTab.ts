@@ -9,7 +9,7 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { FolderSelectModal } from '../ui/FolderPicker';
 import { FM_PROP_KEYS, renderStandardFmPropertyRow } from '../ui/FrontmatterPropertyRow';
 import {
-  computeRankMap,
+  computeRanksForAll,
   previewCohortFrontmatterPropertyUpdates,
   updateCohortFrontmatter,
 } from '../utils/FrontmatterStats';
@@ -562,7 +562,7 @@ export default class GlickoSettingsTab extends PluginSettingTab {
       const map = new Map<string, number>();
       if (!cohort) return map;
       if (key === 'rank') {
-        const rankMap = computeRankMap(cohort);
+        const rankMap = computeRanksForAll(cohort);
         for (const [id, rank] of rankMap) map.set(id, rank);
       } else if (key === 'rating') {
         for (const [id, p] of Object.entries(cohort.players)) map.set(id, Math.round(p.rating));

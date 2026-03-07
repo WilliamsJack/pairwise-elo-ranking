@@ -17,7 +17,7 @@ function anyEnabled(fm: FrontmatterPropertiesSettings): boolean {
 }
 
 // Standard competition ranking ("1224" style)
-export function computeRankMap(cohort: CohortData): Map<string, number> {
+export function computeRanksForAll(cohort: CohortData): Map<string, number> {
   const entries = Object.entries(cohort.players);
   entries.sort((a, b) => b[1].rating - a[1].rating);
 
@@ -36,6 +36,33 @@ export function computeRankMap(cohort: CohortData): Map<string, number> {
     nextRank = i + 2;
   }
   return map;
+}
+
+// Compute ranks for a subset of players by counting how many players
+// have a strictly higher rating (standard competition ranking)
+function computeRanksForSubset(cohort: CohortData, playerIds: string[]): Map<string, number> {
+  const targets = playerIds
+    .map((id) => ({ id, rating: cohort.players[id]?.rating }))
+    .filter((t): t is { id: string; rating: number } => t.rating !== undefined);
+
+  if (targets.length === 0) return new Map();
+
+  // For each player in the cohort, check if their rating exceeds
+  // any target's rating and increment that target's rank counter
+  const higherCounts = new Map<string, number>(targets.map((t) => [t.id, 0]));
+  for (const player of Object.values(cohort.players)) {
+    for (const t of targets) {
+      if (player.rating > t.rating) {
+        higherCounts.set(t.id, higherCounts.get(t.id)! + 1);
+      }
+    }
+  }
+
+  const rankMap = new Map<string, number>();
+  for (const [id, count] of higherCounts) {
+    rankMap.set(id, count + 1);
+  }
+  return rankMap;
 }
 
 function buildProps(fm: FrontmatterPropertiesSettings, stats: PlayerStats): Record<string, number> {
@@ -78,7 +105,8 @@ export async function writeFrontmatterStatsForPair(
   if (!cohort) return;
   if (!anyEnabled(fm)) return;
 
-  const rankMap = computeRankMap(cohort);
+  const ids = [aId, bId].filter((id): id is string => !!id);
+  const rankMap = computeRanksForSubset(cohort, ids);
   const tasks: Promise<void>[] = [];
 
   if (aFile && aId) {
@@ -258,7 +286,7 @@ export async function updateCohortRanksInFrontmatter(
   newPropName: string,
 ): Promise<{ updated: number }> {
   if (!cohort) return { updated: 0 };
-  const rankMap = computeRankMap(cohort);
+  const rankMap = computeRanksForAll(cohort);
   return updateCohortFrontmatterProperties(app, files, rankMap, newPropName);
 }
 
@@ -268,12 +296,12 @@ export async function writeFrontmatterStatsForPlayer(
   cohort: CohortData,
   file: TFile,
   playerId: string,
-  precomputedRankMap?: Map<string, number>,
+  precomputedRankMap: Map<string, number>,
 ): Promise<void> {
   if (!anyEnabled(fm)) return;
   const p = cohort.players[playerId];
   if (!p) return;
-  const rankMap = precomputedRankMap ?? computeRankMap(cohort);
+  const rankMap = precomputedRankMap;
   const props = buildProps(fm, {
     rating: p.rating,
     matches: p.matches,

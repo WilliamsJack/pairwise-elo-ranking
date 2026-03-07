@@ -8,7 +8,7 @@ import type { PluginDataStore } from '../storage/PluginDataStore';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { ALL_SENTINEL, ResetNoteModal } from '../ui/ResetNoteModal';
 import {
-  computeRankMap,
+  computeRanksForAll,
   updateCohortFrontmatter,
   writeFrontmatterStatsForPlayer,
 } from '../utils/FrontmatterStats';
@@ -88,7 +88,7 @@ export async function resetNoteRating(
       def.frontmatterOverrides,
     );
 
-    const rankMap = computeRankMap(cohort);
+    const rankMap = computeRanksForAll(cohort);
 
     // Write the reset note's own stats (rating, matches, wins, rank)
     await writeFrontmatterStatsForPlayer(app, fm, cohort, file, noteId, rankMap);

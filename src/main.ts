@@ -22,7 +22,7 @@ import { CohortPicker } from './ui/CohortPicker';
 import { ensureBaseCohortTarget } from './utils/EnsureBaseCohort';
 import { ensureFolderCohortPath } from './utils/EnsureFolderCohort';
 import { ensureUniqueIds } from './utils/EnsureUniqueIds';
-import { computeRankMap, updateCohortFrontmatter } from './utils/FrontmatterStats';
+import { computeRanksForAll, updateCohortFrontmatter } from './utils/FrontmatterStats';
 import { debugWarn, setDebugLogging } from './utils/logger';
 
 export default class GlickoPlugin extends Plugin {
@@ -262,7 +262,7 @@ export default class GlickoPlugin extends Plugin {
     });
     if (files.length === 0) return;
 
-    const rankMap = computeRankMap(cohort);
+    const rankMap = computeRanksForAll(cohort);
 
     updateCohortFrontmatter(
       this.app,

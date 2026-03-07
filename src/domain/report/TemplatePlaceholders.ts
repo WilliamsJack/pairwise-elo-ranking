@@ -189,7 +189,9 @@ export function computePlaceholders(
     const sessionWithSigma = allWithSigma.filter(({ id }) => uniquePlayerIds.has(id));
 
     const formatStabilityList = (entries: { id: string; sigma: number }[]) =>
-      entries.map((e) => `- ${idToName(e.id, data.idToPath)} (σ ${Math.round(e.sigma)})`).join('\n');
+      entries
+        .map((e) => `- ${idToName(e.id, data.idToPath)} (σ ${Math.round(e.sigma)})`)
+        .join('\n');
 
     // Session participants only
     const byStabilitySession = sessionWithSigma.slice().sort((a, b) => a.sigma - b.sigma);
