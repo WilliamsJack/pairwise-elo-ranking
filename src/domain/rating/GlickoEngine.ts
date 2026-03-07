@@ -30,6 +30,18 @@ export function inflateSigma(sigma: number, elapsedMs: number, cap: number): num
 }
 
 /**
+ * Measure how surprising a match result was relative to the expected outcome.
+ * Returns a value >= 0; higher means more surprising.
+ */
+export function computeSurprise(ratingA: number, ratingB: number, result: 'A' | 'B' | 'D'): number {
+  const E = expectedScore(ratingA, ratingB);
+  const S = result === 'A' ? 1 : result === 'D' ? 0.5 : 0;
+  const observed = Math.abs(S - E);
+  const baseline = 2 * E * (1 - E);
+  return Math.max(0, observed - baseline);
+}
+
+/**
  * Glicko-1 rating + sigma update for one player after a single comparison.
  *
  * Computes both the new rating and new sigma in one pass, sharing the

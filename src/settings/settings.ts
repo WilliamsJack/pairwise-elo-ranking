@@ -13,6 +13,13 @@ export interface FrontmatterPropertiesSettings {
   wins: FrontmatterPropertyConfig;
 }
 
+export interface SessionReportConfig {
+  enabled: boolean;
+  folderPath: string;
+  nameTemplate: string;
+  reportTemplatePath?: string;
+}
+
 export interface GlickoSettings {
   showToasts: boolean;
   idPropertyName: string;
@@ -20,10 +27,12 @@ export interface GlickoSettings {
   sessionLayout: SessionLayoutMode;
   frontmatterProperties: FrontmatterPropertiesSettings;
   askForOverridesOnCohortCreation: boolean;
+  askForReportSettingsOnCreation: boolean;
   stabilityThreshold: number;
   surpriseJitter: boolean;
   templatesFolderPath: string;
   debugLogging: boolean;
+  sessionReport: SessionReportConfig;
 }
 
 export const DEFAULT_SETTINGS: GlickoSettings = {
@@ -38,12 +47,18 @@ export const DEFAULT_SETTINGS: GlickoSettings = {
     wins: { property: 'glickoWins', enabled: false },
   },
   askForOverridesOnCohortCreation: true,
+  askForReportSettingsOnCreation: true,
 
   stabilityThreshold: 150,
   surpriseJitter: true,
 
   templatesFolderPath: '',
   debugLogging: false,
+  sessionReport: {
+    enabled: false,
+    folderPath: 'Glicko Reports',
+    nameTemplate: '{{cohort}} post-session report - {{datetime}}',
+  },
 };
 
 // Merge global defaults with optional overrides (per-property)

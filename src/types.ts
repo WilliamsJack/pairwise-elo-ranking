@@ -1,4 +1,4 @@
-import type { FrontmatterPropertiesSettings } from './settings';
+import type { FrontmatterPropertiesSettings, SessionReportConfig } from './settings';
 
 export type MatchResult = 'A' | 'B' | 'D';
 
@@ -50,6 +50,7 @@ type CohortDefBase<K extends CohortKind> = {
   frontmatterOverrides?: Partial<FrontmatterPropertiesSettings>;
   scrollStart?: ScrollStartMode;
   syncScroll?: boolean;
+  sessionReport?: SessionReportConfig;
   createdAt: number;
   updatedAt: number;
 };
@@ -80,4 +81,12 @@ export interface UndoFrame {
   b: PlayerSnapshot;
   result: MatchResult;
   ts: number;
+}
+
+export interface SessionMatchData {
+  cohortKey: string;
+  matches: UndoFrame[];
+  idToPath: Map<string, string>;
+  fileCount: number;
+  startedAt: number;
 }

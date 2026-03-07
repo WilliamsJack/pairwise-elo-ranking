@@ -2,11 +2,11 @@ import type { App, EventRef, WorkspaceLeaf } from 'obsidian';
 import { MarkdownView, Notice, Platform, TFile } from 'obsidian';
 
 import { pickNextPairIndices } from '../domain/matchmaking/Matchmaker';
-import { DEFAULT_SIGMA, expectedScore } from '../domain/rating/GlickoEngine';
+import { computeSurprise, DEFAULT_SIGMA } from '../domain/rating/GlickoEngine';
 import type GlickoPlugin from '../main';
 import type { FrontmatterPropertiesSettings } from '../settings';
 import { effectiveFrontmatterProperties } from '../settings';
-import type { MatchResult, ScrollStartMode, UndoFrame } from '../types';
+import type { MatchResult, ScrollStartMode, SessionMatchData, UndoFrame } from '../types';
 import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
 import { applyInitialScroll, getPreviewEl } from '../utils/InitialScroll';
 import { debugWarn } from '../utils/logger';
@@ -64,6 +64,8 @@ export default class ArenaSession {
   private scrollSyncCleanup?: () => void;
 
   private stabilityBarFillEl?: HTMLElement;
+
+  private startedAt = Date.now();
 
   constructor(app: App, plugin: GlickoPlugin, cohortKey: string, files: TFile[]) {
     this.app = app;
@@ -176,6 +178,16 @@ export default class ArenaSession {
 
   public getCohortKey(): string {
     return this.cohortKey;
+  }
+
+  public captureSessionData(): SessionMatchData {
+    return {
+      cohortKey: this.cohortKey,
+      matches: this.undoStack.slice(),
+      idToPath: new Map([...this.idByPath.entries()].map(([path, id]) => [id, path])),
+      fileCount: this.files.length,
+      startedAt: this.startedAt,
+    };
   }
 
   onFileRenamed(oldPath: string, newFile: TFile) {
@@ -319,13 +331,8 @@ export default class ArenaSession {
 
   // Measure "surprise" - how much the outcome deviated from what we would predict.
   // Used to trigger a visual jitter on the stability bar.
-  private computeSurprise(undo: UndoFrame): number {
-    const E = expectedScore(undo.a.rating, undo.b.rating);
-    const S = undo.result === 'A' ? 1 : undo.result === 'D' ? 0.5 : 0;
-
-    const observed = Math.abs(S - E);
-    const baseline = 2 * E * (1 - E);
-    return Math.max(0, observed - baseline);
+  private computeSurpriseForFrame(undo: UndoFrame): number {
+    return computeSurprise(undo.a.rating, undo.b.rating, undo.result);
   }
 
   private stabilityJitterTimer?: number;
@@ -641,7 +648,7 @@ export default class ArenaSession {
     const { undo } = this.plugin.dataStore.applyMatch(this.cohortKey, aId, bId, result);
     this.undoStack.push(undo);
 
-    const surprise = this.computeSurprise(undo);
+    const surprise = this.computeSurpriseForFrame(undo);
     this.updateStabilityBar(surprise);
 
     if (this.plugin.settings.showToasts) {

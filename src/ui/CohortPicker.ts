@@ -8,11 +8,10 @@ import {
   prettyCohortDefinition,
 } from '../domain/cohort/CohortResolver';
 import type GlickoPlugin from '../main';
-import type { FrontmatterPropertiesSettings } from '../settings';
 import type { CohortDefinition } from '../types';
-import type { ScrollStartMode } from '../types';
 import { normaliseTag } from '../utils/tags';
 import { BaseFileSelectModal, BaseViewSelectModal } from './BasePicker';
+import type { CohortOptionsResult } from './CohortOptionsModal';
 import { CohortOptionsModal } from './CohortOptionsModal';
 import { FolderSelectModal } from './FolderPicker';
 import { BasePromiseFuzzyModal, BasePromiseModal } from './PromiseModal';
@@ -166,29 +165,31 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     return await this.runChild(() => new TagCohortModal(this.app).openAndGetDefinition());
   }
 
-  private async chooseFrontmatterOverrides(): Promise<
-    | {
-        overrides?: Partial<FrontmatterPropertiesSettings>;
-        name?: string;
-        scrollStart?: ScrollStartMode;
-        syncScroll?: boolean;
-      }
-    | undefined
-  > {
+  private async chooseOverrides(opts?: {
+    showFrontmatterSettings?: boolean;
+    showReportSettings?: boolean;
+  }): Promise<CohortOptionsResult | undefined> {
     return await this.runChild(() =>
       new CohortOptionsModal(this.app, this.plugin, {
         mode: 'create',
+        showFrontmatterSettings: opts?.showFrontmatterSettings,
+        showReportSettings: opts?.showReportSettings,
       }).openAndGetOptions(),
     );
   }
 
-  private async applyFrontmatterOverrides(
+  private async applyOverrides(
     def: CohortDefinition | undefined,
   ): Promise<CohortDefinition | undefined> {
     if (!def) return undefined;
-    if (!this.plugin.settings.askForOverridesOnCohortCreation) return def;
+    const askFm = this.plugin.settings.askForOverridesOnCohortCreation;
+    const askReport = this.plugin.settings.askForReportSettingsOnCreation;
+    if (!askFm && !askReport) return def;
 
-    const res = await this.chooseFrontmatterOverrides();
+    const res = await this.chooseOverrides({
+      showFrontmatterSettings: askFm,
+      showReportSettings: askReport,
+    });
     if (!res) return undefined;
 
     const overrides = res.overrides ?? {};
@@ -201,6 +202,10 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     def.scrollStart = res.scrollStart && res.scrollStart !== 'none' ? res.scrollStart : undefined;
 
     def.syncScroll = res.syncScroll ?? true;
+
+    if (res.sessionReport) {
+      def.sessionReport = res.sessionReport;
+    }
 
     return def;
   }
@@ -265,7 +270,7 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
     }
 
     // It's a new cohort; optionally ask for overrides
-    const finalDef = await this.applyFrontmatterOverrides(baseDef);
+    const finalDef = await this.applyOverrides(baseDef);
     this.complete(finalDef);
   }
 

@@ -301,20 +301,8 @@ export default class GlickoSettingsTab extends PluginSettingTab {
       }
     }
 
-    // Advanced section
-    new Setting(containerEl).setName('Advanced').setHeading();
-
-    new Setting(containerEl)
-      .setName('Debug logging')
-      .setDesc(
-        'Log detailed debug information to the developer console. Useful for troubleshooting.',
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.debugLogging).onChange(async (v) => {
-          this.plugin.settings.debugLogging = v;
-          await this.plugin.saveSettings();
-        }),
-      );
+    // Cohort defaults section
+    new Setting(containerEl).setName('Cohort defaults').setHeading();
 
     const fmAcc = containerEl.createEl('details', { cls: 'glicko-settings-accordion' });
     fmAcc.open = false;
@@ -326,9 +314,7 @@ export default class GlickoSettingsTab extends PluginSettingTab {
     new Setting(fmBody)
       .setName('Ask for per-cohort overrides on creation')
       .setDesc(
-        `When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults.
-        Disabling this may cause clashes if you write frontmatter properties across multiple cohorts.
-        Default: ${DEFAULT_SETTINGS.askForOverridesOnCohortCreation ? 'On' : 'Off'}`,
+        `When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults. Default: ${DEFAULT_SETTINGS.askForOverridesOnCohortCreation ? 'On' : 'Off'}.`,
       )
       .addToggle((t) =>
         t.setValue(this.plugin.settings.askForOverridesOnCohortCreation).onChange(async (v) => {
@@ -356,6 +342,118 @@ export default class GlickoSettingsTab extends PluginSettingTab {
         },
       });
     }
+
+    // Default post-session report settings accordion
+    const reportAcc = containerEl.createEl('details', { cls: 'glicko-settings-accordion' });
+    reportAcc.open = false;
+    reportAcc.createEl('summary', { text: 'Default post-session report settings' });
+    const reportBody = reportAcc.createEl('div', { cls: 'glicko-settings-body' });
+
+    reportBody.createEl('p', {
+      text: 'These settings are used as defaults when configuring reports on a new cohort.',
+    });
+
+    new Setting(reportBody)
+      .setName('Ask for report settings on creation')
+      .setDesc(
+        `When creating a cohort, prompt to configure report settings. Turn off to always use the defaults below. Default: ${DEFAULT_SETTINGS.askForReportSettingsOnCreation ? 'On' : 'Off'}.`,
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.askForReportSettingsOnCreation).onChange(async (v) => {
+          this.plugin.settings.askForReportSettingsOnCreation = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(reportBody)
+      .setName('Enable reports by default')
+      .setDesc('Generate a post-session report for new cohorts by default.')
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.sessionReport.enabled).onChange(async (v) => {
+          this.plugin.settings.sessionReport.enabled = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(reportBody)
+      .setName('Default report folder')
+      .setDesc('Pre-filled vault-relative folder for session reports.')
+      .addText((t) =>
+        t
+          .setPlaceholder(DEFAULT_SETTINGS.sessionReport.folderPath)
+          .setValue(this.plugin.settings.sessionReport.folderPath)
+          .onChange(async (v) => {
+            this.plugin.settings.sessionReport.folderPath = (v ?? '').trim();
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(reportBody)
+      .setName('Default report name')
+      .setDesc('Available: {{cohort}}, {{date}}, {{datetime}}, {{count}}')
+      .addText((t) =>
+        t
+          .setPlaceholder(DEFAULT_SETTINGS.sessionReport.nameTemplate)
+          .setValue(this.plugin.settings.sessionReport.nameTemplate)
+          .onChange(async (v) => {
+            this.plugin.settings.sessionReport.nameTemplate =
+              (v ?? '').trim() || DEFAULT_SETTINGS.sessionReport.nameTemplate;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(reportBody)
+      .setName('Default report template')
+      .setDesc(
+        'Vault path to a markdown file with {{glicko:...}} placeholders. Leave blank to use the built-in template.',
+      )
+      .addText((t) =>
+        t
+          .setPlaceholder('e.g. Templates/My Report.md')
+          .setValue(this.plugin.settings.sessionReport.reportTemplatePath ?? '')
+          .onChange(async (v) => {
+            this.plugin.settings.sessionReport.reportTemplatePath = (v ?? '').trim() || undefined;
+            await this.plugin.saveSettings();
+          }),
+      )
+      .addButton((b) =>
+        b.setButtonText('Generate template').onClick(async () => {
+          try {
+            const { generateOrOverwriteExampleTemplate } =
+              await import('../domain/report/generateExampleTemplate');
+            const file = await generateOrOverwriteExampleTemplate(this.app, {
+              filePath: this.plugin.settings.sessionReport.reportTemplatePath,
+              templatesFolderPath:
+                this.plugin.settings.templatesFolderPath ||
+                this.plugin.settings.sessionReport.folderPath ||
+                '',
+            });
+            if (!file) return;
+
+            this.plugin.settings.sessionReport.reportTemplatePath = file.path;
+            await this.plugin.saveSettings();
+            const leaf = this.app.workspace.getLeaf('tab');
+            await leaf.openFile(file);
+            this.display();
+            new Notice('Report template created and set as default.');
+          } catch (e) {
+            console.error('[Glicko] Failed to generate example template', e);
+            new Notice('Failed to generate example template.');
+          }
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName('Debug logging')
+      .setDesc(
+        'Log detailed debug information to the developer console. Useful for troubleshooting.',
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.debugLogging).onChange(async (v) => {
+          this.plugin.settings.debugLogging = v;
+          await this.plugin.saveSettings();
+        }),
+      );
   }
 
   private async deleteCohortWithConfirm(cohortKey: string): Promise<void> {
@@ -393,6 +491,7 @@ export default class GlickoSettingsTab extends PluginSettingTab {
       initialName: def.label ?? '',
       initialScrollStart: def.scrollStart,
       initialSyncScroll: def.syncScroll ?? true,
+      initialSessionReport: def.sessionReport,
     }).openAndGetOptions();
 
     if (!res) return;
@@ -414,6 +513,10 @@ export default class GlickoSettingsTab extends PluginSettingTab {
     def.scrollStart = res.scrollStart && res.scrollStart !== 'none' ? res.scrollStart : undefined;
 
     def.syncScroll = res.syncScroll ?? true;
+
+    if (res.sessionReport) {
+      def.sessionReport = res.sessionReport;
+    }
 
     this.plugin.dataStore.upsertCohortDef(def);
     await this.plugin.dataStore.saveStore();

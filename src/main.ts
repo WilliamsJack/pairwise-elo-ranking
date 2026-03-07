@@ -4,11 +4,19 @@ import { Notice, Plugin, TFile } from 'obsidian';
 import { resetNoteRating } from './commands/ResetNoteRating';
 import { reconcileCohortPlayersWithFiles } from './domain/cohort/CohortIntegrity';
 import { resolveFilesForCohort } from './domain/cohort/CohortResolver';
+import { DEFAULT_REPORT_TEMPLATE } from './domain/report/defaultReportTemplate';
+import { generateOrOverwriteExampleTemplate } from './domain/report/generateExampleTemplate';
+import { writeSessionReport } from './domain/report/SessionReportWriter';
+import {
+  computePlaceholders,
+  resolveReportFileName,
+  resolveTemplate,
+} from './domain/report/TemplatePlaceholders';
 import type { GlickoSettings } from './settings';
 import { effectiveFrontmatterProperties } from './settings';
 import GlickoSettingsTab from './settings/SettingsTab';
 import { PluginDataStore } from './storage/PluginDataStore';
-import type { CohortDefinition } from './types';
+import type { CohortDefinition, SessionMatchData } from './types';
 import ArenaSession from './ui/ArenaSession';
 import { CohortPicker } from './ui/CohortPicker';
 import { ensureBaseCohortTarget } from './utils/EnsureBaseCohort';
@@ -59,6 +67,30 @@ export default class GlickoPlugin extends Plugin {
         if (!file || file.extension !== 'md') return false;
         if (!checking) void resetNoteRating(this.app, this.dataStore, this.settings, file);
         return true;
+      },
+    });
+
+    this.addCommand({
+      id: 'glicko-generate-report-template',
+      name: 'Generate example report template',
+      callback: async () => {
+        try {
+          const file = await generateOrOverwriteExampleTemplate(this.app, {
+            filePath: this.settings.sessionReport.reportTemplatePath,
+            templatesFolderPath:
+              this.settings.templatesFolderPath || this.settings.sessionReport.folderPath || '',
+          });
+          if (!file) return;
+
+          this.settings.sessionReport.reportTemplatePath = file.path;
+          await this.saveSettings();
+          const leaf = this.app.workspace.getLeaf('tab');
+          await leaf.openFile(file);
+          new Notice('Report template created and set as default.');
+        } catch (e) {
+          console.error('[Glicko] Failed to generate example template', e);
+          new Notice('Failed to generate example template.');
+        }
       },
     });
 
@@ -157,15 +189,65 @@ export default class GlickoPlugin extends Plugin {
     const session = this.currentSession;
     const cohortKey = session.getCohortKey();
 
+    // Capture session data BEFORE end() clears the undo stack
+    let sessionData: SessionMatchData | undefined;
+    if (!opts?.forUnload) {
+      sessionData = session.captureSessionData();
+    }
+
     await session.end({ forUnload: !!opts?.forUnload });
     this.currentSession = undefined;
 
     // On unload, skip cohort-wide frontmatter updates and any additional work
     if (opts?.forUnload) return;
 
-    // After session ends, update rank across the cohort if enabled
     const def = this.dataStore.getCohortDef(cohortKey);
     const cohort = this.dataStore.store.cohorts[cohortKey];
+
+    // Generate session report if enabled and there were matches
+    if (sessionData && sessionData.matches.length > 0 && def) {
+      const reportConfig = def.sessionReport;
+      if (reportConfig?.enabled) {
+        try {
+          const cohortLabel = def.label ?? def.key;
+          let template: string | undefined;
+          const templatePath = reportConfig.reportTemplatePath?.trim();
+          if (templatePath) {
+            const tFile = this.app.vault.getAbstractFileByPath(templatePath);
+            if (tFile instanceof TFile) {
+              template = await this.app.vault.read(tFile);
+            } else {
+              new Notice(
+                `Report template not found at '${templatePath}', using built-in template.`,
+              );
+            }
+          }
+          const reportNow = new Date();
+          const placeholders = computePlaceholders(sessionData, cohort, cohortLabel, reportNow);
+          const markdown = resolveTemplate(template ?? DEFAULT_REPORT_TEMPLATE, placeholders);
+          const fileName = resolveReportFileName(
+            reportConfig.nameTemplate || this.settings.sessionReport.nameTemplate,
+            cohortLabel,
+            sessionData.matches.length,
+            reportNow,
+          );
+          const reportFile = await writeSessionReport(
+            this.app,
+            markdown,
+            reportConfig.folderPath || this.settings.sessionReport.folderPath,
+            fileName,
+          );
+          const leaf = this.app.workspace.getLeaf('tab');
+          await leaf.openFile(reportFile);
+          this.app.workspace.setActiveLeaf(leaf, { focus: true });
+        } catch (e) {
+          console.error('[Glicko] Failed to generate session report', e);
+          new Notice('Failed to generate session report. Check the console for details.');
+        }
+      }
+    }
+
+    // After session ends, update rank across the cohort if enabled
     if (!def || !cohort) return;
 
     const fm = effectiveFrontmatterProperties(

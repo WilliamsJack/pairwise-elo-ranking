@@ -1,8 +1,13 @@
-import type { App } from 'obsidian';
+import type { App, TextComponent } from 'obsidian';
 import { Setting } from 'obsidian';
 
 import type GlickoPlugin from '../main';
-import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '../settings';
+import type {
+  FrontmatterPropertiesSettings,
+  FrontmatterPropertyConfig,
+  SessionReportConfig,
+} from '../settings';
+import { DEFAULT_SETTINGS } from '../settings';
 import type { ScrollStartMode } from '../types';
 import { FM_PROP_KEYS, renderStandardFmPropertyRow } from './FrontmatterPropertyRow';
 import { BasePromiseModal } from './PromiseModal';
@@ -23,6 +28,7 @@ export type CohortOptionsResult = {
   name?: string;
   scrollStart?: ScrollStartMode;
   syncScroll?: boolean;
+  sessionReport?: SessionReportConfig;
 };
 
 export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | undefined> {
@@ -34,10 +40,18 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
   private initialName?: string;
   private initialScrollStart?: ScrollStartMode;
   private initialSyncScroll?: boolean;
+  private initialSessionReport?: SessionReportConfig;
+  private showFrontmatterSettings: boolean;
+  private showReportSettings: boolean;
 
   private nameWorking = '';
   private scrollWorking: ScrollStartMode = 'none';
   private syncScrollWorking = true;
+
+  private reportEnabled = DEFAULT_SETTINGS.sessionReport.enabled;
+  private reportFolderPath = DEFAULT_SETTINGS.sessionReport.folderPath;
+  private reportNameTemplate = DEFAULT_SETTINGS.sessionReport.nameTemplate;
+  private reportTemplatePath = '';
 
   private working: Record<Key, RowState>;
 
@@ -50,6 +64,9 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
       initialName?: string;
       initialScrollStart?: ScrollStartMode;
       initialSyncScroll?: boolean;
+      initialSessionReport?: SessionReportConfig;
+      showFrontmatterSettings?: boolean;
+      showReportSettings?: boolean;
     },
   ) {
     super(app);
@@ -65,6 +82,15 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
 
     this.initialSyncScroll = opts?.initialSyncScroll;
     this.syncScrollWorking = this.initialSyncScroll ?? true;
+
+    this.initialSessionReport = opts?.initialSessionReport;
+    this.showFrontmatterSettings = opts?.showFrontmatterSettings ?? true;
+    this.showReportSettings = opts?.showReportSettings ?? true;
+    const reportDefaults = opts?.initialSessionReport ?? plugin.settings.sessionReport;
+    this.reportEnabled = reportDefaults.enabled;
+    this.reportFolderPath = reportDefaults.folderPath;
+    this.reportNameTemplate = reportDefaults.nameTemplate;
+    this.reportTemplatePath = reportDefaults.reportTemplatePath ?? '';
 
     const mk = (k: Key): RowState => {
       const baseCfg = this.base[k];
@@ -183,20 +209,111 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
 
     updateWarning();
 
-    for (const key of FM_PROP_KEYS) {
-      const row = this.working[key];
-      const baseCfg = this.base[key];
+    // Session report settings (shown in edit mode, or create mode when the setting is enabled)
+    if (this.showReportSettings) {
+      new Setting(contentEl)
+        .setName('Generate post-session report')
+        .setDesc('Create an Obsidian note summarising the session when it ends.')
+        .addToggle((t) =>
+          t.setValue(this.reportEnabled).onChange((v) => {
+            this.reportEnabled = !!v;
+            updateReportVisibility();
+          }),
+        );
 
-      renderStandardFmPropertyRow(contentEl, key, {
-        value: { enabled: row.enabled, property: row.property },
-        base: { enabled: baseCfg.enabled, property: baseCfg.property },
-        mode: 'cohort',
-        onChange: (next) => {
-          row.enabled = !!next.enabled;
-          row.property = next.property || baseCfg.property;
-          this.updateOverriddenFlag(row);
-        },
-      });
+      let reportFolderText: TextComponent;
+      const reportFolderSetting = new Setting(contentEl)
+        .setName('Report folder')
+        .setDesc('Vault-relative path for session reports.')
+        .addText((t) => {
+          reportFolderText = t;
+          t.setPlaceholder(DEFAULT_SETTINGS.sessionReport.folderPath)
+            .setValue(this.reportFolderPath)
+            .onChange((v) => {
+              this.reportFolderPath = (v ?? '').trim();
+            });
+        })
+        .addButton((b) =>
+          b
+            .setButtonText('Reset')
+            .setTooltip('Reset to global default')
+            .onClick(() => {
+              this.reportFolderPath = this.plugin.settings.sessionReport.folderPath;
+              reportFolderText.setValue(this.reportFolderPath);
+            }),
+        );
+
+      let reportNameText: TextComponent;
+      const reportNameSetting = new Setting(contentEl)
+        .setName('Report name')
+        .setDesc('Available: {{cohort}}, {{date}}, {{datetime}}, {{count}}')
+        .addText((t) => {
+          reportNameText = t;
+          t.setPlaceholder(DEFAULT_SETTINGS.sessionReport.nameTemplate)
+            .setValue(this.reportNameTemplate)
+            .onChange((v) => {
+              this.reportNameTemplate = (v ?? '').trim();
+            });
+        })
+        .addButton((b) =>
+          b
+            .setButtonText('Reset')
+            .setTooltip('Reset to global default')
+            .onClick(() => {
+              this.reportNameTemplate = this.plugin.settings.sessionReport.nameTemplate;
+              reportNameText.setValue(this.reportNameTemplate);
+            }),
+        );
+
+      let reportTemplateText: TextComponent;
+      const reportTemplateSetting = new Setting(contentEl)
+        .setName('Report template')
+        .setDesc(
+          'Vault path to a markdown file with {{glicko:...}} placeholders. Leave blank for built-in.',
+        )
+        .addText((t) => {
+          reportTemplateText = t;
+          t.setPlaceholder('e.g. Templates/My Report.md')
+            .setValue(this.reportTemplatePath)
+            .onChange((v) => {
+              this.reportTemplatePath = (v ?? '').trim();
+            });
+        })
+        .addButton((b) =>
+          b
+            .setButtonText('Reset')
+            .setTooltip('Reset to global default')
+            .onClick(() => {
+              this.reportTemplatePath = this.plugin.settings.sessionReport.reportTemplatePath ?? '';
+              reportTemplateText.setValue(this.reportTemplatePath);
+            }),
+        );
+
+      const updateReportVisibility = () => {
+        reportFolderSetting.settingEl.toggle(this.reportEnabled);
+        reportNameSetting.settingEl.toggle(this.reportEnabled);
+        reportTemplateSetting.settingEl.toggle(this.reportEnabled);
+      };
+
+      updateReportVisibility();
+    }
+
+    if (this.showFrontmatterSettings) {
+      for (const key of FM_PROP_KEYS) {
+        const row = this.working[key];
+        const baseCfg = this.base[key];
+
+        renderStandardFmPropertyRow(contentEl, key, {
+          value: { enabled: row.enabled, property: row.property },
+          base: { enabled: baseCfg.enabled, property: baseCfg.property },
+          mode: 'cohort',
+          onChange: (next) => {
+            row.enabled = !!next.enabled;
+            row.property = next.property || baseCfg.property;
+            this.updateOverriddenFlag(row);
+          },
+        });
+      }
     }
 
     const btns = new Setting(contentEl);
@@ -215,6 +332,12 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
             name: this.nameWorking || undefined,
             scrollStart: this.scrollWorking,
             syncScroll: this.syncScrollWorking,
+            sessionReport: {
+              enabled: this.reportEnabled,
+              folderPath: this.reportFolderPath,
+              nameTemplate: this.reportNameTemplate || DEFAULT_SETTINGS.sessionReport.nameTemplate,
+              reportTemplatePath: this.reportTemplatePath || undefined,
+            },
           };
           this.finish(result);
         }),
