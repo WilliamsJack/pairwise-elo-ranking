@@ -232,10 +232,13 @@ export default class ArenaSession {
     if (deletedWasVisible) {
       this.lastPair = undefined;
 
-      // Wait to ensure deleted file is cleaned up before reusing leaf
-      await new Promise((resolve) => window.setTimeout(resolve, 0));
-      await new Promise((resolve) => window.setTimeout(resolve, 0));
+      // Pre-emptively clear the stale leaf so Obsidian's cleanup
+      // doesn't race with our setViewState and overwrite the new file.
+      const staleLeaf = this.leftFile?.path === deletedPath ? this.leftLeaf : this.rightLeaf;
+      await staleLeaf.setViewState({ type: 'empty', state: {} });
 
+      const deletedName = deletedPath.replace(/.*\//, '').replace(/\.md$/i, '');
+      this.showToast(`Match skipped - "${deletedName}" was deleted.`);
       this.pickNextPair();
       await this.openCurrent();
     }
