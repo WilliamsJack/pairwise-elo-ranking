@@ -165,9 +165,10 @@ export default class ArenaSession {
       }
     }
 
-    if (this.stabilityJitterTimer != null) {
-      (this.overlayWin ?? window).clearTimeout(this.stabilityJitterTimer);
-      this.stabilityJitterTimer = undefined;
+    if (this.stabilityJitterAnim) {
+      this.stabilityJitterAnim.cancel();
+      this.stabilityJitterAnim = undefined;
+      this.stabilityBarFillEl?.classList.remove('is-surprise');
     }
 
     this.overlayWin = undefined;
@@ -338,7 +339,7 @@ export default class ArenaSession {
     return computeSurprise(undo.a.rating, undo.b.rating, undo.result);
   }
 
-  private stabilityJitterTimer?: number;
+  private stabilityJitterAnim?: Animation;
 
   private updateStabilityBar(surprise = 0): void {
     if (!this.stabilityBarFillEl) return;
@@ -352,9 +353,10 @@ export default class ArenaSession {
     const win = this.overlayWin ?? window;
 
     // Cancel any in-flight jitter so we don't fight with a new update
-    if (this.stabilityJitterTimer != null) {
-      win.clearTimeout(this.stabilityJitterTimer);
-      this.stabilityJitterTimer = undefined;
+    if (this.stabilityJitterAnim) {
+      this.stabilityJitterAnim.cancel();
+      this.stabilityJitterAnim = undefined;
+      this.stabilityBarFillEl?.classList.remove('is-surprise');
     }
 
     const jitterEnabled = this.plugin.settings.surpriseJitter ?? true;
@@ -364,39 +366,35 @@ export default class ArenaSession {
     // Amplitude scales with surprise (0–1) so mild upsets barely wobble.
     const SURPRISE_THRESHOLD = 0.15;
     if (jitterEnabled && surprise > SURPRISE_THRESHOLD) {
+      this.stabilityBarFillEl.classList.add('is-surprise');
+
       if (prefersReduced) {
         this.stabilityBarFillEl.setCssProps({ '--stability-width': `${pct}%` });
-        this.stabilityBarFillEl.classList.add('is-surprise');
-        this.stabilityJitterTimer = win.setTimeout(() => {
-          this.stabilityBarFillEl?.classList.remove('is-surprise');
-          this.stabilityJitterTimer = undefined;
-        }, 600);
+        this.stabilityJitterAnim = this.stabilityBarFillEl.animate([], { duration: 750 });
       } else {
         const amp = Math.min(8, surprise * 16);
         const back1 = Math.max(0, pct - amp);
         const fwd1 = Math.min(100, pct + amp * 0.6);
         const back2 = Math.max(0, pct - amp * 0.5);
         const fwd2 = Math.min(100, pct + amp * 0.3);
-        const step = 150;
 
-        const setWidth = (v: number) =>
-          this.stabilityBarFillEl?.setCssProps({ '--stability-width': `${v}%` });
-
-        setWidth(back1);
-        this.stabilityJitterTimer = win.setTimeout(() => {
-          setWidth(fwd1);
-          this.stabilityJitterTimer = win.setTimeout(() => {
-            setWidth(back2);
-            this.stabilityJitterTimer = win.setTimeout(() => {
-              setWidth(fwd2);
-              this.stabilityJitterTimer = win.setTimeout(() => {
-                setWidth(pct);
-                this.stabilityJitterTimer = undefined;
-              }, step);
-            }, step);
-          }, step);
-        }, step);
+        this.stabilityJitterAnim = this.stabilityBarFillEl.animate(
+          [
+            { width: `${back1}%` },
+            { width: `${fwd1}%` },
+            { width: `${back2}%` },
+            { width: `${fwd2}%` },
+            { width: `${pct}%` },
+          ],
+          { duration: 750, easing: 'ease', fill: 'forwards' },
+        );
       }
+
+      this.stabilityJitterAnim.onfinish = () => {
+        this.stabilityBarFillEl?.classList.remove('is-surprise');
+        this.stabilityBarFillEl?.setCssProps({ '--stability-width': `${pct}%` });
+        this.stabilityJitterAnim = undefined;
+      };
     } else {
       this.stabilityBarFillEl.setCssProps({ '--stability-width': `${pct}%` });
     }
