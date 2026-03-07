@@ -7,13 +7,20 @@ import { getNoteId } from './NoteIds';
 
 type PlayerStats = {
   rating: number;
+  uncertainty: number;
   matches: number;
   wins: number;
   rank: number;
 };
 
 function anyEnabled(fm: FrontmatterPropertiesSettings): boolean {
-  return !!fm.rating.enabled || !!fm.rank.enabled || !!fm.matches.enabled || !!fm.wins.enabled;
+  return (
+    !!fm.rating.enabled ||
+    !!fm.uncertainty.enabled ||
+    !!fm.rank.enabled ||
+    !!fm.matches.enabled ||
+    !!fm.wins.enabled
+  );
 }
 
 // Standard competition ranking ("1224" style)
@@ -70,6 +77,9 @@ function buildProps(fm: FrontmatterPropertiesSettings, stats: PlayerStats): Reco
 
   if (fm.rating.enabled && fm.rating.property) {
     out[fm.rating.property] = Math.round(stats.rating);
+  }
+  if (fm.uncertainty.enabled && fm.uncertainty.property) {
+    out[fm.uncertainty.property] = Math.round(stats.uncertainty);
   }
   if (fm.rank.enabled && fm.rank.property) {
     out[fm.rank.property] = stats.rank;
@@ -304,6 +314,7 @@ export async function writeFrontmatterStatsForPlayer(
   const rankMap = precomputedRankMap;
   const props = buildProps(fm, {
     rating: p.rating,
+    uncertainty: p.sigma,
     matches: p.matches,
     wins: p.wins,
     rank: rankMap.get(playerId) ?? rankMap.size,

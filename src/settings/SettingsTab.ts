@@ -188,7 +188,7 @@ export default class GlickoSettingsTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Stability threshold')
       .setDesc(
-        `Sigma value at which the progress bar reaches 100%. Lower values require more matches. Default: ${DEFAULT_SETTINGS.stabilityThreshold}.`,
+        `Uncertainty value at which the progress bar reaches 100%. Lower values require more matches. Default: ${DEFAULT_SETTINGS.stabilityThreshold}.`,
       )
       .addSlider((sl) => {
         const current =
@@ -530,7 +530,7 @@ export default class GlickoSettingsTab extends PluginSettingTab {
       newProp?: string;
     }> = [];
 
-    const keys: PropKey[] = ['rating', 'rank', 'matches', 'wins'];
+    const keys: PropKey[] = ['rating', 'uncertainty', 'rank', 'matches', 'wins'];
     for (const key of keys) {
       const oldCfg = oldEffective[key];
       const newCfg = newEffective[key];
@@ -566,6 +566,8 @@ export default class GlickoSettingsTab extends PluginSettingTab {
         for (const [id, rank] of rankMap) map.set(id, rank);
       } else if (key === 'rating') {
         for (const [id, p] of Object.entries(cohort.players)) map.set(id, Math.round(p.rating));
+      } else if (key === 'uncertainty') {
+        for (const [id, p] of Object.entries(cohort.players)) map.set(id, Math.round(p.sigma));
       } else if (key === 'matches') {
         for (const [id, p] of Object.entries(cohort.players)) map.set(id, p.matches);
       } else if (key === 'wins') {

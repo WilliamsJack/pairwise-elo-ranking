@@ -60,6 +60,12 @@ function mergeSettings(raw?: Partial<GlickoSettings>): GlickoSettings {
 
   const out: GlickoSettings = { ...base, ...raw };
 
+  // Deep-merge frontmatterProperties so new keys (e.g. uncertainty) get defaults
+  out.frontmatterProperties = {
+    ...DEFAULT_SETTINGS.frontmatterProperties,
+    ...raw.frontmatterProperties,
+  };
+
   if (noIdPropertyName) {
     out.idPropertyName = 'eloId';
   }
@@ -183,13 +189,20 @@ export class PluginDataStore {
   resetPlayer(cohortKey: string, playerId: string): boolean {
     const cohort = this.store.cohorts[cohortKey];
     if (!cohort?.players[playerId]) return false;
-    cohort.players[playerId] = { rating: 1500, matches: 0, wins: 0 };
+    cohort.players[playerId] = { rating: 1500, matches: 0, wins: 0, sigma: DEFAULT_SIGMA };
     return true;
   }
 
   ensurePlayer(cohortKey: string, id: string) {
     const cohort = (this.store.cohorts[cohortKey] ??= { players: {} } as CohortData);
-    const player = (cohort.players[id] ??= { rating: 1500, matches: 0, wins: 0 });
+    const player = (cohort.players[id] ??= {
+      rating: 1500,
+      matches: 0,
+      wins: 0,
+      sigma: DEFAULT_SIGMA,
+    });
+    // Backfill legacy players that predate sigma tracking
+    if (player.sigma === undefined) (player as { sigma: number }).sigma = DEFAULT_SIGMA;
     return { cohort, player };
   }
 
@@ -201,8 +214,8 @@ export class PluginDataStore {
   ): { winnerId?: string; undo: UndoFrame } {
     const cohort = (this.store.cohorts[cohortKey] ??= { players: {} });
 
-    const a = (cohort.players[aId] ??= { rating: 1500, matches: 0, wins: 0 });
-    const b = (cohort.players[bId] ??= { rating: 1500, matches: 0, wins: 0 });
+    const a = (cohort.players[aId] ??= { rating: 1500, matches: 0, wins: 0, sigma: DEFAULT_SIGMA });
+    const b = (cohort.players[bId] ??= { rating: 1500, matches: 0, wins: 0, sigma: DEFAULT_SIGMA });
 
     const now = Date.now();
 
@@ -220,8 +233,8 @@ export class PluginDataStore {
     // accommodate preference drift. This also prevents the stability progress
     // bar from regressing after long gaps between sessions.
     const cap = this.settings.stabilityThreshold ?? 150;
-    const preSigmaA = inflateSigma(a.sigma ?? DEFAULT_SIGMA, now - (a.lastMatchAt ?? now), cap);
-    const preSigmaB = inflateSigma(b.sigma ?? DEFAULT_SIGMA, now - (b.lastMatchAt ?? now), cap);
+    const preSigmaA = inflateSigma(a.sigma, now - (a.lastMatchAt ?? now), cap);
+    const preSigmaB = inflateSigma(b.sigma, now - (b.lastMatchAt ?? now), cap);
 
     const sA = result === 'A' ? 1 : result === 'D' ? 0.5 : 0;
     const resA = glickoUpdate(a.rating, b.rating, preSigmaA, preSigmaB, sA);
@@ -327,7 +340,7 @@ function snapshot(
   rating: number,
   matches: number,
   wins: number,
-  sigma?: number,
+  sigma: number,
   lastMatchAt?: number,
 ): PlayerSnapshot {
   return { id, rating, matches, wins, sigma, lastMatchAt };

@@ -184,7 +184,7 @@ export function computePlaceholders(
   if (cohort) {
     const allWithSigma = Object.entries(cohort.players)
       .filter(([, p]) => p.sigma != null)
-      .map(([id, p]) => ({ id, sigma: p.sigma! }));
+      .map(([id, p]) => ({ id, sigma: p.sigma }));
 
     const sessionWithSigma = allWithSigma.filter(({ id }) => uniquePlayerIds.has(id));
 
@@ -221,7 +221,7 @@ export function computePlaceholders(
     }
 
     // Leaderboard tables
-    const buildLeaderboard = (entries: { id: string; rating: number; sigma?: number }[]) => {
+    const buildLeaderboard = (entries: { id: string; rating: number; sigma: number }[]) => {
       if (entries.length === 0) return '';
       const rows: string[] = [];
       rows.push('| Rank | Note | Rating |');
@@ -229,7 +229,7 @@ export function computePlaceholders(
       for (let i = 0; i < entries.length; i++) {
         const e = entries[i];
         const name = idToName(e.id, data.idToPath);
-        const sigma = e.sigma != null ? ` (σ ${Math.round(e.sigma)})` : '';
+        const sigma = ` (σ ${Math.round(e.sigma)})`;
         rows.push(`| ${i + 1} | ${name} | ${Math.round(e.rating)}${sigma} |`);
       }
       return rows.join('\n');

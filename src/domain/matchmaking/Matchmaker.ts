@@ -1,10 +1,9 @@
 import type { TFile } from 'obsidian';
 
-import { DEFAULT_SIGMA } from '../rating/GlickoEngine';
 import type { ScoredPlayer } from './InfoGain';
 import { pickMaxInfoGainPair } from './InfoGain';
 
-export type RatingStats = { rating: number; sigma?: number };
+export type RatingStats = { rating: number; sigma: number };
 
 export function pickNextPairIndices(
   files: TFile[],
@@ -28,7 +27,7 @@ export function pickNextPairIndices(
 
   const players: ScoredPlayer[] = files.map((f, i) => {
     const s = getStats(f);
-    return { index: i, rating: s.rating, sigma: s.sigma ?? DEFAULT_SIGMA };
+    return { index: i, rating: s.rating, sigma: s.sigma };
   });
 
   const result = pickMaxInfoGainPair(players, rng, { lastPairIndices });

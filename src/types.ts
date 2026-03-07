@@ -6,7 +6,7 @@ export interface Player {
   rating: number;
   matches: number;
   wins: number;
-  sigma?: number;
+  sigma: number;
   lastMatchAt?: number;
 }
 
@@ -71,7 +71,7 @@ export interface PlayerSnapshot {
   rating: number;
   matches: number;
   wins: number;
-  sigma?: number;
+  sigma: number;
   lastMatchAt?: number;
 }
 

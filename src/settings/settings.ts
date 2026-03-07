@@ -8,6 +8,7 @@ export interface FrontmatterPropertyConfig {
 
 export interface FrontmatterPropertiesSettings {
   rating: FrontmatterPropertyConfig;
+  uncertainty: FrontmatterPropertyConfig;
   rank: FrontmatterPropertyConfig;
   matches: FrontmatterPropertyConfig;
   wins: FrontmatterPropertyConfig;
@@ -42,6 +43,7 @@ export const DEFAULT_SETTINGS: GlickoSettings = {
   sessionLayout: 'new-tab',
   frontmatterProperties: {
     rating: { property: 'glickoRating', enabled: false },
+    uncertainty: { property: 'glickoUncertainty', enabled: false },
     rank: { property: 'glickoRank', enabled: false },
     matches: { property: 'glickoMatches', enabled: false },
     wins: { property: 'glickoWins', enabled: false },
@@ -68,6 +70,7 @@ export function effectiveFrontmatterProperties(
 ): FrontmatterPropertiesSettings {
   return {
     rating: overrides?.rating ?? base.rating,
+    uncertainty: overrides?.uncertainty ?? base.uncertainty,
     rank: overrides?.rank ?? base.rank,
     matches: overrides?.matches ?? base.matches,
     wins: overrides?.wins ?? base.wins,

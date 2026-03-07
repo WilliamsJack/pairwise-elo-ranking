@@ -106,6 +106,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
 
     this.working = {
       rating: mk('rating'),
+      uncertainty: mk('uncertainty'),
       rank: mk('rank'),
       matches: mk('matches'),
       wins: mk('wins'),

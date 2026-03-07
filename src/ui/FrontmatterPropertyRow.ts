@@ -1,8 +1,14 @@
 import type { TextComponent, ToggleComponent } from 'obsidian';
 import { Setting } from 'obsidian';
 
-export type FmPropKey = 'rating' | 'rank' | 'matches' | 'wins';
-export const FM_PROP_KEYS: readonly FmPropKey[] = ['rating', 'rank', 'matches', 'wins'] as const;
+export type FmPropKey = 'rating' | 'uncertainty' | 'rank' | 'matches' | 'wins';
+export const FM_PROP_KEYS: readonly FmPropKey[] = [
+  'rating',
+  'uncertainty',
+  'rank',
+  'matches',
+  'wins',
+] as const;
 
 type Meta = { label: string; desc: string };
 
@@ -10,6 +16,10 @@ const META: Record<FmPropKey, Meta> = {
   rating: {
     label: 'Rating',
     desc: 'Write the current Glicko rating to this property.',
+  },
+  uncertainty: {
+    label: 'Uncertainty',
+    desc: 'Write how uncertain the rating is. Starts high and decreases as more comparisons are made.',
   },
   rank: {
     label: 'Rank',

@@ -321,7 +321,7 @@ export default class ArenaSession {
 
     let playedSum = 0;
     for (const p of players) {
-      playedSum += p.sigma ?? DEFAULT_SIGMA;
+      playedSum += p.sigma;
     }
 
     // Files not yet in the player table carry full uncertainty
@@ -739,7 +739,7 @@ export default class ArenaSession {
 
   // ---- Matchmaking helpers ----
 
-  private getStatsForFile(file: TFile): { rating: number; sigma?: number } {
+  private getStatsForFile(file: TFile): { rating: number; sigma: number } {
     const id = this.idByPath.get(file.path);
     const cohort = this.plugin.dataStore.store.cohorts[this.cohortKey];
 
@@ -748,7 +748,7 @@ export default class ArenaSession {
       if (p) return { rating: p.rating, sigma: p.sigma };
     }
 
-    return { rating: 1500 };
+    return { rating: 1500, sigma: DEFAULT_SIGMA };
   }
 
   private pickNextPair() {
