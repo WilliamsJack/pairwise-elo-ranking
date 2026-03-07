@@ -1,5 +1,5 @@
 {
-	"name": "pairwise-elo-ranking",
+	"name": "pairwise-glicko-ranking",
 	"version": "1.6.0",
 	"description": "Easily sort notes by any subjective criteria - Rank cohorts of notes in your vault by pairwise comparisons using the Glicko rating system.",
 	"main": "main.js",

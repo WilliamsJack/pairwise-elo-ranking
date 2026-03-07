@@ -1,5 +1,5 @@
 {
-	"id": "pairwise-elo-ranking",
+	"id": "pairwise-glicko-ranking",
 	"name": "Pairwise Glicko Ranking",
 	"version": "1.6.0",
 	"minAppVersion": "1.10.0",

@@ -2,7 +2,7 @@ import type { App, TFile } from 'obsidian';
 
 import { debugWarn } from './logger';
 
-// Matches HTML comments like: <!-- eloId: 123e4567-e89b-12d3-a456-426614174000 -->
+// Matches HTML comments like: <!-- glickoId: 123e4567-e89b-12d3-a456-426614174000 -->
 function buildIdHtmlCommentRegex(propName: string): RegExp {
   const escaped = propName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`<!--\\s*${escaped}\\s*:\\s*([0-9A-Za-z][0-9A-Za-z._-]*)\\s*-->`, 'g');

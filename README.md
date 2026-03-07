@@ -21,7 +21,7 @@ _Other comparison arena UI options are available in Settings - shown here is **r
 ## Try it in two minutes
 
 1. Install: Not yet in the Community Plugins list, so first install [BRAT](https://obsidian.md/plugins?id=obsidian42-brat)
-2. Add the Pairwise Glicko Ranking repo - `https://github.com/WilliamsJack/pairwise-elo-ranking` and enable the plugin
+2. Add the Pairwise Glicko Ranking repo - `https://github.com/WilliamsJack/pairwise-glicko-ranking` and enable the plugin
 3. Run the **Pairwise Glicko Ranking: Start rating session** command (or click the trophy icon)
 4. Pick a small cohort (10 notes is perfect)
 5. Do ~10-20 comparisons and you'll see an order emerge surprisingly fast
