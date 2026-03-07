@@ -26,7 +26,7 @@ function anyEnabled(fm: FrontmatterPropertiesSettings): boolean {
 // Standard competition ranking ("1224" style)
 export function computeRanksForAll(cohort: CohortData): Map<string, number> {
   const entries = Object.entries(cohort.players);
-  entries.sort((a, b) => b[1].rating - a[1].rating);
+  entries.sort((a, b) => Math.round(b[1].rating) - Math.round(a[1].rating));
 
   const map = new Map<string, number>();
   let lastRating: number | undefined = undefined;
@@ -35,9 +35,10 @@ export function computeRanksForAll(cohort: CohortData): Map<string, number> {
 
   for (let i = 0; i < entries.length; i++) {
     const [id, player] = entries[i];
-    if (lastRating === undefined || player.rating !== lastRating) {
+    const rounded = Math.round(player.rating);
+    if (lastRating === undefined || rounded !== lastRating) {
       rank = nextRank;
-      lastRating = player.rating;
+      lastRating = rounded;
     }
     map.set(id, rank);
     nextRank = i + 2;
@@ -49,7 +50,10 @@ export function computeRanksForAll(cohort: CohortData): Map<string, number> {
 // have a strictly higher rating (standard competition ranking)
 function computeRanksForSubset(cohort: CohortData, playerIds: string[]): Map<string, number> {
   const targets = playerIds
-    .map((id) => ({ id, rating: cohort.players[id]?.rating }))
+    .map((id) => {
+      const r = cohort.players[id]?.rating;
+      return { id, rating: r !== undefined ? Math.round(r) : undefined };
+    })
     .filter((t): t is { id: string; rating: number } => t.rating !== undefined);
 
   if (targets.length === 0) return new Map();
@@ -58,8 +62,9 @@ function computeRanksForSubset(cohort: CohortData, playerIds: string[]): Map<str
   // any target's rating and increment that target's rank counter
   const higherCounts = new Map<string, number>(targets.map((t) => [t.id, 0]));
   for (const player of Object.values(cohort.players)) {
+    const rounded = Math.round(player.rating);
     for (const t of targets) {
-      if (player.rating > t.rating) {
+      if (rounded > t.rating) {
         higherCounts.set(t.id, higherCounts.get(t.id)! + 1);
       }
     }
