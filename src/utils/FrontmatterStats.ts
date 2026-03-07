@@ -3,7 +3,7 @@ import { Notice } from 'obsidian';
 
 import type { FrontmatterPropertiesSettings } from '../settings';
 import type { CohortData } from '../types';
-import { getEloId } from './NoteIds';
+import { getNoteId } from './NoteIds';
 
 type PlayerStats = {
   rating: number;
@@ -102,6 +102,7 @@ async function planFrontmatterUpdates(
   valuesById: Map<string, number>,
   newPropName: string,
   oldPropName?: string,
+  idPropertyName?: string,
 ): Promise<{ plans: FrontmatterUpdatePlan[] }> {
   const prop = (newPropName ?? '').trim();
   const oldProp = (oldPropName ?? '').trim();
@@ -109,7 +110,7 @@ async function planFrontmatterUpdates(
   const plans: FrontmatterUpdatePlan[] = [];
 
   for (const file of files) {
-    const id = await getEloId(app, file);
+    const id = await getNoteId(app, file, idPropertyName ?? 'glickoId');
     if (!id) continue;
 
     const fcRaw: unknown = app.metadataCache.getFileCache(file)?.frontmatter;
@@ -170,8 +171,16 @@ export async function previewCohortFrontmatterPropertyUpdates(
   valuesById: Map<string, number>,
   newPropName: string,
   oldPropName?: string,
+  idPropertyName?: string,
 ): Promise<{ wouldUpdate: number }> {
-  const { plans } = await planFrontmatterUpdates(app, files, valuesById, newPropName, oldPropName);
+  const { plans } = await planFrontmatterUpdates(
+    app,
+    files,
+    valuesById,
+    newPropName,
+    oldPropName,
+    idPropertyName,
+  );
   return { wouldUpdate: plans.length };
 }
 
@@ -184,8 +193,16 @@ export async function updateCohortFrontmatterProperties(
   valuesById: Map<string, number>,
   newPropName: string,
   oldPropName?: string,
+  idPropertyName?: string,
 ): Promise<{ updated: number }> {
-  const { plans } = await planFrontmatterUpdates(app, files, valuesById, newPropName, oldPropName);
+  const { plans } = await planFrontmatterUpdates(
+    app,
+    files,
+    valuesById,
+    newPropName,
+    oldPropName,
+    idPropertyName,
+  );
 
   let updated = 0;
   for (const p of plans) {
@@ -217,6 +234,7 @@ export async function updateCohortFrontmatter(
   newPropName: string,
   oldPropName?: string,
   noticeMessage?: string,
+  idPropertyName?: string,
 ): Promise<{ updated: number }> {
   const working = new Notice(noticeMessage ?? 'Updating frontmatter...', 0);
   try {
@@ -226,6 +244,7 @@ export async function updateCohortFrontmatter(
       valuesById,
       newPropName,
       oldPropName,
+      idPropertyName,
     );
   } finally {
     working.hide();

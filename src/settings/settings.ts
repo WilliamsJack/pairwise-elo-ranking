@@ -1,4 +1,4 @@
-export type EloIdLocation = 'frontmatter' | 'end';
+export type IdLocation = 'frontmatter' | 'end';
 export type SessionLayoutMode = 'reuse-active' | 'right-split' | 'new-tab' | 'new-window';
 
 export interface FrontmatterPropertyConfig {
@@ -13,9 +13,10 @@ export interface FrontmatterPropertiesSettings {
   wins: FrontmatterPropertyConfig;
 }
 
-export interface EloSettings {
+export interface GlickoSettings {
   showToasts: boolean;
-  eloIdLocation: EloIdLocation;
+  idPropertyName: string;
+  idLocation: IdLocation;
   sessionLayout: SessionLayoutMode;
   frontmatterProperties: FrontmatterPropertiesSettings;
   askForOverridesOnCohortCreation: boolean;
@@ -25,15 +26,16 @@ export interface EloSettings {
   debugLogging: boolean;
 }
 
-export const DEFAULT_SETTINGS: EloSettings = {
+export const DEFAULT_SETTINGS: GlickoSettings = {
   showToasts: true,
-  eloIdLocation: 'frontmatter',
+  idPropertyName: 'glickoId',
+  idLocation: 'frontmatter',
   sessionLayout: 'new-tab',
   frontmatterProperties: {
-    rating: { property: 'eloRating', enabled: false },
-    rank: { property: 'eloRank', enabled: false },
-    matches: { property: 'eloMatches', enabled: false },
-    wins: { property: 'eloWins', enabled: false },
+    rating: { property: 'glickoRating', enabled: false },
+    rank: { property: 'glickoRank', enabled: false },
+    matches: { property: 'glickoMatches', enabled: false },
+    wins: { property: 'glickoWins', enabled: false },
   },
   askForOverridesOnCohortCreation: true,
 

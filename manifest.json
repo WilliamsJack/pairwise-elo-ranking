@@ -1,9 +1,9 @@
 {
 	"id": "pairwise-elo-ranking",
-	"name": "Pairwise Elo Ranking",
+	"name": "Pairwise Glicko Ranking",
 	"version": "1.5.0",
 	"minAppVersion": "1.10.0",
-	"description": "Easily sort notes by any subjective criteria - Rank cohorts of notes in your vault by pairwise comparisons using the Elo rating system.",
+	"description": "Easily sort notes by any subjective criteria - Rank cohorts of notes in your vault by pairwise comparisons using the Glicko rating system.",
 	"author": "Jack Williams",
 	"authorUrl": "https://github.com/WilliamsJack",
 	"fundingUrl": "https://github.com/sponsors/WilliamsJack",

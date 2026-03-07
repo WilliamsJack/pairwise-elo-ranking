@@ -2,7 +2,7 @@ import type { App, TFile } from 'obsidian';
 import { Notice, Setting } from 'obsidian';
 
 import { debugWarn } from '../utils/logger';
-import { removeEloIdEverywhere } from '../utils/NoteIds';
+import { removeNoteIdEverywhere } from '../utils/NoteIds';
 import { BasePromiseModal } from './PromiseModal';
 
 function formatCreatedTime(file: TFile): string {
@@ -22,16 +22,18 @@ function formatCreatedTime(file: TFile): string {
   }
 }
 
-export class ResolveDuplicateEloIdsModal extends BasePromiseModal<boolean> {
-  private eloId: string;
+export class ResolveDuplicateIdsModal extends BasePromiseModal<boolean> {
+  private noteId: string;
   private files: TFile[];
+  private propertyName: string;
 
   private working = false;
 
-  constructor(app: App, opts: { eloId: string; files: TFile[] }) {
+  constructor(app: App, opts: { noteId: string; files: TFile[]; propertyName: string }) {
     super(app);
-    this.eloId = opts.eloId;
+    this.noteId = opts.noteId;
     this.files = opts.files.slice();
+    this.propertyName = opts.propertyName;
   }
 
   async openAndGetResult(): Promise<boolean | undefined> {
@@ -57,12 +59,12 @@ export class ResolveDuplicateEloIdsModal extends BasePromiseModal<boolean> {
   private async keepIdOnFile(keep: TFile): Promise<void> {
     const others = this.files.filter((f) => f.path !== keep.path);
 
-    const workingNotice = new Notice('Fixing duplicate Elo IDs...', 0);
+    const workingNotice = new Notice('Fixing duplicate note IDs...', 0);
     let removed = 0;
 
     try {
       for (const f of others) {
-        const changed = await removeEloIdEverywhere(this.app, f);
+        const changed = await removeNoteIdEverywhere(this.app, f, this.propertyName);
         if (changed) removed += 1;
       }
     } finally {
@@ -70,7 +72,7 @@ export class ResolveDuplicateEloIdsModal extends BasePromiseModal<boolean> {
     }
 
     new Notice(
-      `Kept Elo ID on "${keep.basename}". Removed Elo ID from ${removed} other note${
+      `Kept note ID on "${keep.basename}". Removed note ID from ${removed} other note${
         removed === 1 ? '' : 's'
       }.`,
     );
@@ -82,20 +84,20 @@ export class ResolveDuplicateEloIdsModal extends BasePromiseModal<boolean> {
     const { contentEl } = this;
     contentEl.empty();
 
-    contentEl.createEl('h3', { text: 'Duplicate Elo IDs detected' });
+    contentEl.createEl('h3', { text: 'Duplicate note IDs detected' });
 
     const msg = contentEl.createEl('p');
-    msg.textContent = `Two or more notes in this cohort share the same Elo ID. This usually happens when a note is copied.
-      Pairwise Elo Ranking uses the ID to track ratings - duplicates will cause notes to share a single rating history.`;
+    msg.textContent = `Two or more notes in this cohort share the same note ID. This usually happens when a note is copied.
+      Pairwise Glicko Ranking uses the ID to track ratings - duplicates will cause notes to share a single rating history.`;
 
     const hint = contentEl.createEl('p');
     hint.textContent =
       'If you are not sure which note should keep the ID, keep it on the oldest note and remove it from the newest copy.';
 
-    const idRow = new Setting(contentEl).setName('Duplicate Elo ID').setDesc(this.eloId);
-    idRow.settingEl.classList.add('elo-static');
+    const idRow = new Setting(contentEl).setName('Duplicate note ID').setDesc(this.noteId);
+    idRow.settingEl.classList.add('glicko-static');
 
-    contentEl.createEl('h4', { text: 'Notes using this Elo ID' });
+    contentEl.createEl('h4', { text: 'Notes using this note ID' });
 
     const listWrap = contentEl.createDiv();
 
@@ -123,7 +125,7 @@ export class ResolveDuplicateEloIdsModal extends BasePromiseModal<boolean> {
       row.addButton((b) =>
         b
           .setCta()
-          .setButtonText('Keep Elo ID')
+          .setButtonText('Keep note ID')
           .onClick(async () => {
             if (this.working) return;
             this.setWorking(true);

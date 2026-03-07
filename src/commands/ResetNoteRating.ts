@@ -2,7 +2,7 @@ import type { App, TFile } from 'obsidian';
 import { Notice } from 'obsidian';
 
 import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
-import type { EloSettings } from '../settings';
+import type { GlickoSettings } from '../settings';
 import { effectiveFrontmatterProperties } from '../settings';
 import type { PluginDataStore } from '../storage/PluginDataStore';
 import { ConfirmModal } from '../ui/ConfirmModal';
@@ -12,23 +12,23 @@ import {
   updateCohortFrontmatter,
   writeFrontmatterStatsForPlayer,
 } from '../utils/FrontmatterStats';
-import { getEloId } from '../utils/NoteIds';
+import { getNoteId } from '../utils/NoteIds';
 
 export async function resetNoteRating(
   app: App,
   dataStore: PluginDataStore,
-  settings: EloSettings,
+  settings: GlickoSettings,
   file: TFile,
 ): Promise<void> {
-  const eloId = await getEloId(app, file);
-  if (!eloId) {
-    new Notice('This note has no Elo ID.');
+  const noteId = await getNoteId(app, file, settings.idPropertyName);
+  if (!noteId) {
+    new Notice('This note has no note ID.');
     return;
   }
 
   // Find cohorts containing this player
   const matchingKeys = Object.keys(dataStore.store.cohorts).filter(
-    (key) => !!dataStore.store.cohorts[key]?.players[eloId],
+    (key) => !!dataStore.store.cohorts[key]?.players[noteId],
   );
 
   if (matchingKeys.length === 0) {
@@ -69,7 +69,7 @@ export async function resetNoteRating(
   if (!ok) return;
 
   for (const key of keysToReset) {
-    dataStore.resetPlayer(key, eloId);
+    dataStore.resetPlayer(key, noteId);
   }
   await dataStore.saveStore();
 
@@ -91,7 +91,7 @@ export async function resetNoteRating(
     const rankMap = computeRankMap(cohort);
 
     // Write the reset note's own stats (rating, matches, wins, rank)
-    await writeFrontmatterStatsForPlayer(app, fm, cohort, file, eloId, rankMap);
+    await writeFrontmatterStatsForPlayer(app, fm, cohort, file, noteId, rankMap);
 
     // Update rank across the whole cohort since relative ordering changed
     const rankCfg = fm.rank;
@@ -108,6 +108,7 @@ export async function resetNoteRating(
       rankCfg.property,
       undefined,
       'Updating ranks...',
+      settings.idPropertyName,
     );
   }
 }

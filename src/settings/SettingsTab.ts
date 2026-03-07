@@ -2,29 +2,30 @@ import type { App } from 'obsidian';
 import { Notice, PluginSettingTab, setIcon, Setting } from 'obsidian';
 
 import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
-import type EloPlugin from '../main';
+import type GlickoPlugin from '../main';
 import type { CohortData } from '../types';
 import { CohortOptionsModal } from '../ui/CohortOptionsModal';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { FolderSelectModal } from '../ui/FolderPicker';
 import { FM_PROP_KEYS, renderStandardFmPropertyRow } from '../ui/FrontmatterPropertyRow';
-import { applyEloIdTransferPlan, planEloIdTransfer } from '../utils/EloIdTransfer';
 import {
   computeRankMap,
   previewCohortFrontmatterPropertyUpdates,
   updateCohortFrontmatter,
 } from '../utils/FrontmatterStats';
-import type { EloIdLocation } from './settings';
+import { applyIdTransferPlan, planIdTransfer } from '../utils/IdTransfer';
+import type { IdLocation } from './settings';
 import type { FrontmatterPropertiesSettings, SessionLayoutMode } from './settings';
 import { DEFAULT_SETTINGS, effectiveFrontmatterProperties } from './settings';
+import { migrateIdPropertyName } from './SettingsTabMigration';
 
 type PropKey = keyof FrontmatterPropertiesSettings;
 
-export default class EloSettingsTab extends PluginSettingTab {
+export default class GlickoSettingsTab extends PluginSettingTab {
   icon = 'trophy';
-  plugin: EloPlugin;
+  plugin: GlickoPlugin;
 
-  constructor(app: App, plugin: EloPlugin) {
+  constructor(app: App, plugin: GlickoPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
@@ -70,9 +71,9 @@ export default class EloSettingsTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Elo ID location')
+      .setName('Note ID location')
       .setDesc(
-        `Where to store the Elo ID. When you change this setting, you can optionally move existing IDs to the new location.
+        `Where to store the note ID. When you change this setting, you can optionally move existing IDs to the new location.
         If you choose not to move them, IDs left in the old location will continue to work.
         The frontmatter ID is always used if it exists.`,
       )
@@ -81,25 +82,31 @@ export default class EloSettingsTab extends PluginSettingTab {
           frontmatter: 'Frontmatter (YAML)',
           end: 'End of note (HTML comment)',
         })
-          .setValue(this.plugin.settings.eloIdLocation ?? 'frontmatter')
+          .setValue(this.plugin.settings.idLocation ?? 'frontmatter')
           .onChange(async (v) => {
-            const oldLoc: EloIdLocation = this.plugin.settings.eloIdLocation ?? 'frontmatter';
-            const newLoc: EloIdLocation = v === 'end' ? 'end' : 'frontmatter';
+            const oldLoc: IdLocation = this.plugin.settings.idLocation ?? 'frontmatter';
+            const newLoc: IdLocation = v === 'end' ? 'end' : 'frontmatter';
             if (newLoc === oldLoc) return;
 
-            this.plugin.settings.eloIdLocation = newLoc;
+            this.plugin.settings.idLocation = newLoc;
             await this.plugin.saveSettings();
 
             const files = this.app.vault.getMarkdownFiles();
             if (files.length === 0) return;
 
-            const scanning = new Notice('Scanning notes for Elo IDs...', 0);
+            const propName = this.plugin.settings.idPropertyName;
+            const scanning = new Notice('Scanning notes for note IDs...', 0);
             let plan;
             try {
-              plan = await planEloIdTransfer(this.app, files, oldLoc, newLoc);
+              plan = await planIdTransfer(
+                this.app,
+                files,
+                { propertyName: propName, location: oldLoc },
+                { propertyName: propName, location: newLoc },
+              );
             } catch (e) {
-              console.error('[Elo] Failed to plan Elo ID transfer', e);
-              new Notice('Failed to scan notes for Elo IDs.');
+              console.error('[Glicko] Failed to plan note ID transfer', e);
+              new Notice('Failed to scan notes for note IDs.');
               return;
             } finally {
               scanning.hide();
@@ -107,11 +114,11 @@ export default class EloSettingsTab extends PluginSettingTab {
 
             if (plan.wouldUpdate === 0) return;
 
-            const locLabel = (loc: EloIdLocation) =>
+            const locLabel = (loc: IdLocation) =>
               loc === 'frontmatter' ? 'frontmatter' : 'end-of-note HTML comment';
 
             const msg =
-              `Move Elo IDs from ${locLabel(oldLoc)} to ${locLabel(newLoc)} for ${plan.wouldUpdate} note${plan.wouldUpdate === 1 ? '' : 's'}?` +
+              `Move note IDs from ${locLabel(oldLoc)} to ${locLabel(newLoc)} for ${plan.wouldUpdate} note${plan.wouldUpdate === 1 ? '' : 's'}?` +
               (plan.mismatches > 0
                 ? `\n\n${plan.mismatches} note${plan.mismatches === 1 ? ' has' : 's have'} differing IDs in frontmatter and the end-of-note HTML comment.
                 The ID in the end-of-note HTML comment will be removed, and the frontmatter ID will be ${newLoc === 'frontmatter' ? 'kept' : 'moved to the end-of-note HTML comment'}.`
@@ -119,7 +126,7 @@ export default class EloSettingsTab extends PluginSettingTab {
 
             const ok = await new ConfirmModal(
               this.app,
-              'Move Elo IDs?',
+              'Move note IDs?',
               msg,
               'Yes, move',
               'No, leave as-is',
@@ -127,17 +134,38 @@ export default class EloSettingsTab extends PluginSettingTab {
 
             if (!ok) return;
 
-            const res = await applyEloIdTransferPlan(this.app, plan, {
-              noticeMessage: 'Moving Elo IDs...',
+            const res = await applyIdTransferPlan(this.app, plan, {
+              noticeMessage: 'Moving note IDs...',
             });
 
             new Notice(
-              `Moved Elo IDs in ${res.updated} note${res.updated === 1 ? '' : 's'}` +
+              `Moved note IDs in ${res.updated} note${res.updated === 1 ? '' : 's'}` +
                 (res.mismatches > 0
                   ? ` (${res.mismatches} mismatch${res.mismatches === 1 ? '' : 'es'} resolved).`
                   : '.'),
             );
           });
+      });
+
+    // Note ID property name
+    new Setting(containerEl)
+      .setName('Note ID property name')
+      .setDesc(
+        'The frontmatter property (or HTML comment tag) used to store note IDs. Changing this will offer to migrate all existing notes.',
+      )
+      .addText((t) => {
+        t.setValue(this.plugin.settings.idPropertyName).setPlaceholder(
+          DEFAULT_SETTINGS.idPropertyName,
+        );
+
+        // Trigger migration on blur (not on every keystroke)
+        t.inputEl.addEventListener('blur', async () => {
+          const trimmed = (t.getValue() ?? '').trim();
+          if (!trimmed || trimmed === this.plugin.settings.idPropertyName) return;
+
+          await migrateIdPropertyName(this.app, this.plugin, trimmed);
+          this.display();
+        });
       });
 
     // Progress bar
@@ -180,7 +208,7 @@ export default class EloSettingsTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Templates folder')
       .setDesc(
-        'Excludes your templates from cohorts. Prevents Elo IDs from appearing on templates.',
+        'Excludes your templates from cohorts. Prevents note IDs from appearing on templates.',
       )
       .addText((t) => {
         t.setPlaceholder('Templates')
@@ -216,8 +244,8 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     const defs = this.plugin.dataStore.listCohortDefs();
     if (defs.length === 0) {
-      containerEl.createEl('div', {
-        cls: 'elo-muted',
+      containerEl.createDiv({
+        cls: 'glicko-muted',
         text: 'No cohorts saved yet. Start a session to create one, or use the Command palette.',
       });
     } else {
@@ -233,7 +261,7 @@ export default class EloSettingsTab extends PluginSettingTab {
       for (const def of sorted) {
         const row = list.createDiv({ cls: 'setting-item mod-toggle' });
 
-        const info = row.createDiv({ cls: 'elo-cohort-item-info' });
+        const info = row.createDiv({ cls: 'glicko-cohort-item-info' });
         info.addEventListener('click', () => {
           void this.configureCohort(def.key);
         });
@@ -288,10 +316,10 @@ export default class EloSettingsTab extends PluginSettingTab {
         }),
       );
 
-    const fmAcc = containerEl.createEl('details', { cls: 'elo-settings-accordion' });
+    const fmAcc = containerEl.createEl('details', { cls: 'glicko-settings-accordion' });
     fmAcc.open = false;
     fmAcc.createEl('summary', { text: 'Default frontmatter properties' });
-    const fmBody = fmAcc.createEl('div', { cls: 'elo-settings-body' });
+    const fmBody = fmAcc.createEl('div', { cls: 'glicko-settings-body' });
 
     const fm = this.plugin.settings.frontmatterProperties;
 
@@ -311,7 +339,7 @@ export default class EloSettingsTab extends PluginSettingTab {
 
     fmBody.createEl('p', {
       text:
-        "Choose which Elo statistics to write into a note's frontmatter and the property names to use. " +
+        "Choose which Glicko statistics to write into a note's frontmatter and the property names to use. " +
         'These are global defaults; cohort-specific overrides can be applied during creation.',
     });
 
@@ -425,6 +453,7 @@ export default class EloSettingsTab extends PluginSettingTab {
     });
     if (files.length === 0) return;
 
+    const idPropName = this.plugin.settings.idPropertyName;
     const cohort: CohortData | undefined = this.plugin.dataStore.store.cohorts[cohortKey];
     const valuesFor = (key: PropKey): Map<string, number> => {
       const map = new Map<string, number>();
@@ -454,6 +483,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           new Map(),
           '',
           change.oldProp,
+          idPropName,
         );
         if (preview.wouldUpdate === 0) continue;
 
@@ -473,6 +503,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           '',
           change.oldProp,
           `Removing "${change.oldProp}" from ${preview.wouldUpdate} notes...`,
+          idPropName,
         );
         new Notice(`Removed "${change.oldProp}" from ${res.updated} notes.`);
       } else if (change.action === 'rename' && change.oldProp && change.newProp) {
@@ -482,6 +513,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           vals,
           change.newProp,
           change.oldProp,
+          idPropName,
         );
         if (preview.wouldUpdate === 0) continue;
 
@@ -501,6 +533,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           change.newProp,
           change.oldProp,
           `Renaming "${change.oldProp}" to "${change.newProp}" on ${preview.wouldUpdate} notes...`,
+          idPropName,
         );
         new Notice(`Updated ${res.updated} notes.`);
       } else if (change.action === 'upsert' && change.newProp) {
@@ -509,6 +542,8 @@ export default class EloSettingsTab extends PluginSettingTab {
           files,
           vals,
           change.newProp,
+          undefined,
+          idPropName,
         );
         if (preview.wouldUpdate === 0) continue;
 
@@ -528,6 +563,7 @@ export default class EloSettingsTab extends PluginSettingTab {
           change.newProp,
           undefined,
           `Writing "${change.newProp}" to ${preview.wouldUpdate} notes...`,
+          idPropName,
         );
         new Notice(`Wrote "${change.newProp}" on ${res.updated} notes.`);
       }

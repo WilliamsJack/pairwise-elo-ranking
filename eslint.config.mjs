@@ -46,7 +46,14 @@ export default tseslint.config(
       'obsidianmd/ui/sentence-case': [
         'warn',
         {
-          brands: ['Elo', 'Markdown', 'Obsidian', 'Command palette', 'Pairwise Elo Ranking'],
+          brands: [
+            'Glicko',
+            'Markdown',
+            'Obsidian',
+            'Command palette',
+            'Pairwise Glicko Ranking',
+            'HTML',
+          ],
           acronyms: ['ID', 'K'],
         },
       ],

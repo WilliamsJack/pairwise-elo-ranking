@@ -3,14 +3,14 @@ import { MarkdownView, Notice, Platform, TFile } from 'obsidian';
 
 import { pickNextPairIndices } from '../domain/matchmaking/Matchmaker';
 import { DEFAULT_SIGMA, expectedScore } from '../domain/rating/GlickoEngine';
-import type EloPlugin from '../main';
+import type GlickoPlugin from '../main';
 import type { FrontmatterPropertiesSettings } from '../settings';
 import { effectiveFrontmatterProperties } from '../settings';
 import type { MatchResult, ScrollStartMode, UndoFrame } from '../types';
 import { writeFrontmatterStatsForPair } from '../utils/FrontmatterStats';
 import { applyInitialScroll, getPreviewEl } from '../utils/InitialScroll';
 import { debugWarn } from '../utils/logger';
-import { ensureEloId, getEloId } from '../utils/NoteIds';
+import { ensureNoteId, getNoteId } from '../utils/NoteIds';
 import { attempt, attemptAsync } from '../utils/safe';
 import { installScrollSync } from '../utils/ScrollSync';
 import type { ArenaLayoutHandle } from './LayoutManager';
@@ -18,7 +18,7 @@ import { ArenaLayoutManager } from './LayoutManager';
 
 export default class ArenaSession {
   private app: App;
-  private plugin: EloPlugin;
+  private plugin: GlickoPlugin;
   private cohortKey: string;
   private files: TFile[];
 
@@ -65,7 +65,7 @@ export default class ArenaSession {
 
   private stabilityBarFillEl?: HTMLElement;
 
-  constructor(app: App, plugin: EloPlugin, cohortKey: string, files: TFile[]) {
+  constructor(app: App, plugin: GlickoPlugin, cohortKey: string, files: TFile[]) {
     this.app = app;
     this.plugin = plugin;
     this.cohortKey = cohortKey;
@@ -236,7 +236,7 @@ export default class ArenaSession {
 
     this.clearScrollSync();
 
-    // Lazily ensure eloIds only for the notes being displayed
+    // Lazily ensure note IDs only for the notes being displayed
     await Promise.all([this.getIdForFile(this.leftFile), this.getIdForFile(this.rightFile)]);
 
     await Promise.all([
@@ -402,12 +402,12 @@ export default class ArenaSession {
 
     const win = btn.ownerDocument.defaultView ?? window;
 
-    btn.classList.add('elo-pressed');
+    btn.classList.add('glicko-pressed');
 
     const existing = this.pressTimers.get(btn);
     if (typeof existing === 'number') win.clearTimeout(existing);
 
-    const tid = win.setTimeout(() => btn.classList.remove('elo-pressed'), durationMs);
+    const tid = win.setTimeout(() => btn.classList.remove('glicko-pressed'), durationMs);
 
     this.pressTimers.set(btn, tid);
   }
@@ -444,16 +444,16 @@ export default class ArenaSession {
   }
 
   private mountOverlay(doc: Document = document) {
-    const el = doc.body.createDiv({ cls: 'elo-session-bar' });
+    const el = doc.body.createDiv({ cls: 'glicko-session-bar' });
     if (Platform.isPhone) el.classList.add('is-mobile');
 
-    el.createDiv({ cls: 'elo-side left' });
+    el.createDiv({ cls: 'glicko-side left' });
 
     if (Platform.isPhone) {
-      this.mobileTitleEl = el.createDiv({ cls: 'elo-mobile-title' });
+      this.mobileTitleEl = el.createDiv({ cls: 'glicko-mobile-title' });
     }
 
-    const controls = el.createDiv({ cls: 'elo-controls' });
+    const controls = el.createDiv({ cls: 'glicko-controls' });
 
     if (Platform.isPhone) {
       this.drawBtn = this.makeButton(doc, 'Draw', () => void this.choose('D'));
@@ -474,11 +474,11 @@ export default class ArenaSession {
       controls.append(this.leftBtn, this.drawBtn, this.rightBtn, this.undoBtn, this.endBtn);
     }
 
-    el.createDiv({ cls: 'elo-side right' });
+    el.createDiv({ cls: 'glicko-side right' });
 
     // Stability progress bar
-    const track = el.createDiv({ cls: 'elo-stability-track' });
-    this.stabilityBarFillEl = track.createDiv({ cls: 'elo-stability-fill' });
+    const track = el.createDiv({ cls: 'glicko-stability-track' });
+    this.stabilityBarFillEl = track.createDiv({ cls: 'glicko-stability-fill' });
 
     this.overlayEl = el;
     this.updateOverlay();
@@ -515,8 +515,8 @@ export default class ArenaSession {
   private updateOverlay() {
     if (!this.overlayEl) return;
 
-    const left = this.overlayEl.querySelector('.elo-side.left') as HTMLElement;
-    const right = this.overlayEl.querySelector('.elo-side.right') as HTMLElement;
+    const left = this.overlayEl.querySelector('.glicko-side.left') as HTMLElement;
+    const right = this.overlayEl.querySelector('.glicko-side.right') as HTMLElement;
     left.textContent = this.leftFile?.basename ?? 'Left';
     right.textContent = this.rightFile?.basename ?? 'Right';
 
@@ -550,7 +550,7 @@ export default class ArenaSession {
     if (this.shortcutsPausedToastShown === true) return;
 
     this.shortcutsPausedToastShown = true;
-    this.showToast('Elo keyboard shortcuts are paused while editing.');
+    this.showToast('Glicko keyboard shortcuts are paused while editing.');
   }
 
   private onKeydown(ev: KeyboardEvent) {
@@ -673,16 +673,18 @@ export default class ArenaSession {
     const cached = this.idByPath.get(file.path);
     if (cached) return cached;
 
-    const existing = await getEloId(this.app, file);
+    const propName = this.plugin.settings.idPropertyName;
+    const existing = await getNoteId(this.app, file, propName);
     if (existing) {
       this.idByPath.set(file.path, existing);
       return existing;
     }
 
-    const id = await ensureEloId(
+    const id = await ensureNoteId(
       this.app,
       file,
-      this.plugin.settings.eloIdLocation ?? 'frontmatter',
+      this.plugin.settings.idLocation ?? 'frontmatter',
+      propName,
     );
     this.idByPath.set(file.path, id);
     return id;

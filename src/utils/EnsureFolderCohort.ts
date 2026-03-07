@@ -17,7 +17,7 @@ export async function ensureFolderCohortPath(
   const af = app.vault.getAbstractFileByPath(path);
   if (af instanceof TFolder) return def;
 
-  // Collect Elo IDs from stored cohort (if any) for suggestions.
+  // Collect note IDs from stored cohort (if any) for suggestions.
   const cohort = dataStore.store.cohorts[def.key];
   const idSet = new Set<string>(cohort ? Object.keys(cohort.players ?? {}) : []);
 
@@ -25,6 +25,7 @@ export async function ensureFolderCohortPath(
     oldPath: path,
     recursive: def.kind === 'folder-recursive',
     cohortIds: idSet,
+    idPropertyName: dataStore.settings.idPropertyName,
   }).openAndGetFolderPath();
 
   if (!picked) {

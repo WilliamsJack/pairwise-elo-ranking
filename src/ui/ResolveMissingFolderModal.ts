@@ -1,7 +1,7 @@
 import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
-import { getEloId } from '../utils/NoteIds';
+import { getNoteId } from '../utils/NoteIds';
 import { FolderSelectModal } from './FolderPicker';
 import { BasePromiseModal } from './PromiseModal';
 
@@ -14,6 +14,7 @@ export class ResolveMissingFolderModal extends BasePromiseModal<string | undefin
   private oldPath: string;
   private recursive: boolean;
   private cohortIds: Set<string>;
+  private idPropertyName: string;
 
   private listEl?: HTMLElement;
   private progressEl?: HTMLElement;
@@ -24,11 +25,15 @@ export class ResolveMissingFolderModal extends BasePromiseModal<string | undefin
   private cancelled = false;
   private lastRenderTs = 0;
 
-  constructor(app: App, opts: { oldPath: string; recursive: boolean; cohortIds: Set<string> }) {
+  constructor(
+    app: App,
+    opts: { oldPath: string; recursive: boolean; cohortIds: Set<string>; idPropertyName: string },
+  ) {
     super(app);
     this.oldPath = opts.oldPath;
     this.recursive = opts.recursive;
     this.cohortIds = opts.cohortIds;
+    this.idPropertyName = opts.idPropertyName;
   }
 
   async openAndGetFolderPath(): Promise<string | undefined> {
@@ -96,7 +101,7 @@ export class ResolveMissingFolderModal extends BasePromiseModal<string | undefin
 
     if (items.length === 0) {
       el.createDiv({
-        cls: 'elo-muted',
+        cls: 'glicko-muted',
         text: this.scanning
           ? 'Building suggestions...'
           : 'No suggestions. Use Browse to pick a folder.',
@@ -107,14 +112,14 @@ export class ResolveMissingFolderModal extends BasePromiseModal<string | undefin
     for (const s of items.slice(0, 10)) {
       const row = new Setting(el)
         .setName(s.path || '/')
-        .setDesc(`${s.count} note${s.count === 1 ? '' : 's'} with matching Elo IDs`)
+        .setDesc(`${s.count} note${s.count === 1 ? '' : 's'} with matching note IDs`)
         .addButton((b) =>
           b
             .setCta()
             .setButtonText('Use')
             .onClick(() => this.finish(s.path)),
         );
-      row.settingEl.classList.add('elo-static');
+      row.settingEl.classList.add('glicko-static');
     }
   }
 
@@ -140,7 +145,7 @@ export class ResolveMissingFolderModal extends BasePromiseModal<string | undefin
         if (i >= files.length) break;
         const f = files[i];
 
-        const id = await getEloId(this.app, f);
+        const id = await getNoteId(this.app, f, this.idPropertyName);
         if (id && this.cohortIds.has(id)) {
           const folder = f.parent?.path ?? '';
           this.suggestions.set(folder, (this.suggestions.get(folder) ?? 0) + 1);

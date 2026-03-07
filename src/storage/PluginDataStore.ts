@@ -1,12 +1,12 @@
 import type { Plugin } from 'obsidian';
 
 import { DEFAULT_SIGMA, glickoUpdate, inflateSigma } from '../domain/rating/GlickoEngine';
-import type { EloSettings, SessionLayoutMode } from '../settings';
+import type { GlickoSettings, SessionLayoutMode } from '../settings';
 import { DEFAULT_SETTINGS } from '../settings';
 import type {
   CohortData,
   CohortDefinition,
-  EloStore,
+  GlickoStore,
   MatchResult,
   PlayerSnapshot,
   UndoFrame,
@@ -14,11 +14,11 @@ import type {
 
 interface PersistedData {
   version: number;
-  settings: EloSettings;
-  store: EloStore;
+  settings: GlickoSettings;
+  store: GlickoStore;
 }
 
-const DEFAULT_STORE: EloStore = {
+const DEFAULT_STORE: GlickoStore = {
   version: 1,
   cohorts: {},
   cohortDefs: {},
@@ -49,12 +49,29 @@ function normaliseTemplatesFolderPath(val: unknown): string {
   return p;
 }
 
-function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
-  const base: EloSettings = { ...DEFAULT_SETTINGS };
+function mergeSettings(raw?: Partial<GlickoSettings>): GlickoSettings {
+  const base: GlickoSettings = { ...DEFAULT_SETTINGS };
 
   if (!raw) return base;
 
-  const out: EloSettings = { ...base, ...raw };
+  // Backwards compatibility: existing installations that have no idPropertyName
+  // should default to 'eloId' (preserving their existing note IDs).
+  const noIdPropertyName = !('idPropertyName' in raw);
+
+  const out: GlickoSettings = { ...base, ...raw };
+
+  if (noIdPropertyName) {
+    out.idPropertyName = 'eloId';
+  }
+
+  // Migrate old field names from pre-rebrand settings
+  const rawAny = raw as Record<string, unknown>;
+  if ('eloIdLocation' in rawAny && !('idLocation' in rawAny)) {
+    const loc = rawAny['eloIdLocation'];
+    if (loc === 'frontmatter' || loc === 'end') {
+      out.idLocation = loc;
+    }
+  }
 
   // Validate session layout
   out.sessionLayout = normaliseSessionLayout(raw.sessionLayout, base.sessionLayout);
@@ -67,8 +84,8 @@ function mergeSettings(raw?: Partial<EloSettings>): EloSettings {
 export class PluginDataStore {
   private plugin: Plugin;
 
-  settings: EloSettings = { ...DEFAULT_SETTINGS };
-  store: EloStore = { ...DEFAULT_STORE };
+  settings: GlickoSettings = { ...DEFAULT_SETTINGS };
+  store: GlickoStore = { ...DEFAULT_STORE };
 
   private _saveQueue: Promise<void> = Promise.resolve();
   private _debounceMs = 300;
@@ -106,7 +123,7 @@ export class PluginDataStore {
     this._saveQueue = this._saveQueue
       .then(() => this.writePersisted())
       .catch((e) => {
-        console.error('[Elo] Failed to save data', e);
+        console.error('[Glicko] Failed to save data', e);
       });
     return this._saveQueue;
   }

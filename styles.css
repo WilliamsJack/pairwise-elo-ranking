@@ -1,5 +1,5 @@
-/* Floating controls for Elo arena */
-.elo-session-bar {
+/* Floating controls for Glicko arena */
+.glicko-session-bar {
   position: fixed;
   left: 50%;
   bottom: var(--size-4-4); /* 16px */
@@ -21,19 +21,19 @@
   line-height: var(--line-height-tight);
 }
 
-.elo-session-bar .elo-side {
+.glicko-session-bar .glicko-side {
   min-width: 14ch;
   text-align: center;
   font-weight: var(--font-semibold);
 }
 
-.elo-session-bar .elo-controls {
+.glicko-session-bar .glicko-controls {
   display: flex;
   gap: var(--size-4-2); /* 8px */
   align-items: center;
 }
 
-.elo-session-bar button {
+.glicko-session-bar button {
   font-size: var(--font-ui-small);
   line-height: var(--line-height-tight);
   padding: var(--size-4-1) var(--size-4-2); /* 4px 8px */
@@ -47,30 +47,30 @@
 }
 
 /* Mouse/touch press, plus programmatic press (keyboard shortcuts) */
-.elo-session-bar button:active,
-.elo-session-bar button.elo-pressed {
+.glicko-session-bar button:active,
+.glicko-session-bar button.glicko-pressed {
   transform: translateY(1px);
   filter: brightness(0.9);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
 }
 
-.elo-cohort-item-info {
+.glicko-cohort-item-info {
   cursor: pointer;
 }
 
 /* Settings accordions */
-.elo-settings-accordion {
+.glicko-settings-accordion {
   margin-top: var(--size-4-3); /* 12px */
 }
 
-.elo-settings-accordion > summary {
+.glicko-settings-accordion > summary {
   cursor: pointer;
   font-weight: var(--font-semibold);
   font-size: var(--font-ui-medium);
   margin-bottom: var(--size-4-2); /* 8px */
 }
 
-.elo-settings-accordion .elo-settings-body {
+.glicko-settings-accordion .glicko-settings-body {
   padding-top: var(--size-4-3); /* 12px */
   margin-left: var(--size-4-1); /* 4px */
   padding-left: var(--size-4-3); /* 12px */
@@ -78,35 +78,35 @@
 }
 
 /* Generic muted text helper */
-.elo-muted {
+.glicko-muted {
   color: var(--text-muted);
 }
 
 /* Tag cohort picker: selected tags list */
-.elo-selected-tags {
+.glicko-selected-tags {
   display: flex;
   flex-wrap: wrap;
   gap: var(--size-2-3); /* 6px */
   line-height: var(--line-height-tight);
 }
 
-.elo-tag-wrap {
+.glicko-tag-wrap {
   display: inline-flex;
   align-items: center;
 }
 
-.elo-tag-remove {
+.glicko-tag-remove {
   margin-left: var(--size-2-3); /* 6px */
   font-size: var(--font-ui-small);
   line-height: var(--line-height-tight);
 }
 
 /* Non-interactive setting row (e.g. suggestion rows with a Use button) */
-.elo-static {
+.glicko-static {
   cursor: default;
 }
 
-.elo-warning {
+.glicko-warning {
   display: block;
   box-sizing: border-box;
   max-height: 0;
@@ -130,17 +130,17 @@
     opacity 160ms ease;
 }
 
-.elo-warning.is-visible {
+.glicko-warning.is-visible {
   max-height: 10rem;
   opacity: 1;
 }
 
-.elo-warning p {
+.glicko-warning p {
   margin: 0;
 }
 
 /* Convergence stability progress bar */
-.elo-stability-track {
+.glicko-stability-track {
   position: absolute;
   left: 0;
   right: 0;
@@ -151,7 +151,7 @@
   pointer-events: none;
 }
 
-.elo-stability-fill {
+.glicko-stability-fill {
   height: 100%;
   width: var(--stability-width, 0%);
   background-color: var(--text-accent);
@@ -161,30 +161,30 @@
     background-color 300ms ease;
 }
 
-.elo-stability-fill.is-mid {
+.glicko-stability-fill.is-mid {
   background-color: var(--color-yellow);
 }
 
-.elo-stability-fill.is-high {
+.glicko-stability-fill.is-high {
   background-color: var(--color-green);
 }
 
-.elo-stability-fill.is-surprise {
+.glicko-stability-fill.is-surprise {
   background-color: var(--color-red);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .elo-warning {
+  .glicko-warning {
     transition: none;
   }
 
-  .elo-stability-fill {
+  .glicko-stability-fill {
     transition: none;
   }
 }
 
 /* Phone layout: stack title + controls, stretch to screen width */
-.elo-session-bar.is-mobile {
+.glicko-session-bar.is-mobile {
   left: var(--size-4-2);
   right: var(--size-4-2);
   transform: none;
@@ -202,7 +202,7 @@
 }
 
 /* Title line for mobile session bar */
-.elo-mobile-title {
+.glicko-mobile-title {
   text-align: center;
   font-weight: var(--font-semibold);
   white-space: nowrap;
@@ -211,17 +211,17 @@
 }
 
 /* Hide left/right labels on mobile */
-.elo-session-bar.is-mobile .elo-side {
+.glicko-session-bar.is-mobile .glicko-side {
   display: none;
 }
 
 /* Mobile-friendly buttons */
-.elo-session-bar.is-mobile .elo-controls {
+.glicko-session-bar.is-mobile .glicko-controls {
   flex-wrap: wrap;
   justify-content: space-between;
 }
 
-.elo-session-bar.is-mobile button {
+.glicko-session-bar.is-mobile button {
   min-height: 44px;
   padding: var(--size-4-2) var(--size-4-3);
   font-size: var(--font-ui-medium);

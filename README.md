@@ -1,6 +1,6 @@
-# Pairwise Elo ranking for your notes
+# Pairwise Glicko ranking for your notes
 
-Easily sort notes by any subjective criteria using the **Elo rating system**.
+Easily sort notes by any subjective criteria using the **Glicko rating system**.
 
 It's basically "which one wins?" instead of trying to assign absolute scores. Rather than asking "how does this note compare to every other note?", you only answer: "which of these two do I prefer?"
 
@@ -21,8 +21,8 @@ _Other comparison arena UI options are available in Settings - shown here is **r
 ## Try it in two minutes
 
 1. Install: Not yet in the Community Plugins list, so first install [BRAT](https://obsidian.md/plugins?id=obsidian42-brat)
-2. Add the Pairwise Elo Ranking repo - `https://github.com/WilliamsJack/pairwise-elo-ranking` and enable the plugin
-3. Run the **Pairwise Elo Ranking: Start rating session** command (or click the trophy icon)
+2. Add the Pairwise Glicko Ranking repo - `https://github.com/WilliamsJack/pairwise-elo-ranking` and enable the plugin
+3. Run the **Pairwise Glicko Ranking: Start rating session** command (or click the trophy icon)
 4. Pick a small cohort (10 notes is perfect)
 5. Do ~10-20 comparisons and you'll see an order emerge surprisingly fast
 
@@ -41,7 +41,7 @@ _Other comparison arena UI options are available in Settings - shown here is **r
 - Information-gain matchmaking that automatically picks the most useful pairs to compare
 - A stability progress bar that shows how close your rankings are to converging
 - Glicko-1 rating updates - uncertainty (sigma) governs step sizes automatically, so new notes converge fast and experienced notes stay stable
-- Robust to renames and moves via stable per-note Elo IDs
+- Robust to renames and moves via stable per-note IDs
 - Cohorts are saved so you can resume ranking sessions, picking up where you left off
 
 ## Motivation
@@ -62,7 +62,7 @@ That's essentially what this plugin does. Given two notes, it's much easier to c
 
 ![cohort_creator](docs/images/cohort_creator.webp)
 
-- Click the trophy icon in the left ribbon, or run the command **"Pairwise Elo Ranking: Start rating session"**.
+- Click the trophy icon in the left ribbon, or run the command **"Pairwise Glicko Ranking: Start rating session"**.
 - Create a cohort in the picker:
   - Vault: all notes
   - From a Base (.base file + view)
@@ -87,7 +87,7 @@ A toast shows the winner after each comparison (toggle in Settings).
 
 ### End the session
 
-Press Escape or run **"Pairwise Elo Ranking: End current session"**. If you've enabled a Rank property for this cohort, the plugin recomputes ranks across the cohort and writes them to frontmatter.
+Press Escape or run **"Pairwise Glicko Ranking: End current session"**. If you've enabled a Rank property for this cohort, the plugin recomputes ranks across the cohort and writes them to frontmatter.
 
 ### Configurable frontmatter output
 
@@ -121,25 +121,25 @@ If a Base cohort's **.base file** is moved/renamed, or the **view name** no long
 
 ## Frontmatter
 
-### Elo IDs
+### Note IDs
 
-Each note that participates in a session gets a stable Elo ID so your ratings survive file moves and renames.
+Each note that participates in a session gets a stable note ID so your ratings survive file moves and renames.
 
-- Where: by default in frontmatter as `eloId`; you can choose to store it at the end of the note as an HTML comment instead.
+- Where: by default in frontmatter as `glickoId`; you can choose to store it at the end of the note as an HTML comment instead. The property name is configurable in Settings.
 - When: IDs are created lazily the first time a note is shown in a session.
 
 Example (frontmatter):
 
 ```yaml
 ---
-eloId: 123e4567-e89b-12d3-a456-426614174000
+glickoId: 123e4567-e89b-12d3-a456-426614174000
 ---
 ```
 
 Example (anywhere in the body of a note, but appended to the end by default):
 
 ```markdown
-<!-- eloId: 123e4567-e89b-12d3-a456-426614174000 -->
+<!-- glickoId: 123e4567-e89b-12d3-a456-426614174000 -->
 ```
 
 ### Stored properties
@@ -158,14 +158,15 @@ Stats are written to just the two notes involved after each match. Rank across t
 ## Data and integrity
 
 - Ratings are stored per cohort in the plugin's data; no network calls.
-- Notes are tracked by Elo ID, not by path, so renames and moves are fine.
+- Notes are tracked by note ID, not by path, so renames and moves are fine.
 - On session start, the plugin prunes any players that no longer have a corresponding note in the cohort.
 - Only Markdown files are included. You need at least two notes to start.
 
 ## Settings overview
 
 - Winner toasts
-- Where to store Elo IDs: frontmatter (default) or end-of-note comment
+- Where to store note IDs: frontmatter (default) or end-of-note comment
+- Note ID property name (default: `glickoId`)
 - Progress bar settings (stability threshold, surprise highlight)
 - Default frontmatter properties (names and which to write)
 - Ask for per-cohort overrides when creating a cohort (on by default)

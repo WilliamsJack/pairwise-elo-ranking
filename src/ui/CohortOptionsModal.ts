@@ -1,7 +1,7 @@
 import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
-import type EloPlugin from '../main';
+import type GlickoPlugin from '../main';
 import type { FrontmatterPropertiesSettings, FrontmatterPropertyConfig } from '../settings';
 import type { ScrollStartMode } from '../types';
 import { FM_PROP_KEYS, renderStandardFmPropertyRow } from './FrontmatterPropertyRow';
@@ -26,7 +26,7 @@ export type CohortOptionsResult = {
 };
 
 export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | undefined> {
-  private plugin: EloPlugin;
+  private plugin: GlickoPlugin;
 
   private mode: Mode;
   private base: FrontmatterPropertiesSettings;
@@ -43,7 +43,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
 
   constructor(
     app: App,
-    plugin: EloPlugin,
+    plugin: GlickoPlugin,
     opts?: {
       mode?: Mode;
       initial?: Partial<FrontmatterPropertiesSettings>;
@@ -113,8 +113,8 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
 
     const desc =
       this.mode === 'create'
-        ? 'Set an optional name and configure which Elo statistics to write into frontmatter for this cohort. Global defaults are prefilled.'
-        : 'Rename the cohort and adjust which Elo statistics to write into frontmatter. Use Reset to revert a property to the global default.';
+        ? 'Set an optional name and configure which Glicko statistics to write into frontmatter for this cohort. Global defaults are prefilled.'
+        : 'Rename the cohort and adjust which Glicko statistics to write into frontmatter. Use Reset to revert a property to the global default.';
 
     contentEl.createEl('h3', { text: 'Cohort options' });
     contentEl.createEl('p', { text: desc });
@@ -169,7 +169,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
         }),
       );
 
-    const warningEl = contentEl.createDiv({ cls: 'elo-warning' });
+    const warningEl = contentEl.createDiv({ cls: 'glicko-warning' });
     warningEl.createEl('p', {
       text:
         'Auto-scroll and synchronised scrolling are both enabled. These settings can conflict with each other if your notes have embedded content that loads slowly. ' +

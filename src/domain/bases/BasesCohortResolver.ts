@@ -103,7 +103,7 @@ async function awaitBasesControllerReady(
     await sleep(pollMs);
   }
 
-  throw new Error('[Elo][Bases] Timed out waiting for Bases controller');
+  throw new Error('[Glicko][Bases] Timed out waiting for Bases controller');
 }
 
 /**
@@ -134,7 +134,7 @@ async function waitForResultsToSettle(
 
     if (performance.now() >= deadline) {
       if (resultsOk) return { settled: false };
-      throw new Error('[Elo][Bases] Timed out waiting for Bases results container');
+      throw new Error('[Glicko][Bases] Timed out waiting for Bases results container');
     }
 
     await sleep(pollMs);
@@ -166,7 +166,7 @@ export async function resolveFilesFromBaseView(
 ): Promise<TFile[]> {
   const af = app.vault.getAbstractFileByPath(basePath);
   if (!(af instanceof TFile) || af.extension.toLowerCase() !== 'base') {
-    throw new Error(`[Elo][Bases] Not a .base file: ${basePath}`);
+    throw new Error(`[Glicko][Bases] Not a .base file: ${basePath}`);
   }
   const baseFile = af;
 
@@ -178,14 +178,14 @@ export async function resolveFilesFromBaseView(
 
   try {
     leaf = app.workspace.getLeaf('tab');
-    if (!leaf) throw new Error('[Elo][Bases] Could not create a workspace leaf');
+    if (!leaf) throw new Error('[Glicko][Bases] Could not create a workspace leaf');
 
     await openBaseIntoLeaf(app, leaf, baseFile, viewName);
 
     const basesView = getBasesView(leaf);
     if (!basesView) {
       const viewType = leaf.view.getViewType();
-      throw new Error(`[Elo][Bases] Unexpected view type: ${String(viewType)}`);
+      throw new Error(`[Glicko][Bases] Unexpected view type: ${String(viewType)}`);
     }
 
     const controller = await awaitBasesControllerReady(

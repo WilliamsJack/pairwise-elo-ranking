@@ -7,7 +7,7 @@ import {
   parseCohortKey,
   prettyCohortDefinition,
 } from '../domain/cohort/CohortResolver';
-import type EloPlugin from '../main';
+import type GlickoPlugin from '../main';
 import type { FrontmatterPropertiesSettings } from '../settings';
 import type { CohortDefinition } from '../types';
 import type { ScrollStartMode } from '../types';
@@ -23,12 +23,12 @@ type Choice =
   | { kind: 'action'; action: Action; label: string };
 
 export class CohortPicker extends FuzzySuggestModal<Choice> {
-  private plugin: EloPlugin;
+  private plugin: GlickoPlugin;
   private resolver?: (def?: CohortDefinition) => void;
   private resolved = false;
   private awaitingChild = false;
 
-  constructor(app: App, plugin: EloPlugin) {
+  constructor(app: App, plugin: GlickoPlugin) {
     super(app);
     this.plugin = plugin;
     this.setPlaceholder('Choose a cohort or create a new one...');
@@ -381,18 +381,18 @@ class TagCohortModal extends BasePromiseModal<CohortDefinition | undefined> {
 
     const tags = Array.from(this.selectedTags).sort();
     if (tags.length === 0) {
-      el.createDiv({ cls: 'elo-muted', text: 'No tags selected.' });
+      el.createDiv({ cls: 'glicko-muted', text: 'No tags selected.' });
       return;
     }
 
-    const list = el.createDiv({ cls: 'elo-selected-tags' });
+    const list = el.createDiv({ cls: 'glicko-selected-tags' });
 
     for (const tag of tags) {
-      const wrap = list.createSpan({ cls: 'elo-tag-wrap' });
+      const wrap = list.createSpan({ cls: 'glicko-tag-wrap' });
 
       wrap.createSpan({ cls: 'tag', text: tag });
 
-      const removeBtn = wrap.createEl('button', { cls: 'elo-tag-remove', text: '×' });
+      const removeBtn = wrap.createEl('button', { cls: 'glicko-tag-remove', text: '×' });
       removeBtn.ariaLabel = `Remove ${tag}`;
       removeBtn.addEventListener('click', (e) => {
         e.preventDefault();

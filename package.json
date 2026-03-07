@@ -1,7 +1,7 @@
 {
 	"name": "pairwise-elo-ranking",
 	"version": "1.5.0",
-	"description": "Easily sort notes by any subjective criteria - Rank cohorts of notes in your vault by pairwise comparisons using the Elo rating system.",
+	"description": "Easily sort notes by any subjective criteria - Rank cohorts of notes in your vault by pairwise comparisons using the Glicko rating system.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",

@@ -1,10 +1,10 @@
 import type { App, TFile } from 'obsidian';
 
 import type { PluginDataStore } from '../../storage/PluginDataStore';
-import { getEloId } from '../../utils/NoteIds';
+import { getNoteId } from '../../utils/NoteIds';
 
 /**
- * Scan all notes in the cohort to collect Elo IDs (frontmatter or HTML comment),
+ * Scan all notes in the cohort to collect note IDs (frontmatter or HTML comment),
  * then remove any players from the cohort whose IDs are not present.
  *
  * Returns the list of removed IDs.
@@ -14,6 +14,7 @@ export async function reconcileCohortPlayersWithFiles(
   dataStore: PluginDataStore,
   cohortKey: string,
   files: TFile[],
+  idPropertyName: string,
 ): Promise<string[]> {
   const cohort = dataStore.store.cohorts[cohortKey];
   if (!cohort) return [];
@@ -21,7 +22,7 @@ export async function reconcileCohortPlayersWithFiles(
   const foundIds = new Set<string>();
   await Promise.all(
     files.map(async (f) => {
-      const id = await getEloId(app, f);
+      const id = await getNoteId(app, f, idPropertyName);
       if (id) foundIds.add(id);
     }),
   );

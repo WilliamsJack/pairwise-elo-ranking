@@ -4,22 +4,22 @@ import { Notice, Plugin, TFile } from 'obsidian';
 import { resetNoteRating } from './commands/ResetNoteRating';
 import { reconcileCohortPlayersWithFiles } from './domain/cohort/CohortIntegrity';
 import { resolveFilesForCohort } from './domain/cohort/CohortResolver';
-import type { EloSettings } from './settings';
+import type { GlickoSettings } from './settings';
 import { effectiveFrontmatterProperties } from './settings';
-import EloSettingsTab from './settings/SettingsTab';
+import GlickoSettingsTab from './settings/SettingsTab';
 import { PluginDataStore } from './storage/PluginDataStore';
 import type { CohortDefinition } from './types';
 import ArenaSession from './ui/ArenaSession';
 import { CohortPicker } from './ui/CohortPicker';
 import { ensureBaseCohortTarget } from './utils/EnsureBaseCohort';
 import { ensureFolderCohortPath } from './utils/EnsureFolderCohort';
-import { ensureUniqueEloIds } from './utils/EnsureUniqueEloIds';
+import { ensureUniqueIds } from './utils/EnsureUniqueIds';
 import { computeRankMap, updateCohortFrontmatter } from './utils/FrontmatterStats';
 import { debugWarn, setDebugLogging } from './utils/logger';
 
-export default class EloPlugin extends Plugin {
+export default class GlickoPlugin extends Plugin {
   dataStore: PluginDataStore;
-  settings: EloSettings;
+  settings: GlickoSettings;
 
   private currentSession?: ArenaSession;
 
@@ -29,12 +29,12 @@ export default class EloPlugin extends Plugin {
     this.settings = this.dataStore.settings;
     setDebugLogging(this.settings.debugLogging);
 
-    this.addRibbonIcon('trophy', 'Start Elo rating session', async () => {
+    this.addRibbonIcon('trophy', 'Start Glicko rating session', async () => {
       await this.selectCohortAndStart();
     });
 
     this.addCommand({
-      id: 'elo-start-session',
+      id: 'glicko-start-session',
       name: 'Start rating session',
       callback: async () => {
         await this.selectCohortAndStart();
@@ -42,7 +42,7 @@ export default class EloPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'elo-end-session',
+      id: 'glicko-end-session',
       name: 'End current session',
       checkCallback: (checking) => {
         const has = !!this.currentSession;
@@ -52,7 +52,7 @@ export default class EloPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'elo-reset-note-rating',
+      id: 'glicko-reset-note-rating',
       name: 'Reset rating for active note',
       checkCallback: (checking) => {
         const file = this.app.workspace.getActiveFile();
@@ -78,7 +78,7 @@ export default class EloPlugin extends Plugin {
       }),
     );
 
-    this.addSettingTab(new EloSettingsTab(this.app, this));
+    this.addSettingTab(new GlickoSettingsTab(this.app, this));
   }
 
   onunload(): void {
@@ -128,7 +128,7 @@ export default class EloPlugin extends Plugin {
   ) {
     await this.endSession();
 
-    const ok = await ensureUniqueEloIds(this.app, files);
+    const ok = await ensureUniqueIds(this.app, files, this.settings.idPropertyName);
     if (!ok) return;
 
     this.currentSession = new ArenaSession(this.app, this, def.key, files);
@@ -140,7 +140,13 @@ export default class EloPlugin extends Plugin {
     void this.dataStore.saveStore();
 
     // Run cohort integrity scan after start()
-    void reconcileCohortPlayersWithFiles(this.app, this.dataStore, def.key, files).catch((e) => {
+    void reconcileCohortPlayersWithFiles(
+      this.app,
+      this.dataStore,
+      def.key,
+      files,
+      this.settings.idPropertyName,
+    ).catch((e) => {
       debugWarn('Cohort integrity reconciliation failed', e);
     });
   }
@@ -183,8 +189,9 @@ export default class EloPlugin extends Plugin {
       rankCfg.property,
       undefined,
       'Updating ranks in frontmatter...',
+      this.settings.idPropertyName,
     ).catch((e) => {
-      console.error('[Elo] Failed to update ranks in frontmatter', e);
+      console.error('[Glicko] Failed to update ranks in frontmatter', e);
     });
   }
 }

@@ -1,14 +1,15 @@
 import type { App, TFile } from 'obsidian';
 import { Notice } from 'obsidian';
 
-import { ResolveDuplicateEloIdsModal } from '../ui/ResolveDuplicateEloIdsModal';
-import { getEloId } from './NoteIds';
+import { ResolveDuplicateIdsModal } from '../ui/ResolveDuplicateIdsModal';
+import { getNoteId } from './NoteIds';
 
 const DEFAULT_POOL = 8;
 
-export async function findDuplicateEloIds(
+export async function findDuplicateIds(
   app: App,
   files: TFile[],
+  propertyName: string,
   opts?: { pool?: number },
 ): Promise<Map<string, TFile[]>> {
   const pool = Math.max(1, Math.round(opts?.pool ?? DEFAULT_POOL));
@@ -21,7 +22,7 @@ export async function findDuplicateEloIds(
       if (i >= files.length) break;
 
       const f = files[i];
-      const id = await getEloId(app, f);
+      const id = await getNoteId(app, f, propertyName);
       if (!id) continue;
 
       const existing = byId.get(id);
@@ -41,21 +42,25 @@ export async function findDuplicateEloIds(
 }
 
 /**
- * Ensures there are no duplicate Elo IDs across `files`.
+ * Ensures there are no duplicate note IDs across `files`.
  *
  * Returns:
  * - true: duplicates resolved (or none found), safe to start session
  * - false: user cancelled (session should not start)
  */
-export async function ensureUniqueEloIds(app: App, files: TFile[]): Promise<boolean> {
+export async function ensureUniqueIds(
+  app: App,
+  files: TFile[],
+  propertyName: string,
+): Promise<boolean> {
   if (files.length < 2) return true;
 
   while (true) {
-    const scanning = new Notice('Scanning notes for duplicate Elo IDs...', 0);
+    const scanning = new Notice('Scanning notes for duplicate IDs...', 0);
 
     let dupes: Map<string, TFile[]>;
     try {
-      dupes = await findDuplicateEloIds(app, files);
+      dupes = await findDuplicateIds(app, files, propertyName);
     } finally {
       scanning.hide();
     }
@@ -67,17 +72,16 @@ export async function ensureUniqueEloIds(app: App, files: TFile[]): Promise<bool
     const id = ids[0];
     const dupFiles = dupes.get(id) ?? [];
 
-    const res = await new ResolveDuplicateEloIdsModal(app, {
-      eloId: id,
+    const res = await new ResolveDuplicateIdsModal(app, {
+      noteId: id,
       files: dupFiles,
+      propertyName,
     }).openAndGetResult();
 
     if (res === true) {
-      // Loop and re-scan, because there may be more duplicates across the cohort
       continue;
     }
 
-    // User cancelled: stop session start
     return false;
   }
 }

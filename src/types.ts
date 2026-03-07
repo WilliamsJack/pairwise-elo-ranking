@@ -2,7 +2,7 @@ import type { FrontmatterPropertiesSettings } from './settings';
 
 export type MatchResult = 'A' | 'B' | 'D';
 
-export interface EloPlayer {
+export interface Player {
   rating: number;
   matches: number;
   wins: number;
@@ -11,7 +11,7 @@ export interface EloPlayer {
 }
 
 export interface CohortData {
-  players: Record<string, EloPlayer>;
+  players: Record<string, Player>;
 }
 
 export type CohortKind =
@@ -58,7 +58,7 @@ export type CohortDefinition = {
   [K in CohortKind]: CohortDefBase<K>;
 }[CohortKind];
 
-export interface EloStore {
+export interface GlickoStore {
   version: number;
   cohorts: Record<string, CohortData>;
   cohortDefs?: Record<string, CohortDefinition>;

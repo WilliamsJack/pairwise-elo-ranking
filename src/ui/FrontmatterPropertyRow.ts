@@ -9,7 +9,7 @@ type Meta = { label: string; desc: string };
 const META: Record<FmPropKey, Meta> = {
   rating: {
     label: 'Rating',
-    desc: 'Write the current Elo rating to this property.',
+    desc: 'Write the current Glicko rating to this property.',
   },
   rank: {
     label: 'Rank',

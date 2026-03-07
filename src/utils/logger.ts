@@ -1,4 +1,4 @@
-const PREFIX = '[Elo]';
+const PREFIX = '[Glicko]';
 
 let debugEnabled = false;
 
