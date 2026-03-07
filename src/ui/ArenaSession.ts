@@ -597,7 +597,8 @@ export default class ArenaSession {
       (ev.key === 'ArrowLeft' ||
         ev.key === 'ArrowRight' ||
         ev.key === 'ArrowUp' ||
-        ev.key === 'ArrowDown')
+        ev.key === 'ArrowDown' ||
+        ev.key === 'Backspace')
     ) {
       ev.preventDefault();
       return;
