@@ -317,31 +317,44 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
       }
     }
 
-    const btns = new Setting(contentEl);
-    btns.addButton((b) =>
-      b.setButtonText('Cancel').onClick(() => {
-        this.finish(undefined);
-      }),
-    );
-    btns.addButton((b) =>
-      b
-        .setCta()
-        .setButtonText(this.mode === 'create' ? 'Create cohort' : 'Save changes')
-        .onClick(() => {
-          const result: CohortOptionsResult = {
-            overrides: this.buildOverridesPayload(),
-            name: this.nameWorking || undefined,
-            scrollStart: this.scrollWorking,
-            syncScroll: this.syncScrollWorking,
-            sessionReport: {
-              enabled: this.reportEnabled,
-              folderPath: this.reportFolderPath,
-              nameTemplate: this.reportNameTemplate || DEFAULT_SETTINGS.sessionReport.nameTemplate,
-              reportTemplatePath: this.reportTemplatePath || undefined,
-            },
-          };
-          this.finish(result);
+    if (this.mode === 'create') {
+      const btns = new Setting(contentEl);
+      btns.addButton((b) =>
+        b.setButtonText('Cancel').onClick(() => {
+          this.finish(undefined);
         }),
-    );
+      );
+      btns.addButton((b) =>
+        b
+          .setCta()
+          .setButtonText('Create cohort')
+          .onClick(() => {
+            this.finish(this.buildResult());
+          }),
+      );
+    }
+  }
+
+  private buildResult(): CohortOptionsResult {
+    return {
+      overrides: this.buildOverridesPayload(),
+      name: this.nameWorking || undefined,
+      scrollStart: this.scrollWorking,
+      syncScroll: this.syncScrollWorking,
+      sessionReport: {
+        enabled: this.reportEnabled,
+        folderPath: this.reportFolderPath,
+        nameTemplate: this.reportNameTemplate || DEFAULT_SETTINGS.sessionReport.nameTemplate,
+        reportTemplatePath: this.reportTemplatePath || undefined,
+      },
+    };
+  }
+
+  onClose(): void {
+    if (!this._resolved && this.mode === 'edit') {
+      this.finish(this.buildResult());
+    } else if (!this._resolved) {
+      this.finish(undefined);
+    }
   }
 }
