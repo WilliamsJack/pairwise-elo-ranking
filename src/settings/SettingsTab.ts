@@ -3,7 +3,7 @@ import { Notice, PluginSettingTab } from 'obsidian';
 
 import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 import type GlickoPlugin from '../main';
-import type { CohortData } from '../types';
+import type { CohortData, CohortDefinition } from '../types';
 import { CohortOptionsModal } from '../ui/CohortOptionsModal';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import {
@@ -105,7 +105,6 @@ export default class GlickoSettingsTab extends PluginSettingTab {
   async setControlValue(key: string, value: unknown): Promise<void> {
     setByPath(this.plugin.settings as unknown as Record<string, unknown>, key, value);
     await this.plugin.saveSettings();
-    this.refreshDomState();
   }
 
   getSettingDefinitions(): SettingDefinitionItem[] {
@@ -134,13 +133,23 @@ export default class GlickoSettingsTab extends PluginSettingTab {
       },
       {
         name: 'Note ID location',
-        desc: 'Where to store the note ID. When you change this setting, you can optionally move existing IDs to the new location. If you choose not to move them, IDs left in the old location will continue to work. If a note has both IDs, the frontmatter ID is used.',
+        desc: 'Where to store the note ID.',
         render: (setting) => this.renderIdLocation(setting),
       },
       {
         name: 'Note ID property name',
-        desc: 'The frontmatter property (or HTML comment tag) used to store note IDs. Changing this will offer to migrate all existing notes.',
+        desc: 'The frontmatter property (or HTML comment tag) used to store note IDs.',
         render: (setting) => this.renderIdPropertyName(setting),
+      },
+      {
+        name: 'Templates folder',
+        desc: 'Excludes templates from cohorts to keep note IDs from appearing on them.',
+        control: {
+          type: 'folder',
+          key: 'templatesFolderPath',
+          placeholder: 'Templates',
+          includeRoot: false,
+        },
       },
       {
         type: 'group',
@@ -148,7 +157,7 @@ export default class GlickoSettingsTab extends PluginSettingTab {
         items: [
           {
             name: 'Highlight surprising results',
-            desc: `Wobble the progress bar when a match result is unexpected, alerting you that your choice was unexpected. Default: ${
+            desc: `Wobble the progress bar when a match result is unexpected. Default: ${
               DEFAULT_SETTINGS.surpriseJitter ? 'On' : 'Off'
             }.`,
             control: { type: 'toggle', key: 'surpriseJitter' },
@@ -166,23 +175,7 @@ export default class GlickoSettingsTab extends PluginSettingTab {
           },
         ],
       },
-      {
-        type: 'group',
-        heading: 'Cohorts',
-        items: [
-          {
-            name: 'Templates folder',
-            desc: 'Excludes your templates from cohorts. Prevents note IDs from appearing on templates.',
-            control: {
-              type: 'folder',
-              key: 'templatesFolderPath',
-              placeholder: 'Templates',
-              includeRoot: false,
-            },
-          },
-          ...this.cohortRowDefinitions(),
-        ],
-      },
+      this.cohortListDefinition(),
       {
         type: 'group',
         heading: 'Cohort defaults',
@@ -195,7 +188,7 @@ export default class GlickoSettingsTab extends PluginSettingTab {
           },
           {
             type: 'page',
-            name: 'Default post-session report settings',
+            name: 'Post-session report defaults',
             desc: 'Defaults used when configuring reports on a new cohort.',
             items: this.reportDefaultsPageItems(),
           },
@@ -203,7 +196,7 @@ export default class GlickoSettingsTab extends PluginSettingTab {
       },
       {
         name: 'Debug logging',
-        desc: 'Log detailed debug information to the developer console. Useful for troubleshooting.',
+        desc: 'Log detailed debug information to the developer console.',
         control: { type: 'toggle', key: 'debugLogging' },
       },
     ];
@@ -260,11 +253,11 @@ export default class GlickoSettingsTab extends PluginSettingTab {
         plan.wouldUpdate === 1 ? '' : 's'
       }?` +
       (plan.mismatches > 0
-        ? `\n\n${plan.mismatches} note${plan.mismatches === 1 ? ' has' : 's have'} differing IDs in frontmatter and the end-of-note HTML comment.
-                The ID in the end-of-note HTML comment will be removed, and the frontmatter ID will be ${
-                  newLoc === 'frontmatter' ? 'kept' : 'moved to the end-of-note HTML comment'
-                }.`
-        : '');
+        ? `\n\n${plan.mismatches} note${plan.mismatches === 1 ? ' has' : 's have'} differing IDs in frontmatter and the end-of-note HTML comment. The ID in the end-of-note HTML comment will be removed, and the frontmatter ID will be ${
+            newLoc === 'frontmatter' ? 'kept' : 'moved to the end-of-note HTML comment'
+          }.`
+        : '') +
+      `\n\nIf you choose not to move any IDs to the new location, IDs left in the old location will continue to work. If a note has both IDs, the frontmatter ID is used.`;
 
     const ok = await new ConfirmModal(
       this.app,
@@ -306,30 +299,37 @@ export default class GlickoSettingsTab extends PluginSettingTab {
     });
   }
 
-  private cohortRowDefinitions(): SettingGroupItem[] {
-    const defs = this.plugin.dataStore.listCohortDefs();
-    if (defs.length === 0) {
-      return [
-        {
-          name: 'No cohorts saved yet',
-          desc: 'Start a session to create one, or use the command palette.',
-        },
-      ];
-    }
+  private cohortListDefinition(): SettingDefinitionItem {
+    const sorted = this.sortedCohortDefs();
+    return {
+      type: 'list',
+      heading: 'Cohorts',
+      emptyState:
+        'No cohorts saved yet. Start a session to create one, or use the command palette.',
+      onDelete: (idx) => {
+        const def = this.sortedCohortDefs()[idx];
+        if (!def) return;
+        void this.deleteCohortWithConfirm(def.key);
+      },
+      items: sorted.map(
+        (def): SettingGroupItem => ({
+          name: def.label ?? prettyCohortDefinition(def),
+          desc: `Definition: ${prettyCohortDefinition(def)}`,
+          render: (setting) => this.renderCohortRow(setting, def.key),
+        }),
+      ),
+    };
+  }
 
-    const sorted = defs.slice().sort((a, b) => {
-      const an = (a.label ?? prettyCohortDefinition(a)).toLowerCase();
-      const bn = (b.label ?? prettyCohortDefinition(b)).toLowerCase();
-      return an.localeCompare(bn);
-    });
-
-    return sorted.map(
-      (def): SettingGroupItem => ({
-        name: def.label ?? prettyCohortDefinition(def),
-        desc: `Definition: ${prettyCohortDefinition(def)}`,
-        render: (setting) => this.renderCohortRow(setting, def.key),
-      }),
-    );
+  private sortedCohortDefs(): CohortDefinition[] {
+    return this.plugin.dataStore
+      .listCohortDefs()
+      .slice()
+      .sort((a, b) => {
+        const an = (a.label ?? prettyCohortDefinition(a)).toLowerCase();
+        const bn = (b.label ?? prettyCohortDefinition(b)).toLowerCase();
+        return an.localeCompare(bn);
+      });
   }
 
   private renderCohortRow(setting: Setting, cohortKey: string): void {
@@ -337,24 +337,6 @@ export default class GlickoSettingsTab extends PluginSettingTab {
     setting.infoEl.addEventListener('click', () => {
       void this.configureCohort(cohortKey);
     });
-
-    setting.addExtraButton((b) =>
-      b
-        .setIcon('settings')
-        .setTooltip('Configure cohort')
-        .onClick(() => {
-          void this.configureCohort(cohortKey);
-        }),
-    );
-
-    setting.addExtraButton((b) =>
-      b
-        .setIcon('trash-2')
-        .setTooltip('Delete cohort')
-        .onClick(() => {
-          void this.deleteCohortWithConfirm(cohortKey);
-        }),
-    );
   }
 
   private frontmatterDefaultsPageItems(): SettingDefinitionItem[] {
