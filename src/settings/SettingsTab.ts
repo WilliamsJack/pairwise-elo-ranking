@@ -337,6 +337,15 @@ export default class GlickoSettingsTab extends PluginSettingTab {
     setting.infoEl.addEventListener('click', () => {
       void this.configureCohort(cohortKey);
     });
+
+    setting.addExtraButton((b) =>
+      b
+        .setIcon('settings')
+        .setTooltip('Configure')
+        .onClick(() => {
+          void this.configureCohort(cohortKey);
+        }),
+    );
   }
 
   private frontmatterDefaultsPageItems(): SettingDefinitionItem[] {
