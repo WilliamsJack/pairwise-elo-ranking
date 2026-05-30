@@ -26,11 +26,15 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
   private resolver?: (def?: CohortDefinition) => void;
   private resolved = false;
   private awaitingChild = false;
+  private createOnly: boolean;
 
-  constructor(app: App, plugin: GlickoPlugin) {
+  constructor(app: App, plugin: GlickoPlugin, opts?: { createOnly?: boolean }) {
     super(app);
     this.plugin = plugin;
-    this.setPlaceholder('Choose a cohort or create a new one...');
+    this.createOnly = opts?.createOnly ?? false;
+    this.setPlaceholder(
+      this.createOnly ? 'Choose a new cohort type...' : 'Choose a cohort or create a new one...',
+    );
   }
 
   async openAndGetSelection(): Promise<CohortDefinition | undefined> {
@@ -43,34 +47,39 @@ export class CohortPicker extends FuzzySuggestModal<Choice> {
   getItems(): Choice[] {
     const items: Choice[] = [];
 
-    // Last used
-    const lastKey = this.plugin.dataStore.store.lastUsedCohortKey;
-    if (lastKey) {
-      const lastDef = this.plugin.dataStore.getCohortDef(lastKey) ?? parseCohortKey(lastKey);
-      if (lastDef)
+    if (!this.createOnly) {
+      // Last used
+      const lastKey = this.plugin.dataStore.store.lastUsedCohortKey;
+      if (lastKey) {
+        const lastDef = this.plugin.dataStore.getCohortDef(lastKey) ?? parseCohortKey(lastKey);
+        if (lastDef)
+          items.push({
+            kind: 'saved',
+            key: lastDef.key,
+            label: `Last used: ${lastDef.label ?? prettyCohortDefinition(lastDef)}`,
+            def: lastDef,
+          });
+      }
+
+      // Saved definitions
+      const defs = this.plugin.dataStore.listCohortDefs();
+      for (const def of defs) {
+        if (def.key === 'vault:all') continue;
+        if (def.key === lastKey) continue;
         items.push({
           kind: 'saved',
-          key: lastDef.key,
-          label: `Last used: ${lastDef.label ?? prettyCohortDefinition(lastDef)}`,
-          def: lastDef,
+          key: def.key,
+          label: def.label ?? prettyCohortDefinition(def),
+          def,
         });
-    }
+      }
 
-    // Saved definitions
-    const defs = this.plugin.dataStore.listCohortDefs();
-    for (const def of defs) {
-      if (def.key === 'vault:all') continue;
-      if (def.key === lastKey) continue;
-      items.push({
-        kind: 'saved',
-        key: def.key,
-        label: def.label ?? prettyCohortDefinition(def),
-        def,
-      });
-    }
-
-    // Add "Vault: all notes" only if not already present
-    if (!items.some((item) => item.kind === 'saved' && item.def.key === 'vault:all')) {
+      // Add "Vault: all notes" only if not already present
+      if (!items.some((item) => item.kind === 'saved' && item.def.key === 'vault:all')) {
+        items.push({ kind: 'action', action: 'vault-all', label: 'Vault: all notes' });
+      }
+    } else if (!this.plugin.dataStore.getCohortDef('vault:all')) {
+      // Create-only: offer vault-all only if the user doesn't already have one.
       items.push({ kind: 'action', action: 'vault-all', label: 'Vault: all notes' });
     }
 

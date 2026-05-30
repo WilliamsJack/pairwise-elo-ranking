@@ -5,6 +5,7 @@ import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/
 import type GlickoPlugin from '../main';
 import type { CohortData, CohortDefinition } from '../types';
 import { CohortOptionsModal } from '../ui/CohortOptionsModal';
+import { CohortPicker } from '../ui/CohortPicker';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import {
   computeRanksForAll,
@@ -304,8 +305,13 @@ export default class GlickoSettingsTab extends PluginSettingTab {
     return {
       type: 'list',
       heading: 'Cohorts',
-      emptyState:
-        'No cohorts saved yet. Start a session to create one, or use the command palette.',
+      emptyState: 'No cohorts saved yet. Add one to get started, or use the command palette.',
+      addItem: {
+        name: 'Add cohort',
+        action: () => {
+          void this.addNewCohort();
+        },
+      },
       onDelete: (idx) => {
         const def = this.sortedCohortDefs()[idx];
         if (!def) return;
@@ -319,6 +325,21 @@ export default class GlickoSettingsTab extends PluginSettingTab {
         }),
       ),
     };
+  }
+
+  private async addNewCohort(): Promise<void> {
+    const def = await new CohortPicker(this.app, this.plugin, {
+      createOnly: true,
+    }).openAndGetSelection();
+    if (!def) return;
+
+    // upsert only when this is genuinely a new entry.
+    if (!this.plugin.dataStore.getCohortDef(def.key)) {
+      this.plugin.dataStore.upsertCohortDef(def);
+      await this.plugin.dataStore.saveStore();
+    }
+
+    this.update();
   }
 
   private sortedCohortDefs(): CohortDefinition[] {
