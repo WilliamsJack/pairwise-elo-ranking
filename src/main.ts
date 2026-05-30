@@ -126,20 +126,25 @@ export default class GlickoPlugin extends Plugin {
   }
 
   private async selectCohortAndStart() {
+    const picker = new CohortPicker(this.app, this);
+    const def = await picker.openAndGetSelection();
+    if (!def) return;
+    await this.startSessionForDef(def);
+  }
+
+  public async startSessionForDef(def: CohortDefinition): Promise<void> {
     try {
-      const picker = new CohortPicker(this.app, this);
-      let def = await picker.openAndGetSelection();
-      if (!def) return;
+      let cur: CohortDefinition | undefined = def;
 
       // Recover folder for folder-based cohorts if missing
-      def = await ensureFolderCohortPath(this.app, this.dataStore, def);
-      if (!def) return;
+      cur = await ensureFolderCohortPath(this.app, this.dataStore, cur);
+      if (!cur) return;
 
       // Recover base/view for base-based cohorts if missing
-      def = await ensureBaseCohortTarget(this.app, this.dataStore, def);
-      if (!def) return;
+      cur = await ensureBaseCohortTarget(this.app, this.dataStore, cur);
+      if (!cur) return;
 
-      const files = await resolveFilesForCohort(this.app, def, {
+      const files = await resolveFilesForCohort(this.app, cur, {
         excludeFolderPath: this.settings.templatesFolderPath,
       });
 
@@ -148,12 +153,12 @@ export default class GlickoPlugin extends Plugin {
         return;
       }
 
-      if (!this.dataStore.getCohortDef(def.key)) {
-        this.dataStore.upsertCohortDef(def);
+      if (!this.dataStore.getCohortDef(cur.key)) {
+        this.dataStore.upsertCohortDef(cur);
         await this.dataStore.saveStore();
       }
 
-      await this.startSessionForCohort(def, files, { saveDef: false });
+      await this.startSessionForCohort(cur, files, { saveDef: false });
     } finally {
       // Refresh the declarative settings tab so the Cohorts list is current.
       this.settingTab.update();

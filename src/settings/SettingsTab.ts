@@ -361,6 +361,17 @@ export default class GlickoSettingsTab extends PluginSettingTab {
 
     setting.addExtraButton((b) =>
       b
+        .setIcon('play')
+        .setTooltip('Start session')
+        .onClick(() => {
+          const def = this.plugin.dataStore.getCohortDef(cohortKey);
+          if (!def) return;
+          void this.plugin.startSessionForDef(def);
+        }),
+    );
+
+    setting.addExtraButton((b) =>
+      b
         .setIcon('settings')
         .setTooltip('Configure')
         .onClick(() => {
