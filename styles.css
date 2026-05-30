@@ -58,25 +58,6 @@
   cursor: pointer;
 }
 
-/* Settings accordions */
-.glicko-settings-accordion {
-  margin-top: var(--size-4-3); /* 12px */
-}
-
-.glicko-settings-accordion > summary {
-  cursor: pointer;
-  font-weight: var(--font-semibold);
-  font-size: var(--font-ui-medium);
-  margin-bottom: var(--size-4-2); /* 8px */
-}
-
-.glicko-settings-accordion .glicko-settings-body {
-  padding-top: var(--size-4-3); /* 12px */
-  margin-left: var(--size-4-1); /* 4px */
-  padding-left: var(--size-4-3); /* 12px */
-  border-left: 2px solid var(--background-modifier-border);
-}
-
 /* Generic muted text helper */
 .glicko-muted {
   color: var(--text-muted);

@@ -41,7 +41,7 @@ export class ConfirmModal extends BasePromiseModal<boolean> {
     const btns = new Setting(contentEl);
     btns.addButton((b) => b.setButtonText(this.cancelText).onClick(() => this.finish(false)));
     btns.addButton((b) => {
-      if (this.warningCta) b.setWarning();
+      if (this.warningCta) b.setDestructive().setCta();
       else b.setCta();
       b.setButtonText(this.ctaText).onClick(() => this.finish(true));
     });

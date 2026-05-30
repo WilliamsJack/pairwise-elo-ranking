@@ -1,13 +1,11 @@
-import type { App } from 'obsidian';
-import { Notice, PluginSettingTab, setIcon, Setting } from 'obsidian';
+import type { App, Setting, SettingDefinitionItem, SettingGroupItem } from 'obsidian';
+import { Notice, PluginSettingTab } from 'obsidian';
 
 import { prettyCohortDefinition, resolveFilesForCohort } from '../domain/cohort/CohortResolver';
 import type GlickoPlugin from '../main';
 import type { CohortData } from '../types';
 import { CohortOptionsModal } from '../ui/CohortOptionsModal';
 import { ConfirmModal } from '../ui/ConfirmModal';
-import { FolderSelectModal } from '../ui/FolderPicker';
-import { FM_PROP_KEYS, renderStandardFmPropertyRow } from '../ui/FrontmatterPropertyRow';
 import {
   computeRanksForAll,
   previewCohortFrontmatterPropertyUpdates,
@@ -15,12 +13,81 @@ import {
 } from '../utils/FrontmatterStats';
 import { applyIdTransferPlan, planIdTransfer } from '../utils/IdTransfer';
 import { withNotice } from '../utils/safe';
-import type { IdLocation } from './settings';
-import type { FrontmatterPropertiesSettings, SessionLayoutMode } from './settings';
+import type { FrontmatterPropertiesSettings, IdLocation } from './settings';
 import { DEFAULT_SETTINGS, effectiveFrontmatterProperties } from './settings';
 import { migrateIdPropertyName } from './SettingsTabMigration';
 
 type PropKey = keyof FrontmatterPropertiesSettings;
+
+function getByPath(root: unknown, path: string): unknown {
+  const parts = path.split('.');
+  let cur: unknown = root;
+  for (const p of parts) {
+    if (cur === null || typeof cur !== 'object') return undefined;
+    cur = (cur as Record<string, unknown>)[p];
+  }
+  return cur;
+}
+
+function setByPath(root: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split('.');
+  let cur: Record<string, unknown> = root;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const next = cur[parts[i]];
+    if (next === null || typeof next !== 'object') {
+      const created: Record<string, unknown> = {};
+      cur[parts[i]] = created;
+      cur = created;
+    } else {
+      cur = next as Record<string, unknown>;
+    }
+  }
+  cur[parts[parts.length - 1]] = value;
+}
+
+const FM_KEY_META: Record<
+  PropKey,
+  { group: string; toggleName: string; toggleDesc: string; nameDesc: string; defaultProp: string }
+> = {
+  rating: {
+    group: 'Rating',
+    toggleName: 'Write rating to frontmatter',
+    toggleDesc: 'Write the current Glicko rating to a frontmatter property.',
+    nameDesc: 'Frontmatter property used to store the rating.',
+    defaultProp: DEFAULT_SETTINGS.frontmatterProperties.rating.property,
+  },
+  uncertainty: {
+    group: 'Uncertainty',
+    toggleName: 'Write uncertainty to frontmatter',
+    toggleDesc:
+      'Write how uncertain the rating is. Starts high and decreases as more comparisons are made.',
+    nameDesc: 'Frontmatter property used to store the uncertainty.',
+    defaultProp: DEFAULT_SETTINGS.frontmatterProperties.uncertainty.property,
+  },
+  rank: {
+    group: 'Rank',
+    toggleName: 'Write rank to frontmatter',
+    toggleDesc: 'Write the cohort rank (1 = highest) to a frontmatter property.',
+    nameDesc: 'Frontmatter property used to store the rank.',
+    defaultProp: DEFAULT_SETTINGS.frontmatterProperties.rank.property,
+  },
+  matches: {
+    group: 'Matches',
+    toggleName: 'Write match count to frontmatter',
+    toggleDesc: 'Write the number of matches played to a frontmatter property.',
+    nameDesc: 'Frontmatter property used to store the match count.',
+    defaultProp: DEFAULT_SETTINGS.frontmatterProperties.matches.property,
+  },
+  wins: {
+    group: 'Wins',
+    toggleName: 'Write win count to frontmatter',
+    toggleDesc: 'Write the number of wins to a frontmatter property.',
+    nameDesc: 'Frontmatter property used to store the win count.',
+    defaultProp: DEFAULT_SETTINGS.frontmatterProperties.wins.property,
+  },
+};
+
+const FM_KEYS_ORDERED: readonly PropKey[] = ['rating', 'uncertainty', 'rank', 'matches', 'wins'];
 
 export default class GlickoSettingsTab extends PluginSettingTab {
   icon = 'trophy';
@@ -31,431 +98,388 @@ export default class GlickoSettingsTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
+  getControlValue(key: string): unknown {
+    return getByPath(this.plugin.settings, key);
+  }
 
-    // General
-    new Setting(containerEl)
-      .setName('Show win/draw notices')
-      .setDesc(
-        `Show a toast with the winner after each comparison. Default: ${DEFAULT_SETTINGS.showToasts ? 'On' : 'Off'}.`,
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.showToasts).onChange(async (v) => {
-          this.plugin.settings.showToasts = v;
-          await this.plugin.saveSettings();
-        }),
-      );
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    setByPath(this.plugin.settings as unknown as Record<string, unknown>, key, value);
+    await this.plugin.saveSettings();
+    this.refreshDomState();
+  }
 
-    // Session layout
-    const layoutLabels: Record<SessionLayoutMode, string> = {
-      'reuse-active': 'Reuse active pane',
-      'right-split': 'Insert to the right of active pane',
-      'new-tab': 'New tab',
-      'new-window': 'New window (pop-out)',
-    };
-    new Setting(containerEl)
-      .setName('Session layout')
-      .setDesc('Choose how and where the arena opens.')
-      .addDropdown((dd) => {
-        dd.addOptions(layoutLabels)
-          .setValue(this.plugin.settings.sessionLayout ?? DEFAULT_SETTINGS.sessionLayout)
-          .onChange(async (v) => {
-            const val: SessionLayoutMode =
-              v === 'reuse-active' || v === 'right-split' || v === 'new-tab' || v === 'new-window'
-                ? v
-                : 'new-tab';
-            this.plugin.settings.sessionLayout = val;
-            await this.plugin.saveSettings();
-          });
-      });
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return [
+      {
+        name: 'Show win/draw notices',
+        desc: `Show a toast with the winner after each comparison. Default: ${
+          DEFAULT_SETTINGS.showToasts ? 'On' : 'Off'
+        }.`,
+        control: { type: 'toggle', key: 'showToasts' },
+      },
+      {
+        name: 'Session layout',
+        desc: 'Choose how and where the arena opens.',
+        control: {
+          type: 'dropdown',
+          key: 'sessionLayout',
+          defaultValue: DEFAULT_SETTINGS.sessionLayout,
+          options: {
+            'reuse-active': 'Reuse active pane',
+            'right-split': 'Insert to the right of active pane',
+            'new-tab': 'New tab',
+            'new-window': 'New window (pop-out)',
+          },
+        },
+      },
+      {
+        name: 'Note ID location',
+        desc: 'Where to store the note ID. When you change this setting, you can optionally move existing IDs to the new location. If you choose not to move them, IDs left in the old location will continue to work. If a note has both IDs, the frontmatter ID is used.',
+        render: (setting) => this.renderIdLocation(setting),
+      },
+      {
+        name: 'Note ID property name',
+        desc: 'The frontmatter property (or HTML comment tag) used to store note IDs. Changing this will offer to migrate all existing notes.',
+        render: (setting) => this.renderIdPropertyName(setting),
+      },
+      {
+        type: 'group',
+        heading: 'Progress bar',
+        items: [
+          {
+            name: 'Highlight surprising results',
+            desc: `Wobble the progress bar when a match result is unexpected, alerting you that your choice was unexpected. Default: ${
+              DEFAULT_SETTINGS.surpriseJitter ? 'On' : 'Off'
+            }.`,
+            control: { type: 'toggle', key: 'surpriseJitter' },
+          },
+          {
+            name: 'Stability threshold',
+            desc: `Uncertainty value at which the progress bar reaches 100%. Lower values require more matches. Default: ${DEFAULT_SETTINGS.stabilityThreshold}.`,
+            control: {
+              type: 'slider',
+              key: 'stabilityThreshold',
+              min: 80,
+              max: 250,
+              step: 10,
+            },
+          },
+        ],
+      },
+      {
+        type: 'group',
+        heading: 'Cohorts',
+        items: [
+          {
+            name: 'Templates folder',
+            desc: 'Excludes your templates from cohorts. Prevents note IDs from appearing on templates.',
+            control: {
+              type: 'folder',
+              key: 'templatesFolderPath',
+              placeholder: 'Templates',
+              includeRoot: false,
+            },
+          },
+          ...this.cohortRowDefinitions(),
+        ],
+      },
+      {
+        type: 'group',
+        heading: 'Cohort defaults',
+        items: [
+          {
+            type: 'page',
+            name: 'Default frontmatter properties',
+            desc: 'Choose which Glicko statistics to write into frontmatter and the property names to use.',
+            items: this.frontmatterDefaultsPageItems(),
+          },
+          {
+            type: 'page',
+            name: 'Default post-session report settings',
+            desc: 'Defaults used when configuring reports on a new cohort.',
+            items: this.reportDefaultsPageItems(),
+          },
+        ],
+      },
+      {
+        name: 'Debug logging',
+        desc: 'Log detailed debug information to the developer console. Useful for troubleshooting.',
+        control: { type: 'toggle', key: 'debugLogging' },
+      },
+    ];
+  }
 
-    new Setting(containerEl)
-      .setName('Note ID location')
-      .setDesc(
-        `Where to store the note ID. When you change this setting, you can optionally move existing IDs to the new location.
-        If you choose not to move them, IDs left in the old location will continue to work.
-        The frontmatter ID is always used if it exists.`,
-      )
-      .addDropdown((dd) => {
-        dd.addOptions({
-          frontmatter: 'Frontmatter (YAML)',
-          end: 'End of note (HTML comment)',
-        })
-          .setValue(this.plugin.settings.idLocation ?? 'frontmatter')
-          .onChange(async (v) => {
-            const oldLoc: IdLocation = this.plugin.settings.idLocation ?? 'frontmatter';
-            const newLoc: IdLocation = v === 'end' ? 'end' : 'frontmatter';
-            if (newLoc === oldLoc) return;
-
-            this.plugin.settings.idLocation = newLoc;
-            await this.plugin.saveSettings();
-
-            const files = this.app.vault.getMarkdownFiles();
-            if (files.length === 0) return;
-
-            const propName = this.plugin.settings.idPropertyName;
-            let plan;
-            try {
-              plan = await withNotice('Scanning notes for note IDs...', () =>
-                planIdTransfer(
-                  this.app,
-                  files,
-                  { propertyName: propName, location: oldLoc },
-                  { propertyName: propName, location: newLoc },
-                ),
-              );
-            } catch (e) {
-              console.error('[Glicko] Failed to plan note ID transfer', e);
-              new Notice('Failed to scan notes for note IDs.');
-              return;
-            }
-
-            if (plan.wouldUpdate === 0) return;
-
-            const locLabel = (loc: IdLocation) =>
-              loc === 'frontmatter' ? 'frontmatter' : 'end-of-note HTML comment';
-
-            const msg =
-              `Move note IDs from ${locLabel(oldLoc)} to ${locLabel(newLoc)} for ${plan.wouldUpdate} note${plan.wouldUpdate === 1 ? '' : 's'}?` +
-              (plan.mismatches > 0
-                ? `\n\n${plan.mismatches} note${plan.mismatches === 1 ? ' has' : 's have'} differing IDs in frontmatter and the end-of-note HTML comment.
-                The ID in the end-of-note HTML comment will be removed, and the frontmatter ID will be ${newLoc === 'frontmatter' ? 'kept' : 'moved to the end-of-note HTML comment'}.`
-                : '');
-
-            const ok = await new ConfirmModal(
-              this.app,
-              'Move note IDs?',
-              msg,
-              'Yes, move',
-              'No, leave as-is',
-            ).openAndConfirm();
-
-            if (!ok) return;
-
-            const res = await applyIdTransferPlan(this.app, plan, {
-              noticeMessage: 'Moving note IDs...',
-            });
-
-            new Notice(
-              `Moved note IDs in ${res.updated} note${res.updated === 1 ? '' : 's'}` +
-                (res.mismatches > 0
-                  ? ` (${res.mismatches} mismatch${res.mismatches === 1 ? '' : 'es'} resolved).`
-                  : '.'),
-            );
-          });
-      });
-
-    // Note ID property name
-    new Setting(containerEl)
-      .setName('Note ID property name')
-      .setDesc(
-        'The frontmatter property (or HTML comment tag) used to store note IDs. Changing this will offer to migrate all existing notes.',
-      )
-      .addText((t) => {
-        t.setValue(this.plugin.settings.idPropertyName).setPlaceholder(
-          DEFAULT_SETTINGS.idPropertyName,
-        );
-
-        // Trigger migration on blur (not on every keystroke)
-        t.inputEl.addEventListener('blur', () => {
-          const trimmed = (t.getValue() ?? '').trim();
-          if (!trimmed || trimmed === this.plugin.settings.idPropertyName) return;
-
-          void (async () => {
-            await migrateIdPropertyName(this.app, this.plugin, trimmed);
-            this.display();
-          })();
-        });
-      });
-
-    // Progress bar
-    new Setting(containerEl).setName('Progress bar').setHeading();
-
-    new Setting(containerEl)
-      .setName('Highlight surprising results')
-      .setDesc(
-        `Wobble the progress bar when a match result is unexpected, alterting you that your choice was unexpected. Default: ${DEFAULT_SETTINGS.surpriseJitter ? 'On' : 'Off'}.`,
-      )
-      .addToggle((t) =>
-        t
-          .setValue(this.plugin.settings.surpriseJitter ?? DEFAULT_SETTINGS.surpriseJitter)
-          .onChange(async (v) => {
-            this.plugin.settings.surpriseJitter = v;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName('Stability threshold')
-      .setDesc(
-        `Uncertainty value at which the progress bar reaches 100%. Lower values require more matches. Default: ${DEFAULT_SETTINGS.stabilityThreshold}.`,
-      )
-      .addSlider((sl) => {
-        const current =
-          this.plugin.settings.stabilityThreshold ?? DEFAULT_SETTINGS.stabilityThreshold;
-        sl.setLimits(80, 250, 10)
-          .setValue(Math.max(80, Math.min(250, current)))
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            this.plugin.settings.stabilityThreshold = Math.round(value);
-            await this.plugin.saveSettings();
-          });
-      });
-
-    // Cohort configuration
-    new Setting(containerEl).setName('Cohorts').setHeading();
-
-    new Setting(containerEl)
-      .setName('Templates folder')
-      .setDesc(
-        'Excludes your templates from cohorts. Prevents note IDs from appearing on templates.',
-      )
-      .addText((t) => {
-        t.setPlaceholder('Templates')
-          .setValue(this.plugin.settings.templatesFolderPath ?? '')
-          .onChange(async (v) => {
-            this.plugin.settings.templatesFolderPath = (v ?? '').trim();
-            await this.plugin.saveSettings();
-          });
+  private renderIdLocation(setting: Setting): void {
+    setting.addDropdown((dd) => {
+      dd.addOptions({
+        frontmatter: 'Frontmatter (YAML)',
+        end: 'End of note (HTML comment)',
       })
-      .addButton((b) =>
-        b.setButtonText('Browse...').onClick(async () => {
-          const folder = await new FolderSelectModal(this.app).openAndGetSelection();
-          if (!folder) return;
+        .setValue(this.plugin.settings.idLocation ?? 'frontmatter')
+        .onChange((v) => {
+          void this.applyIdLocationChange(v);
+        });
+    });
+  }
 
-          // Disallow vault root as a "templates folder" (treat as disabled)
-          const picked = (folder.path ?? '').trim();
-          this.plugin.settings.templatesFolderPath = picked.length > 0 ? picked : '';
-          await this.plugin.saveSettings();
-          this.display();
-        }),
-      )
-      .addButton((b) =>
-        b.setButtonText('Clear').onClick(async () => {
-          this.plugin.settings.templatesFolderPath = '';
-          await this.plugin.saveSettings();
-          this.display();
-        }),
+  private async applyIdLocationChange(v: string): Promise<void> {
+    const oldLoc: IdLocation = this.plugin.settings.idLocation ?? 'frontmatter';
+    const newLoc: IdLocation = v === 'end' ? 'end' : 'frontmatter';
+    if (newLoc === oldLoc) return;
+
+    this.plugin.settings.idLocation = newLoc;
+    await this.plugin.saveSettings();
+
+    const files = this.app.vault.getMarkdownFiles();
+    if (files.length === 0) return;
+
+    const propName = this.plugin.settings.idPropertyName;
+    let plan;
+    try {
+      plan = await withNotice('Scanning notes for note IDs...', () =>
+        planIdTransfer(
+          this.app,
+          files,
+          { propertyName: propName, location: oldLoc },
+          { propertyName: propName, location: newLoc },
+        ),
       );
+    } catch (e) {
+      console.error('[Glicko] Failed to plan note ID transfer', e);
+      new Notice('Failed to scan notes for note IDs.');
+      return;
+    }
 
-    containerEl.createEl('p', {
-      text: "Configure existing cohorts' frontmatter properties or delete a cohort.",
+    if (plan.wouldUpdate === 0) return;
+
+    const locLabel = (loc: IdLocation) =>
+      loc === 'frontmatter' ? 'frontmatter' : 'end-of-note HTML comment';
+
+    const msg =
+      `Move note IDs from ${locLabel(oldLoc)} to ${locLabel(newLoc)} for ${plan.wouldUpdate} note${
+        plan.wouldUpdate === 1 ? '' : 's'
+      }?` +
+      (plan.mismatches > 0
+        ? `\n\n${plan.mismatches} note${plan.mismatches === 1 ? ' has' : 's have'} differing IDs in frontmatter and the end-of-note HTML comment.
+                The ID in the end-of-note HTML comment will be removed, and the frontmatter ID will be ${
+                  newLoc === 'frontmatter' ? 'kept' : 'moved to the end-of-note HTML comment'
+                }.`
+        : '');
+
+    const ok = await new ConfirmModal(
+      this.app,
+      'Move note IDs?',
+      msg,
+      'Yes, move',
+      'No, leave as-is',
+    ).openAndConfirm();
+
+    if (!ok) return;
+
+    const res = await applyIdTransferPlan(this.app, plan, {
+      noticeMessage: 'Moving note IDs...',
     });
 
+    new Notice(
+      `Moved note IDs in ${res.updated} note${res.updated === 1 ? '' : 's'}` +
+        (res.mismatches > 0
+          ? ` (${res.mismatches} mismatch${res.mismatches === 1 ? '' : 'es'} resolved).`
+          : '.'),
+    );
+  }
+
+  private renderIdPropertyName(setting: Setting): void {
+    setting.addText((t) => {
+      t.setValue(this.plugin.settings.idPropertyName).setPlaceholder(
+        DEFAULT_SETTINGS.idPropertyName,
+      );
+
+      t.inputEl.addEventListener('blur', () => {
+        const trimmed = (t.getValue() ?? '').trim();
+        if (!trimmed || trimmed === this.plugin.settings.idPropertyName) return;
+
+        void (async () => {
+          await migrateIdPropertyName(this.app, this.plugin, trimmed);
+          this.update();
+        })();
+      });
+    });
+  }
+
+  private cohortRowDefinitions(): SettingGroupItem[] {
     const defs = this.plugin.dataStore.listCohortDefs();
     if (defs.length === 0) {
-      containerEl.createDiv({
-        cls: 'glicko-muted',
-        text: 'No cohorts saved yet. Start a session to create one, or use the Command palette.',
-      });
-    } else {
-      const list = containerEl.createDiv({ cls: 'installed-plugins-container' });
-
-      // Sort by display label
-      const sorted = defs.slice().sort((a, b) => {
-        const an = (a.label ?? prettyCohortDefinition(a)).toLowerCase();
-        const bn = (b.label ?? prettyCohortDefinition(b)).toLowerCase();
-        return an.localeCompare(bn);
-      });
-
-      for (const def of sorted) {
-        const row = list.createDiv({ cls: 'setting-item mod-toggle' });
-
-        const info = row.createDiv({ cls: 'glicko-cohort-item-info' });
-        info.addEventListener('click', () => {
-          void this.configureCohort(def.key);
-        });
-
-        const name = info.createDiv({
-          cls: 'setting-item-name',
-          text: def.label ?? prettyCohortDefinition(def),
-        });
-        name.title = def.key;
-
-        const desc = info.createDiv({ cls: 'setting-item-description' });
-        desc.createDiv({ text: `Definition: ${prettyCohortDefinition(def)}` });
-
-        const controls = row.createDiv({ cls: 'setting-item-control' });
-
-        const settingsBtn = controls.createDiv({
-          cls: 'clickable-icon extra-setting-button',
-          attr: { 'aria-label': 'Configure cohort' },
-        });
-        setIcon(settingsBtn, 'settings');
-        settingsBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          void this.configureCohort(def.key);
-        });
-
-        const deleteBtn = controls.createDiv({
-          cls: 'clickable-icon extra-setting-button',
-          attr: { 'aria-label': 'Delete cohort' },
-        });
-        setIcon(deleteBtn, 'trash-2');
-        deleteBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          void this.deleteCohortWithConfirm(def.key);
-        });
-      }
-    }
-
-    // Cohort defaults section
-    new Setting(containerEl).setName('Cohort defaults').setHeading();
-
-    const fmAcc = containerEl.createEl('details', { cls: 'glicko-settings-accordion' });
-    fmAcc.open = false;
-    fmAcc.createEl('summary', { text: 'Default frontmatter properties' });
-    const fmBody = fmAcc.createDiv({ cls: 'glicko-settings-body' });
-
-    const fm = this.plugin.settings.frontmatterProperties;
-
-    new Setting(fmBody)
-      .setName('Ask for per-cohort overrides on creation')
-      .setDesc(
-        `When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults. Default: ${DEFAULT_SETTINGS.askForOverridesOnCohortCreation ? 'On' : 'Off'}.`,
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.askForOverridesOnCohortCreation).onChange(async (v) => {
-          this.plugin.settings.askForOverridesOnCohortCreation = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    fmBody.createEl('p', {
-      text:
-        "Choose which Glicko statistics to write into a note's frontmatter and the property names to use. " +
-        'These are global defaults; cohort-specific overrides can be applied during creation.',
-    });
-
-    for (const key of FM_PROP_KEYS) {
-      const cfg = fm[key];
-      renderStandardFmPropertyRow(fmBody, key, {
-        value: { enabled: cfg.enabled, property: cfg.property },
-        base: { enabled: cfg.enabled, property: cfg.property },
-        mode: 'global',
-        onChange: async (next) => {
-          cfg.enabled = !!next.enabled;
-          cfg.property = next.property;
-          await this.plugin.saveSettings();
+      return [
+        {
+          name: 'No cohorts saved yet',
+          desc: 'Start a session to create one, or use the command palette.',
         },
+      ];
+    }
+
+    const sorted = defs.slice().sort((a, b) => {
+      const an = (a.label ?? prettyCohortDefinition(a)).toLowerCase();
+      const bn = (b.label ?? prettyCohortDefinition(b)).toLowerCase();
+      return an.localeCompare(bn);
+    });
+
+    return sorted.map(
+      (def): SettingGroupItem => ({
+        name: def.label ?? prettyCohortDefinition(def),
+        desc: `Definition: ${prettyCohortDefinition(def)}`,
+        render: (setting) => this.renderCohortRow(setting, def.key),
+      }),
+    );
+  }
+
+  private renderCohortRow(setting: Setting, cohortKey: string): void {
+    setting.infoEl.addClass('glicko-cohort-item-info');
+    setting.infoEl.addEventListener('click', () => {
+      void this.configureCohort(cohortKey);
+    });
+
+    setting.addExtraButton((b) =>
+      b
+        .setIcon('settings')
+        .setTooltip('Configure cohort')
+        .onClick(() => {
+          void this.configureCohort(cohortKey);
+        }),
+    );
+
+    setting.addExtraButton((b) =>
+      b
+        .setIcon('trash-2')
+        .setTooltip('Delete cohort')
+        .onClick(() => {
+          void this.deleteCohortWithConfirm(cohortKey);
+        }),
+    );
+  }
+
+  private frontmatterDefaultsPageItems(): SettingDefinitionItem[] {
+    const items: SettingDefinitionItem[] = [
+      {
+        name: 'Ask for per-cohort overrides on creation',
+        desc: `When creating a cohort, prompt to set frontmatter overrides. Turn off to always use the global defaults. Default: ${
+          DEFAULT_SETTINGS.askForOverridesOnCohortCreation ? 'On' : 'Off'
+        }.`,
+        control: { type: 'toggle', key: 'askForOverridesOnCohortCreation' },
+      },
+    ];
+
+    for (const key of FM_KEYS_ORDERED) {
+      const meta = FM_KEY_META[key];
+      items.push({
+        type: 'group',
+        heading: meta.group,
+        items: [
+          {
+            name: meta.toggleName,
+            desc: meta.toggleDesc,
+            control: {
+              type: 'toggle',
+              key: `frontmatterProperties.${key}.enabled`,
+            },
+          },
+          {
+            name: 'Property name',
+            desc: meta.nameDesc,
+            control: {
+              type: 'text',
+              key: `frontmatterProperties.${key}.property`,
+              placeholder: meta.defaultProp,
+              disabled: () => !this.plugin.settings.frontmatterProperties[key].enabled,
+            },
+          },
+        ],
       });
     }
 
-    // Default post-session report settings accordion
-    const reportAcc = containerEl.createEl('details', { cls: 'glicko-settings-accordion' });
-    reportAcc.open = false;
-    reportAcc.createEl('summary', { text: 'Default post-session report settings' });
-    const reportBody = reportAcc.createDiv({ cls: 'glicko-settings-body' });
+    return items;
+  }
 
-    reportBody.createEl('p', {
-      text: 'These settings are used as defaults when configuring reports on a new cohort.',
-    });
+  private reportDefaultsPageItems(): SettingDefinitionItem[] {
+    return [
+      {
+        name: 'Ask for report settings on creation',
+        desc: `When creating a cohort, prompt to configure report settings. Turn off to always use the defaults below. Default: ${
+          DEFAULT_SETTINGS.askForReportSettingsOnCreation ? 'On' : 'Off'
+        }.`,
+        control: { type: 'toggle', key: 'askForReportSettingsOnCreation' },
+      },
+      {
+        name: 'Enable reports by default',
+        desc: 'Generate a post-session report for new cohorts by default.',
+        control: { type: 'toggle', key: 'sessionReport.enabled' },
+      },
+      {
+        name: 'Default report folder',
+        desc: 'Pre-filled vault-relative folder for session reports.',
+        control: {
+          type: 'text',
+          key: 'sessionReport.folderPath',
+          placeholder: DEFAULT_SETTINGS.sessionReport.folderPath,
+        },
+      },
+      {
+        name: 'Default report name',
+        desc: 'Available: {{cohort}}, {{date}}, {{datetime}}, {{count}}',
+        control: {
+          type: 'text',
+          key: 'sessionReport.nameTemplate',
+          placeholder: DEFAULT_SETTINGS.sessionReport.nameTemplate,
+        },
+      },
+      {
+        name: 'Default report template',
+        desc: 'Vault path to a markdown file with {{glicko:...}} placeholders. Leave blank to use the built-in template.',
+        render: (setting) => this.renderReportTemplate(setting),
+      },
+    ];
+  }
 
-    new Setting(reportBody)
-      .setName('Ask for report settings on creation')
-      .setDesc(
-        `When creating a cohort, prompt to configure report settings. Turn off to always use the defaults below. Default: ${DEFAULT_SETTINGS.askForReportSettingsOnCreation ? 'On' : 'Off'}.`,
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.askForReportSettingsOnCreation).onChange(async (v) => {
-          this.plugin.settings.askForReportSettingsOnCreation = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(reportBody)
-      .setName('Enable reports by default')
-      .setDesc('Generate a post-session report for new cohorts by default.')
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.sessionReport.enabled).onChange(async (v) => {
-          this.plugin.settings.sessionReport.enabled = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(reportBody)
-      .setName('Default report folder')
-      .setDesc('Pre-filled vault-relative folder for session reports.')
-      .addText((t) =>
-        t
-          .setPlaceholder(DEFAULT_SETTINGS.sessionReport.folderPath)
-          .setValue(this.plugin.settings.sessionReport.folderPath)
-          .onChange(async (v) => {
-            this.plugin.settings.sessionReport.folderPath = (v ?? '').trim();
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(reportBody)
-      .setName('Default report name')
-      .setDesc('Available: {{cohort}}, {{date}}, {{datetime}}, {{count}}')
-      .addText((t) =>
-        t
-          .setPlaceholder(DEFAULT_SETTINGS.sessionReport.nameTemplate)
-          .setValue(this.plugin.settings.sessionReport.nameTemplate)
-          .onChange(async (v) => {
-            this.plugin.settings.sessionReport.nameTemplate =
-              (v ?? '').trim() || DEFAULT_SETTINGS.sessionReport.nameTemplate;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(reportBody)
-      .setName('Default report template')
-      .setDesc(
-        'Vault path to a markdown file with {{glicko:...}} placeholders. Leave blank to use the built-in template.',
-      )
+  private renderReportTemplate(setting: Setting): void {
+    setting
       .addText((t) =>
         t
           .setPlaceholder('e.g. Templates/My Report.md')
           .setValue(this.plugin.settings.sessionReport.reportTemplatePath ?? '')
-          .onChange(async (v) => {
+          .onChange((v) => {
             this.plugin.settings.sessionReport.reportTemplatePath = (v ?? '').trim() || undefined;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           }),
       )
       .addButton((b) =>
-        b.setButtonText('Generate template').onClick(async () => {
-          try {
-            const { generateOrOverwriteExampleTemplate } =
-              await import('../domain/report/generateExampleTemplate');
-            const file = await generateOrOverwriteExampleTemplate(this.app, {
-              filePath: this.plugin.settings.sessionReport.reportTemplatePath,
-              templatesFolderPath:
-                this.plugin.settings.templatesFolderPath ||
-                this.plugin.settings.sessionReport.folderPath ||
-                '',
-            });
-            if (!file) return;
-
-            this.plugin.settings.sessionReport.reportTemplatePath = file.path;
-            await this.plugin.saveSettings();
-            const leaf = this.app.workspace.getLeaf('tab');
-            await leaf.openFile(file);
-            this.display();
-            new Notice('Report template created and set as default.');
-          } catch (e) {
-            console.error('[Glicko] Failed to generate example template', e);
-            new Notice('Failed to generate example template.');
-          }
+        b.setButtonText('Generate template').onClick(() => {
+          void this.generateReportTemplate();
         }),
       );
+  }
 
-    new Setting(containerEl)
-      .setName('Debug logging')
-      .setDesc(
-        'Log detailed debug information to the developer console. Useful for troubleshooting.',
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.debugLogging).onChange(async (v) => {
-          this.plugin.settings.debugLogging = v;
-          await this.plugin.saveSettings();
-        }),
-      );
+  private async generateReportTemplate(): Promise<void> {
+    try {
+      const { generateOrOverwriteExampleTemplate } =
+        await import('../domain/report/generateExampleTemplate');
+      const file = await generateOrOverwriteExampleTemplate(this.app, {
+        filePath: this.plugin.settings.sessionReport.reportTemplatePath,
+        templatesFolderPath:
+          this.plugin.settings.templatesFolderPath ||
+          this.plugin.settings.sessionReport.folderPath ||
+          '',
+      });
+      if (!file) return;
+
+      this.plugin.settings.sessionReport.reportTemplatePath = file.path;
+      await this.plugin.saveSettings();
+      const leaf = this.app.workspace.getLeaf('tab');
+      await leaf.openFile(file);
+      this.update();
+      new Notice('Report template created and set as default.');
+    } catch (e) {
+      console.error('[Glicko] Failed to generate example template', e);
+      new Notice('Failed to generate example template.');
+    }
   }
 
   private async deleteCohortWithConfirm(cohortKey: string): Promise<void> {
@@ -480,7 +504,7 @@ export default class GlickoSettingsTab extends PluginSettingTab {
     await this.plugin.dataStore.saveStore();
 
     new Notice(`Deleted cohort: ${label}`);
-    this.display();
+    this.update();
   }
 
   private async configureCohort(cohortKey: string): Promise<void> {
@@ -522,7 +546,7 @@ export default class GlickoSettingsTab extends PluginSettingTab {
 
     this.plugin.dataStore.upsertCohortDef(def);
     await this.plugin.dataStore.saveStore();
-    this.display();
+    this.update();
 
     // Determine changes that require optional bulk updates
     const changed: Array<{
