@@ -28,6 +28,7 @@ import { debugWarn, setDebugLogging } from './utils/logger';
 export default class GlickoPlugin extends Plugin {
   dataStore: PluginDataStore;
   settings: GlickoSettings;
+  private settingTab!: GlickoSettingsTab;
 
   private currentSession?: ArenaSession;
 
@@ -110,7 +111,8 @@ export default class GlickoPlugin extends Plugin {
       }),
     );
 
-    this.addSettingTab(new GlickoSettingsTab(this.app, this));
+    this.settingTab = new GlickoSettingsTab(this.app, this);
+    this.addSettingTab(this.settingTab);
   }
 
   onunload(): void {
@@ -124,33 +126,38 @@ export default class GlickoPlugin extends Plugin {
   }
 
   private async selectCohortAndStart() {
-    const picker = new CohortPicker(this.app, this);
-    let def = await picker.openAndGetSelection();
-    if (!def) return;
+    try {
+      const picker = new CohortPicker(this.app, this);
+      let def = await picker.openAndGetSelection();
+      if (!def) return;
 
-    // Recover folder for folder-based cohorts if missing
-    def = await ensureFolderCohortPath(this.app, this.dataStore, def);
-    if (!def) return;
+      // Recover folder for folder-based cohorts if missing
+      def = await ensureFolderCohortPath(this.app, this.dataStore, def);
+      if (!def) return;
 
-    // Recover base/view for base-based cohorts if missing
-    def = await ensureBaseCohortTarget(this.app, this.dataStore, def);
-    if (!def) return;
+      // Recover base/view for base-based cohorts if missing
+      def = await ensureBaseCohortTarget(this.app, this.dataStore, def);
+      if (!def) return;
 
-    const files = await resolveFilesForCohort(this.app, def, {
-      excludeFolderPath: this.settings.templatesFolderPath,
-    });
+      const files = await resolveFilesForCohort(this.app, def, {
+        excludeFolderPath: this.settings.templatesFolderPath,
+      });
 
-    if (files.length < 2) {
-      new Notice('Need at least two Markdown notes to compare.');
-      return;
+      if (files.length < 2) {
+        new Notice('Need at least two Markdown notes to compare.');
+        return;
+      }
+
+      if (!this.dataStore.getCohortDef(def.key)) {
+        this.dataStore.upsertCohortDef(def);
+        await this.dataStore.saveStore();
+      }
+
+      await this.startSessionForCohort(def, files, { saveDef: false });
+    } finally {
+      // Refresh the declarative settings tab so the Cohorts list is current.
+      this.settingTab.update();
     }
-
-    if (!this.dataStore.getCohortDef(def.key)) {
-      this.dataStore.upsertCohortDef(def);
-      await this.dataStore.saveStore();
-    }
-
-    await this.startSessionForCohort(def, files, { saveDef: false });
   }
 
   private async startSessionForCohort(
