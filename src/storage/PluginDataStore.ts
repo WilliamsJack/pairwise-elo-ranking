@@ -65,6 +65,11 @@ function mergeSettings(raw?: Partial<GlickoSettings>): GlickoSettings {
     ...raw.frontmatterProperties,
   };
 
+  out.frontmatterProperties.stars = {
+    ...DEFAULT_SETTINGS.frontmatterProperties.stars,
+    ...raw.frontmatterProperties?.stars,
+  };
+
   if (noIdPropertyName) {
     out.idPropertyName = 'eloId';
   }

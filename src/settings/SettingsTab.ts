@@ -9,16 +9,30 @@ import { CohortPicker } from '../ui/CohortPicker';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import {
   computeRanksForAll,
+  computeStarsForAll,
   previewCohortFrontmatterPropertyUpdates,
   updateCohortFrontmatter,
 } from '../utils/FrontmatterStats';
 import { applyIdTransferPlan, planIdTransfer } from '../utils/IdTransfer';
 import { withNotice } from '../utils/safe';
-import type { FrontmatterPropertiesSettings, IdLocation } from './settings';
-import { DEFAULT_SETTINGS, effectiveFrontmatterProperties } from './settings';
+import type { FmSimpleKey } from './frontmatterCopy';
+import {
+  FM_SIMPLE_COPY,
+  FM_SIMPLE_KEYS,
+  FM_STARS_COPY,
+  PROPERTY_NAME_LABEL,
+  STAR_MAPPING_LABELS,
+  STAR_MODE_LABELS,
+} from './frontmatterCopy';
+import type { IdLocation } from './settings';
+import {
+  DEFAULT_SETTINGS,
+  effectiveFrontmatterProperties,
+  starScaleConfigEquals,
+} from './settings';
 import { migrateIdPropertyName } from './SettingsTabMigration';
 
-type PropKey = keyof FrontmatterPropertiesSettings;
+type PropKey = FmSimpleKey;
 
 function getByPath(root: unknown, path: string): unknown {
   const parts = path.split('.');
@@ -45,50 +59,6 @@ function setByPath(root: Record<string, unknown>, path: string, value: unknown):
   }
   cur[parts[parts.length - 1]] = value;
 }
-
-const FM_KEY_META: Record<
-  PropKey,
-  { group: string; toggleName: string; toggleDesc: string; nameDesc: string; defaultProp: string }
-> = {
-  rating: {
-    group: 'Rating',
-    toggleName: 'Write rating to frontmatter',
-    toggleDesc: 'Write the current Glicko rating to a frontmatter property.',
-    nameDesc: 'Frontmatter property used to store the rating.',
-    defaultProp: DEFAULT_SETTINGS.frontmatterProperties.rating.property,
-  },
-  uncertainty: {
-    group: 'Uncertainty',
-    toggleName: 'Write uncertainty to frontmatter',
-    toggleDesc:
-      'Write how uncertain the rating is. Starts high and decreases as more comparisons are made.',
-    nameDesc: 'Frontmatter property used to store the uncertainty.',
-    defaultProp: DEFAULT_SETTINGS.frontmatterProperties.uncertainty.property,
-  },
-  rank: {
-    group: 'Rank',
-    toggleName: 'Write rank to frontmatter',
-    toggleDesc: 'Write the cohort rank (1 = highest) to a frontmatter property.',
-    nameDesc: 'Frontmatter property used to store the rank.',
-    defaultProp: DEFAULT_SETTINGS.frontmatterProperties.rank.property,
-  },
-  matches: {
-    group: 'Matches',
-    toggleName: 'Write match count to frontmatter',
-    toggleDesc: 'Write the number of matches played to a frontmatter property.',
-    nameDesc: 'Frontmatter property used to store the match count.',
-    defaultProp: DEFAULT_SETTINGS.frontmatterProperties.matches.property,
-  },
-  wins: {
-    group: 'Wins',
-    toggleName: 'Write win count to frontmatter',
-    toggleDesc: 'Write the number of wins to a frontmatter property.',
-    nameDesc: 'Frontmatter property used to store the win count.',
-    defaultProp: DEFAULT_SETTINGS.frontmatterProperties.wins.property,
-  },
-};
-
-const FM_KEYS_ORDERED: readonly PropKey[] = ['rating', 'uncertainty', 'rank', 'matches', 'wins'];
 
 export default class GlickoSettingsTab extends PluginSettingTab {
   icon = 'trophy';
@@ -391,33 +361,114 @@ export default class GlickoSettingsTab extends PluginSettingTab {
       },
     ];
 
-    for (const key of FM_KEYS_ORDERED) {
-      const meta = FM_KEY_META[key];
+    for (const key of FM_SIMPLE_KEYS) {
+      const copy = FM_SIMPLE_COPY[key];
       items.push({
         type: 'group',
-        heading: meta.group,
+        heading: copy.label,
         items: [
           {
-            name: meta.toggleName,
-            desc: meta.toggleDesc,
+            name: copy.toggleName,
+            desc: copy.toggleDesc,
             control: {
               type: 'toggle',
               key: `frontmatterProperties.${key}.enabled`,
             },
           },
           {
-            name: 'Property name',
-            desc: meta.nameDesc,
+            name: PROPERTY_NAME_LABEL,
+            desc: copy.nameDesc,
             control: {
               type: 'text',
               key: `frontmatterProperties.${key}.property`,
-              placeholder: meta.defaultProp,
+              placeholder: DEFAULT_SETTINGS.frontmatterProperties[key].property,
               disabled: () => !this.plugin.settings.frontmatterProperties[key].enabled,
             },
           },
         ],
       });
     }
+
+    const starsEnabled = () => this.plugin.settings.frontmatterProperties.stars.enabled;
+    const starFields = FM_STARS_COPY.fields;
+    items.push({
+      type: 'group',
+      heading: FM_STARS_COPY.label,
+      items: [
+        {
+          name: FM_STARS_COPY.toggleName,
+          desc: FM_STARS_COPY.toggleDesc,
+          control: { type: 'toggle', key: 'frontmatterProperties.stars.enabled' },
+        },
+        {
+          name: PROPERTY_NAME_LABEL,
+          desc: FM_STARS_COPY.nameDesc,
+          control: {
+            type: 'text',
+            key: 'frontmatterProperties.stars.property',
+            placeholder: DEFAULT_SETTINGS.frontmatterProperties.stars.property,
+            disabled: () => !starsEnabled(),
+          },
+        },
+        {
+          name: starFields.max.name,
+          desc: starFields.max.desc,
+          control: {
+            type: 'number',
+            key: 'frontmatterProperties.stars.max',
+            min: 2,
+            step: 1,
+            placeholder: String(DEFAULT_SETTINGS.frontmatterProperties.stars.max),
+            disabled: () => !starsEnabled(),
+          },
+        },
+        {
+          name: starFields.allowZero.name,
+          desc: starFields.allowZero.desc,
+          control: {
+            type: 'toggle',
+            key: 'frontmatterProperties.stars.allowZero',
+            disabled: () => !starsEnabled(),
+          },
+        },
+        {
+          name: starFields.mode.name,
+          desc: starFields.mode.desc,
+          control: {
+            type: 'dropdown',
+            key: 'frontmatterProperties.stars.mode',
+            defaultValue: DEFAULT_SETTINGS.frontmatterProperties.stars.mode,
+            options: STAR_MODE_LABELS,
+            disabled: () => !starsEnabled(),
+          },
+        },
+        {
+          name: starFields.decimals.name,
+          desc: starFields.decimals.desc,
+          control: {
+            type: 'number',
+            key: 'frontmatterProperties.stars.decimals',
+            min: 1,
+            max: 2,
+            step: 1,
+            disabled: () => !starsEnabled(),
+          },
+          visible: () =>
+            starsEnabled() && this.plugin.settings.frontmatterProperties.stars.mode === 'float',
+        },
+        {
+          name: starFields.mapping.name,
+          desc: starFields.mapping.desc,
+          control: {
+            type: 'dropdown',
+            key: 'frontmatterProperties.stars.mapping',
+            defaultValue: DEFAULT_SETTINGS.frontmatterProperties.stars.mapping,
+            options: STAR_MAPPING_LABELS,
+            disabled: () => !starsEnabled(),
+          },
+        },
+      ],
+    });
 
     return items;
   }
@@ -598,7 +649,11 @@ export default class GlickoSettingsTab extends PluginSettingTab {
       }
     }
 
-    if (changed.length === 0) return;
+    const starsRelevant =
+      (oldEffective.stars.enabled || newEffective.stars.enabled) &&
+      !starScaleConfigEquals(oldEffective.stars, newEffective.stars);
+
+    if (changed.length === 0 && !starsRelevant) return;
 
     const files = await resolveFilesForCohort(this.app, def, {
       excludeFolderPath: this.plugin.settings.templatesFolderPath,
@@ -720,6 +775,78 @@ export default class GlickoSettingsTab extends PluginSettingTab {
           idPropName,
         );
         new Notice(`Wrote "${change.newProp}" on ${res.updated} notes.`);
+      }
+    }
+
+    if (starsRelevant) {
+      const oldStars = oldEffective.stars;
+      const newStars = newEffective.stars;
+
+      if (oldStars.enabled && !newStars.enabled && oldStars.property) {
+        const preview = await previewCohortFrontmatterPropertyUpdates(
+          this.app,
+          files,
+          new Map(),
+          '',
+          oldStars.property,
+          idPropName,
+        );
+        if (preview.wouldUpdate > 0) {
+          const ok = await new ConfirmModal(
+            this.app,
+            'Remove star rating?',
+            `Remove frontmatter property "${oldStars.property}" from ${preview.wouldUpdate} notes in this cohort?`,
+            'Yes, remove',
+            "No, don't update",
+          ).openAndConfirm();
+          if (ok) {
+            const res = await updateCohortFrontmatter(
+              this.app,
+              files,
+              new Map(),
+              '',
+              oldStars.property,
+              `Removing "${oldStars.property}" from ${preview.wouldUpdate} notes...`,
+              idPropName,
+            );
+            new Notice(`Removed "${oldStars.property}" from ${res.updated} notes.`);
+          }
+        }
+      } else if (newStars.enabled && newStars.property) {
+        const starVals = cohort ? computeStarsForAll(cohort, newStars) : new Map<string, number>();
+        const oldProp =
+          oldStars.enabled && oldStars.property && oldStars.property !== newStars.property
+            ? oldStars.property
+            : undefined;
+        const preview = await previewCohortFrontmatterPropertyUpdates(
+          this.app,
+          files,
+          starVals,
+          newStars.property,
+          oldProp,
+          idPropName,
+        );
+        if (preview.wouldUpdate > 0) {
+          const ok = await new ConfirmModal(
+            this.app,
+            'Update star rating?',
+            `Write frontmatter property "${newStars.property}" on ${preview.wouldUpdate} notes in this cohort?`,
+            'Yes, write',
+            "No, don't update",
+          ).openAndConfirm();
+          if (ok) {
+            const res = await updateCohortFrontmatter(
+              this.app,
+              files,
+              starVals,
+              newStars.property,
+              oldProp,
+              `Updating "${newStars.property}" on ${preview.wouldUpdate} notes...`,
+              idPropName,
+            );
+            new Notice(`Updated ${res.updated} notes.`);
+          }
+        }
       }
     }
   }

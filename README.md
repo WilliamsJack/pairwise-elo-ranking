@@ -79,13 +79,14 @@ Optionally, the plugin can generate a **post-session report** - a Markdown note 
 
 The plugin can write the following properties to frontmatter (configurable per-cohort, all optional, names customisable):
 
-- Rating
+- Glicko rating
 - Rank (1 = highest within the cohort)
 - Matches
 - Wins
 - Uncertainty (sigma)
+- Star rating (rank or rating normalised to an n-star scale)
 
-You can then use the values computed by the plugin however you want. For example, enable the Rank property and then sort a Base by it to see your notes in ranked order, or use the Rating property to filter for your best notes with a rating above a certain threshold.
+You can then use the values computed by the plugin however you want. For example, enable the Rank property and then sort a Base by it to see your notes in ranked order, or use the Glicko rating property to filter for your best notes with a rating above a certain threshold.
 
 **Tip:** Configure global defaults in Settings, and (optionally) set per-cohort overrides when creating or editing a cohort.
 

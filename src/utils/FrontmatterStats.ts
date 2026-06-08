@@ -1,6 +1,6 @@
 import type { App, TFile } from 'obsidian';
 
-import type { FrontmatterPropertiesSettings } from '../settings';
+import type { FrontmatterPropertiesSettings, StarScaleConfig } from '../settings';
 import type { CohortData } from '../types';
 import { getNoteId } from './NoteIds';
 import { withNotice } from './safe';
@@ -11,6 +11,7 @@ type PlayerStats = {
   matches: number;
   wins: number;
   rank: number;
+  stars?: number;
 };
 
 function anyEnabled(fm: FrontmatterPropertiesSettings): boolean {
@@ -19,8 +20,77 @@ function anyEnabled(fm: FrontmatterPropertiesSettings): boolean {
     !!fm.uncertainty.enabled ||
     !!fm.rank.enabled ||
     !!fm.matches.enabled ||
-    !!fm.wins.enabled
+    !!fm.wins.enabled ||
+    !!fm.stars.enabled
   );
+}
+
+// Compute a derived n-star value for every rated note in the cohort
+export function computeStarsForAll(cohort: CohortData, cfg: StarScaleConfig): Map<string, number> {
+  const map = new Map<string, number>();
+  const rated = Object.entries(cohort.players)
+    .filter(([, p]) => p.matches >= 1)
+    .map(([id, p]) => ({ id, rating: p.rating }));
+  if (rated.length === 0) return map;
+
+  const floor = cfg.allowZero ? 0 : 1;
+  const top = cfg.max;
+  const range = top - floor;
+
+  const quantize = (value: number): number => {
+    const clamped = Math.min(top, Math.max(floor, value));
+    if (cfg.mode === 'integer') return Math.round(clamped);
+    const places = Math.max(0, Math.min(6, Math.floor(cfg.decimals ?? 1)));
+    const factor = Math.pow(10, places);
+    return Math.round(clamped * factor) / factor;
+  };
+
+  // Degenerate scale: nothing meaningful to spread across
+  if (range <= 0) {
+    for (const { id } of rated) map.set(id, quantize(floor));
+    return map;
+  }
+
+  const midpoint = floor + range / 2;
+
+  if (cfg.mapping === 'rank') {
+    // Even spread by rank position (1 = best). Standard competition ranking,
+    // so tied ratings share the higher rank.
+    const sorted = [...rated].sort((a, b) => b.rating - a.rating);
+    const m = sorted.length;
+    if (m === 1) {
+      map.set(sorted[0].id, quantize(midpoint));
+      return map;
+    }
+    let lastRating: number | undefined;
+    let rank = 0;
+    for (let i = 0; i < m; i++) {
+      const { id, rating } = sorted[i];
+      if (lastRating === undefined || rating !== lastRating) {
+        rank = i + 1;
+        lastRating = rating;
+      }
+      const t = (m - rank) / (m - 1); // best -> 1, worst -> 0
+      map.set(id, quantize(floor + t * range));
+    }
+    return map;
+  }
+
+  let min = Infinity;
+  let max = -Infinity;
+  for (const { rating } of rated) {
+    if (rating < min) min = rating;
+    if (rating > max) max = rating;
+  }
+  if (max === min) {
+    for (const { id } of rated) map.set(id, quantize(midpoint));
+    return map;
+  }
+  for (const { id, rating } of rated) {
+    const t = (rating - min) / (max - min);
+    map.set(id, quantize(floor + t * range));
+  }
+  return map;
 }
 
 // Standard competition ranking ("1224" style)
@@ -95,6 +165,9 @@ function buildProps(fm: FrontmatterPropertiesSettings, stats: PlayerStats): Reco
   if (fm.wins.enabled && fm.wins.property) {
     out[fm.wins.property] = stats.wins;
   }
+  if (fm.stars.enabled && fm.stars.property && typeof stats.stars === 'number') {
+    out[fm.stars.property] = stats.stars;
+  }
   return out;
 }
 
@@ -122,13 +195,17 @@ export async function writeFrontmatterStatsForPair(
 
   const ids = [aId, bId].filter((id): id is string => !!id);
   const rankMap = computeRanksForSubset(cohort, ids);
+  // Stars depend on the cohort-wide min/max (or full ranking), so compute the
+  // whole map and look up the pair. Other notes are refreshed at session end.
+  const starMap =
+    fm.stars.enabled && fm.stars.property ? computeStarsForAll(cohort, fm.stars) : undefined;
   const tasks: Promise<void>[] = [];
 
   if (aFile && aId) {
-    tasks.push(writeFrontmatterStatsForPlayer(app, fm, cohort, aFile, aId, rankMap));
+    tasks.push(writeFrontmatterStatsForPlayer(app, fm, cohort, aFile, aId, rankMap, starMap));
   }
   if (bFile && bId) {
-    tasks.push(writeFrontmatterStatsForPlayer(app, fm, cohort, bFile, bId, rankMap));
+    tasks.push(writeFrontmatterStatsForPlayer(app, fm, cohort, bFile, bId, rankMap, starMap));
   }
 
   await Promise.all(tasks);
@@ -291,15 +368,41 @@ export async function updateCohortFrontmatter(
   );
 }
 
-export async function updateCohortRanksInFrontmatter(
+// Refresh the rank and star properties across an entire cohort.
+export async function refreshCohortRankAndStars(
   app: App,
-  cohort: CohortData | undefined,
+  fm: FrontmatterPropertiesSettings,
+  cohort: CohortData,
   files: TFile[],
-  newPropName: string,
-): Promise<{ updated: number }> {
-  if (!cohort) return { updated: 0 };
-  const rankMap = computeRanksForAll(cohort);
-  return updateCohortFrontmatterProperties(app, files, rankMap, newPropName);
+  idPropertyName?: string,
+  rankMap?: Map<string, number>,
+): Promise<void> {
+  const wantRank = !!fm.rank.enabled && !!fm.rank.property;
+  const wantStars = !!fm.stars.enabled && !!fm.stars.property;
+  if ((!wantRank && !wantStars) || files.length === 0) return;
+
+  if (wantRank) {
+    await updateCohortFrontmatter(
+      app,
+      files,
+      rankMap ?? computeRanksForAll(cohort),
+      fm.rank.property,
+      undefined,
+      'Updating ranks...',
+      idPropertyName,
+    );
+  }
+  if (wantStars) {
+    await updateCohortFrontmatter(
+      app,
+      files,
+      computeStarsForAll(cohort, fm.stars),
+      fm.stars.property,
+      undefined,
+      'Updating star ratings...',
+      idPropertyName,
+    );
+  }
 }
 
 export async function writeFrontmatterStatsForPlayer(
@@ -309,6 +412,7 @@ export async function writeFrontmatterStatsForPlayer(
   file: TFile,
   playerId: string,
   precomputedRankMap: Map<string, number>,
+  starMap?: Map<string, number>,
 ): Promise<void> {
   if (!anyEnabled(fm)) return;
   const p = cohort.players[playerId];
@@ -320,6 +424,7 @@ export async function writeFrontmatterStatsForPlayer(
     matches: p.matches,
     wins: p.wins,
     rank: rankMap.get(playerId) ?? rankMap.size,
+    stars: starMap?.get(playerId),
   });
   await writeProps(app, file, props);
 }

@@ -6,12 +6,29 @@ export interface FrontmatterPropertyConfig {
   enabled: boolean;
 }
 
+// How a note's star value is derived from the cohort's pairwise results.
+// - 'rating': min-max normalise the Glicko rating between the lowest and
+//   highest rated notes (preserves the size of rating gaps).
+// - 'rank': spread notes evenly across the scale by rank position.
+export type StarMapping = 'rating' | 'rank';
+
+export interface StarScaleConfig {
+  enabled: boolean;
+  property: string;
+  max: number;
+  allowZero: boolean;
+  mode: 'integer' | 'float';
+  decimals: number; // decimal places used when mode === 'float'
+  mapping: StarMapping;
+}
+
 export interface FrontmatterPropertiesSettings {
   rating: FrontmatterPropertyConfig;
   uncertainty: FrontmatterPropertyConfig;
   rank: FrontmatterPropertyConfig;
   matches: FrontmatterPropertyConfig;
   wins: FrontmatterPropertyConfig;
+  stars: StarScaleConfig;
 }
 
 export interface SessionReportConfig {
@@ -47,6 +64,15 @@ export const DEFAULT_SETTINGS: GlickoSettings = {
     rank: { property: 'glickoRank', enabled: false },
     matches: { property: 'glickoMatches', enabled: false },
     wins: { property: 'glickoWins', enabled: false },
+    stars: {
+      enabled: false,
+      property: 'stars',
+      max: 7,
+      allowZero: false,
+      mode: 'integer',
+      decimals: 1,
+      mapping: 'rating',
+    },
   },
   askForOverridesOnCohortCreation: true,
   askForReportSettingsOnCreation: true,
@@ -74,5 +100,19 @@ export function effectiveFrontmatterProperties(
     rank: overrides?.rank ?? base.rank,
     matches: overrides?.matches ?? base.matches,
     wins: overrides?.wins ?? base.wins,
+    stars: overrides?.stars ?? base.stars,
   };
+}
+
+// Used to decide whether a change warrants rewriting cohort frontmatter.
+export function starScaleConfigEquals(a: StarScaleConfig, b: StarScaleConfig): boolean {
+  return (
+    a.enabled === b.enabled &&
+    a.property.trim() === b.property.trim() &&
+    a.max === b.max &&
+    a.allowZero === b.allowZero &&
+    a.mode === b.mode &&
+    a.decimals === b.decimals &&
+    a.mapping === b.mapping
+  );
 }

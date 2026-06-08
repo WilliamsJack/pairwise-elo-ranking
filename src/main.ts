@@ -22,7 +22,7 @@ import { CohortPicker } from './ui/CohortPicker';
 import { ensureBaseCohortTarget } from './utils/EnsureBaseCohort';
 import { ensureFolderCohortPath } from './utils/EnsureFolderCohort';
 import { ensureUniqueIds } from './utils/EnsureUniqueIds';
-import { computeRanksForAll, updateCohortFrontmatter } from './utils/FrontmatterStats';
+import { refreshCohortRankAndStars } from './utils/FrontmatterStats';
 import { debugWarn, setDebugLogging } from './utils/logger';
 
 export default class GlickoPlugin extends Plugin {
@@ -266,26 +266,14 @@ export default class GlickoPlugin extends Plugin {
       this.settings.frontmatterProperties,
       def.frontmatterOverrides,
     );
-    const rankCfg = fm.rank;
-    if (!rankCfg.enabled || !rankCfg.property) return;
-
     const files = await resolveFilesForCohort(this.app, def, {
       excludeFolderPath: this.settings.templatesFolderPath,
     });
-    if (files.length === 0) return;
 
-    const rankMap = computeRanksForAll(cohort);
-
-    updateCohortFrontmatter(
-      this.app,
-      files,
-      rankMap,
-      rankCfg.property,
-      undefined,
-      'Updating ranks in frontmatter...',
-      this.settings.idPropertyName,
-    ).catch((e) => {
-      console.error('[Glicko] Failed to update ranks in frontmatter', e);
-    });
+    refreshCohortRankAndStars(this.app, fm, cohort, files, this.settings.idPropertyName).catch(
+      (e) => {
+        console.error('[Glicko] Failed to refresh cohort frontmatter', e);
+      },
+    );
   }
 }

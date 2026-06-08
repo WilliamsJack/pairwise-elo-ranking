@@ -9,7 +9,8 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { ALL_SENTINEL, ResetNoteModal } from '../ui/ResetNoteModal';
 import {
   computeRanksForAll,
-  updateCohortFrontmatter,
+  computeStarsForAll,
+  refreshCohortRankAndStars,
   writeFrontmatterStatsForPlayer,
 } from '../utils/FrontmatterStats';
 import { getNoteId } from '../utils/NoteIds';
@@ -89,26 +90,16 @@ export async function resetNoteRating(
     );
 
     const rankMap = computeRanksForAll(cohort);
+    const wantStars = !!fm.stars.enabled && !!fm.stars.property;
+    const starMap = wantStars ? computeStarsForAll(cohort, fm.stars) : undefined;
 
-    // Write the reset note's own stats (rating, matches, wins, rank)
-    await writeFrontmatterStatsForPlayer(app, fm, cohort, file, noteId, rankMap);
+    // Write the reset note's own stats (rating, matches, wins, rank, stars)
+    await writeFrontmatterStatsForPlayer(app, fm, cohort, file, noteId, rankMap, starMap);
 
-    // Update rank across the whole cohort since relative ordering changed
-    const rankCfg = fm.rank;
-    if (!rankCfg.enabled || !rankCfg.property) continue;
-
+    // Update rank/stars across the whole cohort since relative ordering changed
     const cohortFiles = await resolveFilesForCohort(app, def, {
       excludeFolderPath: settings.templatesFolderPath,
     });
-    if (cohortFiles.length === 0) continue;
-    await updateCohortFrontmatter(
-      app,
-      cohortFiles,
-      rankMap,
-      rankCfg.property,
-      undefined,
-      'Updating ranks...',
-      settings.idPropertyName,
-    );
+    await refreshCohortRankAndStars(app, fm, cohort, cohortFiles, settings.idPropertyName, rankMap);
   }
 }

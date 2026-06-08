@@ -6,15 +6,18 @@ import type {
   FrontmatterPropertiesSettings,
   FrontmatterPropertyConfig,
   SessionReportConfig,
+  StarScaleConfig,
 } from '../settings';
-import { DEFAULT_SETTINGS } from '../settings';
+import { DEFAULT_SETTINGS, starScaleConfigEquals } from '../settings';
 import type { ScrollStartMode } from '../types';
+import type { FmPropKey } from './FrontmatterPropertyRow';
 import { FM_PROP_KEYS, renderStandardFmPropertyRow } from './FrontmatterPropertyRow';
 import { BasePromiseModal } from './PromiseModal';
+import { renderStarScaleSettings } from './StarScaleRow';
 
 type Mode = 'create' | 'edit';
 
-type Key = keyof FrontmatterPropertiesSettings;
+type Key = FmPropKey;
 
 type RowState = {
   key: Key;
@@ -54,6 +57,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
   private reportTemplatePath = '';
 
   private working: Record<Key, RowState>;
+  private starWorking: StarScaleConfig;
 
   constructor(
     app: App,
@@ -111,6 +115,8 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
       matches: mk('matches'),
       wins: mk('wins'),
     };
+
+    this.starWorking = { ...(this.initial?.stars ?? this.base.stars) };
   }
 
   async openAndGetOptions(): Promise<CohortOptionsResult | undefined> {
@@ -131,6 +137,9 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
         out[key] = { property: row.property.trim(), enabled: !!row.enabled };
       }
     }
+    if (!starScaleConfigEquals(this.starWorking, this.base.stars)) {
+      out.stars = { ...this.starWorking, property: this.starWorking.property.trim() };
+    }
     return out;
   }
 
@@ -141,7 +150,7 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
     const desc =
       this.mode === 'create'
         ? 'Set an optional name and configure which Glicko statistics to write into frontmatter for this cohort. Global defaults are prefilled.'
-        : 'Rename the cohort and adjust which Glicko statistics to write into frontmatter. Use Reset to revert a property to the global default.';
+        : 'Rename the cohort and adjust which Glicko statistics to write into frontmatter. Use the reset button to revert a property to the global default.';
 
     contentEl.createEl('h3', { text: 'Cohort options' });
     contentEl.createEl('p', { text: desc });
@@ -234,9 +243,9 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
               this.reportFolderPath = (v ?? '').trim();
             });
         })
-        .addButton((b) =>
+        .addExtraButton((b) =>
           b
-            .setButtonText('Reset')
+            .setIcon('reset')
             .setTooltip('Reset to global default')
             .onClick(() => {
               this.reportFolderPath = this.plugin.settings.sessionReport.folderPath;
@@ -256,9 +265,9 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
               this.reportNameTemplate = (v ?? '').trim();
             });
         })
-        .addButton((b) =>
+        .addExtraButton((b) =>
           b
-            .setButtonText('Reset')
+            .setIcon('reset')
             .setTooltip('Reset to global default')
             .onClick(() => {
               this.reportNameTemplate = this.plugin.settings.sessionReport.nameTemplate;
@@ -280,9 +289,9 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
               this.reportTemplatePath = (v ?? '').trim();
             });
         })
-        .addButton((b) =>
+        .addExtraButton((b) =>
           b
-            .setButtonText('Reset')
+            .setIcon('reset')
             .setTooltip('Reset to global default')
             .onClick(() => {
               this.reportTemplatePath = this.plugin.settings.sessionReport.reportTemplatePath ?? '';
@@ -315,6 +324,15 @@ export class CohortOptionsModal extends BasePromiseModal<CohortOptionsResult | u
           },
         });
       }
+
+      renderStarScaleSettings(contentEl, {
+        value: this.starWorking,
+        base: this.base.stars,
+        mode: 'cohort',
+        onChange: (next) => {
+          this.starWorking = { ...next };
+        },
+      });
     }
 
     if (this.mode === 'create') {

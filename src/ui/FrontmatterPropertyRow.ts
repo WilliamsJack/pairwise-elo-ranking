@@ -1,39 +1,11 @@
 import type { TextComponent, ToggleComponent } from 'obsidian';
 import { Setting } from 'obsidian';
 
-export type FmPropKey = 'rating' | 'uncertainty' | 'rank' | 'matches' | 'wins';
-export const FM_PROP_KEYS: readonly FmPropKey[] = [
-  'rating',
-  'uncertainty',
-  'rank',
-  'matches',
-  'wins',
-] as const;
+import type { FmSimpleKey } from '../settings/frontmatterCopy';
+import { FM_SIMPLE_COPY, FM_SIMPLE_KEYS } from '../settings/frontmatterCopy';
 
-type Meta = { label: string; desc: string };
-
-const META: Record<FmPropKey, Meta> = {
-  rating: {
-    label: 'Rating',
-    desc: 'Write the current Glicko rating to this property.',
-  },
-  uncertainty: {
-    label: 'Uncertainty',
-    desc: 'Write how uncertain the rating is. Starts high and decreases as more comparisons are made.',
-  },
-  rank: {
-    label: 'Rank',
-    desc: 'Write the cohort rank (1 = highest) to this property.',
-  },
-  matches: {
-    label: 'Matches',
-    desc: 'Write the number of matches to this property.',
-  },
-  wins: {
-    label: 'Wins',
-    desc: 'Write the number of wins to this property.',
-  },
-};
+export type FmPropKey = FmSimpleKey;
+export const FM_PROP_KEYS = FM_SIMPLE_KEYS;
 
 export type FmRowValue = { enabled: boolean; property: string };
 export type FmRowRefs = { setting: Setting; text: TextComponent; toggle: ToggleComponent };
@@ -50,7 +22,7 @@ export function renderStandardFmPropertyRow(
     mode?: RowMode;
   },
 ): FmRowRefs {
-  const meta = META[key];
+  const copy = FM_SIMPLE_COPY[key];
   const placeholder = opts.base.property || '';
   const mode: RowMode = opts.mode ?? 'cohort';
 
@@ -63,8 +35,8 @@ export function renderStandardFmPropertyRow(
   let toggleRef!: ToggleComponent;
 
   const setting = new Setting(parent)
-    .setName(meta.label)
-    .setDesc(meta.desc)
+    .setName(copy.label)
+    .setDesc(copy.toggleDesc)
     .addToggle((t) => {
       toggleRef = t;
       t.setValue(cur.enabled).onChange((v) => {
@@ -88,9 +60,9 @@ export function renderStandardFmPropertyRow(
     });
 
   if (mode === 'cohort') {
-    setting.addButton((b) =>
+    setting.addExtraButton((b) =>
       b
-        .setButtonText('Reset')
+        .setIcon('reset')
         .setTooltip('Reset to global default')
         .onClick(() => {
           cur.enabled = !!opts.base.enabled;
