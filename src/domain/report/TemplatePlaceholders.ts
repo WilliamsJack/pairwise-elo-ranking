@@ -48,19 +48,19 @@ export function computePlaceholders(
   const uniquePlayerIds = new Set<string>();
   let draws = 0;
   const newEntrants = new Set<string>();
-  const firstSeen = new Map<string, UndoFrame>();
+  const seenPlayerIds = new Set<string>();
 
   for (const m of data.matches) {
     uniquePlayerIds.add(m.a.id);
     uniquePlayerIds.add(m.b.id);
     if (m.result === 'D') draws++;
 
-    if (!firstSeen.has(m.a.id)) {
-      firstSeen.set(m.a.id, m);
+    if (!seenPlayerIds.has(m.a.id)) {
+      seenPlayerIds.add(m.a.id);
       if (m.a.matches === 0) newEntrants.add(m.a.id);
     }
-    if (!firstSeen.has(m.b.id)) {
-      firstSeen.set(m.b.id, m);
+    if (!seenPlayerIds.has(m.b.id)) {
+      seenPlayerIds.add(m.b.id);
       if (m.b.matches === 0) newEntrants.add(m.b.id);
     }
   }
@@ -172,7 +172,7 @@ export function computePlaceholders(
     if (!preSessionSigma.has(m.b.id) && m.b.sigma != null) preSessionSigma.set(m.b.id, m.b.sigma);
   }
 
-  // Stability lists and leaderboard — session-scoped and cohort-wide variants
+  // Stability lists and leaderboard
   let mostStableList = '';
   let leastStableList = '';
   let mostStableListAll = '';

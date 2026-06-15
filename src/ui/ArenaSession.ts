@@ -17,6 +17,14 @@ import type { ArenaLayoutHandle } from './LayoutManager';
 import { ArenaLayoutManager } from './LayoutManager';
 
 export default class ArenaSession {
+  private static readonly VOTE_KEYS: ReadonlySet<string> = new Set([
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowUp',
+    'ArrowDown',
+    'Backspace',
+  ]);
+
   private app: App;
   private plugin: GlickoPlugin;
   private cohortKey: string;
@@ -214,7 +222,7 @@ export default class ArenaSession {
     if (this.rightFile?.path === oldPath) this.rightFile = newFile;
     this.lastPair =
       this.leftFile && this.rightFile
-        ? ([this.leftFile.path, this.rightFile.path].sort() as [string, string])
+        ? this.sortedPair(this.leftFile.path, this.rightFile.path)
         : undefined;
     this.updateOverlay();
   }
@@ -375,7 +383,7 @@ export default class ArenaSession {
     const prefersReduced = win.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
 
     // Jitter: slide back, overshoot forward, then settle at the true value.
-    // Amplitude scales with surprise (0–1) so mild upsets barely wobble.
+    // Amplitude scales with surprise so mild upsets barely wobble.
     const SURPRISE_THRESHOLD = 0.15;
     if (jitterEnabled && surprise > SURPRISE_THRESHOLD) {
       this.stabilityBarFillEl.classList.add('is-surprise');
@@ -555,14 +563,7 @@ export default class ArenaSession {
   }
 
   private isArenaShortcutKey(ev: KeyboardEvent): boolean {
-    return (
-      ev.key === 'ArrowLeft' ||
-      ev.key === 'ArrowRight' ||
-      ev.key === 'ArrowUp' ||
-      ev.key === 'ArrowDown' ||
-      ev.key === 'Backspace' ||
-      ev.key === 'Escape'
-    );
+    return ArenaSession.VOTE_KEYS.has(ev.key) || ev.key === 'Escape';
   }
 
   private showShortcutsPausedToast(ev: KeyboardEvent): void {
@@ -604,14 +605,7 @@ export default class ArenaSession {
     this.shortcutsPausedToastShown = false;
 
     // Ignore auto-repeat for voting keys (prevents accidental multi-votes if a key is held).
-    if (
-      ev.repeat &&
-      (ev.key === 'ArrowLeft' ||
-        ev.key === 'ArrowRight' ||
-        ev.key === 'ArrowUp' ||
-        ev.key === 'ArrowDown' ||
-        ev.key === 'Backspace')
-    ) {
+    if (ev.repeat && ArenaSession.VOTE_KEYS.has(ev.key)) {
       ev.preventDefault();
       return;
     }
@@ -734,7 +728,7 @@ export default class ArenaSession {
     if (aFile && bFile) {
       this.leftFile = aFile;
       this.rightFile = bFile;
-      this.lastPair = [aFile.path, bFile.path].sort() as [string, string];
+      this.lastPair = this.sortedPair(aFile.path, bFile.path);
       await this.openCurrent();
       this.updateOverlay();
     }
@@ -751,6 +745,11 @@ export default class ArenaSession {
   }
 
   // ---- Matchmaking helpers ----
+
+  /** A pair key is the two paths sorted, so order-independent comparisons work. */
+  private sortedPair(aPath: string, bPath: string): [string, string] {
+    return [aPath, bPath].sort() as [string, string];
+  }
 
   private getStatsForFile(file: TFile): { rating: number; sigma: number } {
     const id = this.idByPath.get(file.path);
@@ -783,6 +782,6 @@ export default class ArenaSession {
 
     this.leftFile = this.files[leftIndex];
     this.rightFile = this.files[rightIndex];
-    this.lastPair = [this.leftFile.path, this.rightFile.path].sort() as [string, string];
+    this.lastPair = this.sortedPair(this.leftFile.path, this.rightFile.path);
   }
 }
