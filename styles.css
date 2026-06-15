@@ -208,3 +208,12 @@
   font-size: var(--font-ui-medium);
   flex: 1 1 7rem;
 }
+
+/* Off-screen container used to resolve Base results without a visible tab. */
+.glicko-offscreen {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
