@@ -1,4 +1,4 @@
-import type { App, ViewState, WorkspaceLeaf } from 'obsidian';
+import type { App, ViewState, WorkspaceLeaf, WorkspaceSplit } from 'obsidian';
 import { Notice, Platform } from 'obsidian';
 
 import type { SessionLayoutMode } from '../settings';
@@ -35,6 +35,25 @@ export class ArenaLayoutManager {
 
   private getUserLeaf(): WorkspaceLeaf {
     return this.app.workspace.getMostRecentLeaf() ?? this.app.workspace.getLeaf(false);
+  }
+
+  /**
+   * Create the arena's second pane next to `first`.
+   */
+  private createSecondLeaf(first: WorkspaceLeaf): WorkspaceLeaf {
+    this.app.workspace.setActiveLeaf(first, { focus: false });
+
+    const split = this.app.workspace.getLeaf('split');
+    if (split !== first) return split;
+
+    const parent = first.parent as unknown as
+      | (WorkspaceSplit & { children?: unknown[] })
+      | undefined;
+
+    const index = parent?.children?.indexOf(first) ?? -1;
+    if (!parent || index < 0) return first;
+
+    return this.app.workspace.createLeafInParent(parent, index + 1);
   }
 
   private snapshot(vs: ViewState | undefined): ViewState | undefined {
@@ -84,9 +103,7 @@ export class ArenaLayoutManager {
     const leftLeaf = this.getUserLeaf();
     const originalLeftViewState = this.snapshot(leftLeaf.getViewState());
 
-    this.app.workspace.setActiveLeaf(leftLeaf, { focus: false });
-
-    const rightLeaf = this.app.workspace.getLeaf('split');
+    const rightLeaf = this.createSecondLeaf(leftLeaf);
 
     const cleanup = async () => {
       // Restore the user's original tab state
@@ -119,12 +136,10 @@ export class ArenaLayoutManager {
     const referenceLeaf = this.getUserLeaf();
 
     // First split: create arena-right to the right
-    this.app.workspace.setActiveLeaf(referenceLeaf, { focus: false });
-    const arenaRight = this.app.workspace.getLeaf('split');
+    const arenaRight = this.createSecondLeaf(referenceLeaf);
 
     // Second split: split the arena-right to create arena-left
-    this.app.workspace.setActiveLeaf(arenaRight, { focus: false });
-    const arenaLeft = this.app.workspace.getLeaf('split');
+    const arenaLeft = this.createSecondLeaf(arenaRight);
 
     // Focus the arena so keyboard works immediately
     this.app.workspace.setActiveLeaf(arenaLeft, { focus: true });
@@ -157,8 +172,7 @@ export class ArenaLayoutManager {
 
     const left = this.app.workspace.getLeaf('tab');
 
-    this.app.workspace.setActiveLeaf(left, { focus: false });
-    const right = this.app.workspace.getLeaf('split');
+    const right = this.createSecondLeaf(left);
 
     // Focus the arena
     this.app.workspace.setActiveLeaf(left, { focus: true });
@@ -204,12 +218,7 @@ export class ArenaLayoutManager {
     // Make sure subsequent splits happen in the pop-out
     this.app.workspace.setActiveLeaf(popLeft, { focus: true });
 
-    let popRight = this.app.workspace.getLeaf('split');
-    const createdRight = !!popRight && popRight !== popLeft;
-    if (!createdRight) {
-      const tab = this.app.workspace.getLeaf('tab');
-      popRight = tab && tab !== popLeft ? tab : popLeft;
-    }
+    const popRight = this.createSecondLeaf(popLeft);
 
     const cleanup = async () => {
       // Detach inside the popout; detaching the last leaf should close the window.
