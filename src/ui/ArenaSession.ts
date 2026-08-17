@@ -16,6 +16,8 @@ import { installScrollSync } from '../utils/ScrollSync';
 import type { ArenaLayoutHandle } from './LayoutManager';
 import { ArenaLayoutManager } from './LayoutManager';
 
+type ArenaSide = 'left' | 'right';
+
 export default class ArenaSession {
   private static readonly VOTE_KEYS: ReadonlySet<string> = new Set([
     'ArrowLeft',
@@ -52,8 +54,12 @@ export default class ArenaSession {
   private shortcutsPausedToastShown = false;
 
   // Mobile (phone) mode: two tabs + switch/win bar
-  private lastVisibleSide: 'left' | 'right' = 'left';
+  private lastVisibleSide: ArenaSide = 'left';
   private activeLeafChangeRef?: EventRef;
+
+  private pendingScrollSides = new Set<ArenaSide>();
+
+  private pairToken = 0;
 
   // Button refs for keyboard "press-in" flash
   private leftBtn?: HTMLButtonElement;
@@ -107,11 +113,15 @@ export default class ArenaSession {
     this.mountOverlay(doc);
     this.plugin.registerDomEvent(win, 'keydown', this.keydownHandler, true);
 
-    // Mobile: Update bar to reflect the currently visible note
+    // Mobile: Update bar to reflect the currently visible note and give it its initial scroll
     if (Platform.isPhone) {
-      this.activeLeafChangeRef = this.app.workspace.on('active-leaf-change', () =>
-        this.updateOverlay(),
-      );
+      this.activeLeafChangeRef = this.app.workspace.on('active-leaf-change', () => {
+        const active = this.activeSide();
+        if (active) this.lastVisibleSide = active;
+
+        this.updateOverlay();
+        void this.applyPendingScrolls();
+      });
     }
 
     // If the user closes a pop-out window, end the session automatically.
@@ -144,6 +154,7 @@ export default class ArenaSession {
 
   async end(opts?: { forUnload?: boolean }) {
     this.clearScrollSync();
+    this.cancelPendingScrolls();
 
     // Remove mobile UI workspace listeners
     if (this.activeLeafChangeRef) {
@@ -269,6 +280,8 @@ export default class ArenaSession {
   private async openCurrent() {
     if (!this.leftFile || !this.rightFile) return;
 
+    const token = this.cancelPendingScrolls();
+
     this.clearScrollSync();
 
     // Lazily ensure note IDs only for the notes being displayed
@@ -279,23 +292,62 @@ export default class ArenaSession {
       this.openInReadingMode(this.rightLeaf, this.rightFile),
     ]);
 
-    if (this.getCohortSyncScrollEnabled() && !Platform.isPhone) {
-      const leftView = this.leftLeaf.view;
-      const rightView = this.rightLeaf.view;
-      if (leftView instanceof MarkdownView && rightView instanceof MarkdownView) {
-        const leftEl = getPreviewEl(leftView);
-        const rightEl = getPreviewEl(rightView);
-        if (leftEl && rightEl) {
-          this.scrollSyncCleanup = installScrollSync(leftEl, rightEl);
-        }
-      }
-    }
+    // Return if a newer pair took over while these notes were loading
+    if (token !== this.pairToken) return;
 
     // Phone UX: start a new pair on the left note
     if (Platform.isPhone) {
       this.app.workspace.setActiveLeaf(this.leftLeaf, { focus: true });
       this.lastVisibleSide = 'left';
     }
+
+    this.pendingScrollSides = new Set(['left', 'right']);
+    await this.applyPendingScrolls();
+
+    if (token !== this.pairToken) return;
+    this.installScrollSyncForPair();
+  }
+
+  private cancelPendingScrolls(): number {
+    this.pendingScrollSides.clear();
+    return ++this.pairToken;
+  }
+
+  private leafFor(side: ArenaSide): WorkspaceLeaf {
+    return side === 'left' ? this.leftLeaf : this.rightLeaf;
+  }
+
+  /** Sides whose pane is on screen, and so can actually be scrolled. */
+  private visibleSides(): ArenaSide[] {
+    if (!Platform.isPhone) return ['left', 'right'];
+    return [this.currentSide()];
+  }
+
+  private async applyPendingScrolls(): Promise<void> {
+    const due = this.visibleSides().filter((side) => this.pendingScrollSides.has(side));
+    if (due.length === 0) return;
+
+    for (const side of due) this.pendingScrollSides.delete(side);
+
+    const token = this.pairToken;
+    const mode = this.getCohortScrollStart();
+    const isStale = () => token !== this.pairToken;
+
+    await Promise.all(due.map((side) => applyInitialScroll(this.leafFor(side), mode, isStale)));
+  }
+
+  private installScrollSyncForPair(): void {
+    if (Platform.isPhone || !this.getCohortSyncScrollEnabled()) return;
+
+    const leftView = this.leftLeaf.view;
+    const rightView = this.rightLeaf.view;
+    if (!(leftView instanceof MarkdownView) || !(rightView instanceof MarkdownView)) return;
+
+    const leftEl = getPreviewEl(leftView);
+    const rightEl = getPreviewEl(rightView);
+    if (!leftEl || !rightEl) return;
+
+    this.scrollSyncCleanup = installScrollSync(leftEl, rightEl);
   }
 
   private getCohortScrollStart(): ScrollStartMode {
@@ -314,10 +366,6 @@ export default class ArenaSession {
         }),
       `Open file in reading mode: ${file.path}`,
     );
-
-    // Apply initial scroll behaviour
-    const mode = Platform.isPhone ? 'none' : this.getCohortScrollStart();
-    await applyInitialScroll(leaf, mode);
   }
 
   private clearScrollSync(): void {
@@ -440,30 +488,27 @@ export default class ArenaSession {
     this.pressTimers.set(btn, tid);
   }
 
-  private getVisibleSide(): 'left' | 'right' | undefined {
+  private activeSide(): ArenaSide | undefined {
     const active = this.app.workspace.getActiveViewOfType(MarkdownView)?.leaf;
-    if (active === this.leftLeaf) {
-      this.lastVisibleSide = 'left';
-      return 'left';
-    }
-    if (active === this.rightLeaf) {
-      this.lastVisibleSide = 'right';
-      return 'right';
-    }
+    if (active === this.leftLeaf) return 'left';
+    if (active === this.rightLeaf) return 'right';
     return undefined;
   }
 
-  private switchNote(): void {
-    const side = this.getVisibleSide() ?? this.lastVisibleSide;
-    const target = side === 'left' ? this.rightLeaf : this.leftLeaf;
+  private currentSide(): ArenaSide {
+    return this.activeSide() ?? this.lastVisibleSide;
+  }
 
-    this.app.workspace.setActiveLeaf(target, { focus: true });
-    this.lastVisibleSide = side === 'left' ? 'right' : 'left';
+  private switchNote(): void {
+    const target: ArenaSide = this.currentSide() === 'left' ? 'right' : 'left';
+
+    this.app.workspace.setActiveLeaf(this.leafFor(target), { focus: true });
+    this.lastVisibleSide = target;
     this.updateOverlay();
   }
 
   private chooseCurrentWinner(): void {
-    const side = this.getVisibleSide();
+    const side = this.activeSide();
     if (!side) {
       this.showToast('Tap Switch to view a note, then choose a winner.');
       return;
@@ -550,7 +595,7 @@ export default class ArenaSession {
 
     if (!Platform.isPhone) return;
 
-    const visible = this.getVisibleSide();
+    const visible = this.activeSide();
 
     const curFile =
       visible === 'left' ? this.leftFile : visible === 'right' ? this.rightFile : undefined;
