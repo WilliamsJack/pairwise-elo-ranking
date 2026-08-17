@@ -47,8 +47,7 @@ export class ArenaLayoutManager {
     if (split !== first) return split;
 
     const parent = first.parent as unknown as
-      | (WorkspaceSplit & { children?: unknown[] })
-      | undefined;
+      (WorkspaceSplit & { children?: unknown[] }) | undefined;
 
     const index = parent?.children?.indexOf(first) ?? -1;
     if (!parent || index < 0) return first;

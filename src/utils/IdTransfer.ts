@@ -144,7 +144,10 @@ export async function planIdTransfer(
       const i = idx++;
       if (i >= candidates.length) break;
 
-      const plan = await planForFile(app, candidates[i], from, to);
+      const candidate = candidates[i];
+      if (!candidate) break;
+
+      const plan = await planForFile(app, candidate, from, to);
       if (!plan) continue;
 
       plans.push(plan);

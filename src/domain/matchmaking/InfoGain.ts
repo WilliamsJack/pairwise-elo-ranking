@@ -40,8 +40,10 @@ export function pickMaxInfoGainPair(
   opts?: { lastPairIndices?: [number, number] },
 ): { leftIndex: number; rightIndex: number } | null {
   const n = players.length;
-  if (n < 2) return null;
-  if (n === 2) return { leftIndex: players[0].index, rightIndex: players[1].index };
+  const first = players[0];
+  const second = players[1];
+  if (!first || !second) return null;
+  if (n === 2) return { leftIndex: first.index, rightIndex: second.index };
 
   const lastA = opts?.lastPairIndices?.[0] ?? -1;
   const lastB = opts?.lastPairIndices?.[1] ?? -1;
@@ -54,7 +56,8 @@ export function pickMaxInfoGainPair(
   let bestB = -1;
   let tieCount = 0;
 
-  const consider = (pi: ScoredPlayer, pj: ScoredPlayer) => {
+  const consider = (pi: ScoredPlayer | undefined, pj: ScoredPlayer | undefined) => {
+    if (!pi || !pj) return;
     if (isLastPair(pi.index, pj.index)) return;
     const ig = informationGain(pi.rating, pj.rating, pi.sigma, pj.sigma);
     if (ig > bestIG) {
@@ -88,8 +91,8 @@ export function pickMaxInfoGainPair(
 
   // Fallback: if every pair was the last pair (n=3 edge case)
   if (bestA < 0) {
-    bestA = players[0].index;
-    bestB = players[1].index;
+    bestA = first.index;
+    bestB = second.index;
   }
 
   // Random side assignment

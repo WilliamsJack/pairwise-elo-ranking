@@ -100,7 +100,7 @@ export class ResolveDuplicateIdsModal extends BasePromiseModal<boolean> {
     const listWrap = contentEl.createDiv();
 
     const sorted = this.sortedByCreatedAsc(this.files);
-    const oldestPath = sorted[0].path;
+    const oldestPath = sorted[0]?.path;
 
     for (const f of sorted) {
       const row = new Setting(listWrap).setName('');

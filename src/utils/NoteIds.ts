@@ -220,11 +220,11 @@ export async function overwriteNoteIdInHtmlComment(
     const regex = buildIdHtmlCommentRegex(propertyName);
     const matches = Array.from(data.matchAll(regex));
 
-    if (matches.length === 1 && matches[0][1] === id) {
-      const m = matches[0];
-      const start = typeof m.index === 'number' ? m.index : -1;
+    const only = matches.length === 1 ? matches[0] : undefined;
+    if (only && only[1] === id) {
+      const start = typeof only.index === 'number' ? only.index : -1;
       if (start >= 0) {
-        const end = start + m[0].length;
+        const end = start + only[0].length;
         const after = data.slice(end);
         if (/^[ \t]*(?:\r?\n)*$/.test(after)) return data;
       }

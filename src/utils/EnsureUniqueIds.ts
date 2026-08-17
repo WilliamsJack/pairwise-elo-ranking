@@ -22,6 +22,8 @@ export async function findDuplicateIds(
       if (i >= files.length) break;
 
       const f = files[i];
+      if (!f) break;
+
       const id = await getNoteId(app, f, propertyName);
       if (!id) continue;
 
@@ -65,6 +67,8 @@ export async function ensureUniqueIds(
     // Handle one duplicate ID group at a time (stable order by ID)
     const ids = Array.from(dupes.keys()).sort((a, b) => a.localeCompare(b));
     const id = ids[0];
+    if (id === undefined) return true;
+
     const dupFiles = dupes.get(id) ?? [];
 
     const res = await new ResolveDuplicateIdsModal(app, {

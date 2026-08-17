@@ -68,7 +68,7 @@ export function computePlaceholders(
   const drawRate = matchCount > 0 ? ((draws / matchCount) * 100).toFixed(0) : '0';
 
   // Session duration
-  const endTs = matchCount > 0 ? data.matches[matchCount - 1].ts : now.getTime();
+  const endTs = data.matches[matchCount - 1]?.ts ?? now.getTime();
   const durationMs = Math.max(0, endTs - data.startedAt);
   const durationStr = formatDuration(durationMs);
 
@@ -226,8 +226,7 @@ export function computePlaceholders(
       const rows: string[] = [];
       rows.push('| Rank | Note | Rating |');
       rows.push('|------|------|--------|');
-      for (let i = 0; i < entries.length; i++) {
-        const e = entries[i];
+      for (const [i, e] of entries.entries()) {
         const name = idToName(e.id, data.idToPath);
         const sigma = ` (σ ${Math.round(e.sigma)})`;
         rows.push(`| ${i + 1} | ${name} | ${Math.round(e.rating)}${sigma} |`);
@@ -278,9 +277,9 @@ export function resolveTemplate(template: string, placeholders: Record<string, s
   const stripped = template.replace(/```glicko-placeholders[\s\S]*?```\n?/g, '');
   return stripped.replace(
     /\{\{(glicko:[a-z-]+)(?::(\d+))?\}\}/g,
-    (match, key: string, limitStr?: string) => {
-      if (!(key in placeholders)) return match;
+    (match: string, key: string, limitStr?: string) => {
       const value = placeholders[key];
+      if (value === undefined) return match;
       if (!limitStr) return value;
 
       const limit = parseInt(limitStr, 10);
@@ -289,7 +288,7 @@ export function resolveTemplate(template: string, placeholders: Record<string, s
       const lines = value.split('\n');
 
       // For tables, preserve header (first 2 lines) and limit data rows
-      if (lines.length > 2 && lines[0].startsWith('|') && lines[1].startsWith('|')) {
+      if (lines.length > 2 && lines[0]?.startsWith('|') && lines[1]?.startsWith('|')) {
         const header = lines.slice(0, 2);
         const dataRows = lines.slice(2);
         return [...header, ...dataRows.slice(0, limit)].join('\n');
@@ -315,7 +314,7 @@ function idToName(id: string, idToPath: Map<string, string>): string {
   const path = idToPath.get(id);
   if (!path) return id;
   const parts = path.split('/');
-  const filename = parts[parts.length - 1];
+  const filename = parts[parts.length - 1] ?? path;
   const base = filename.replace(/\.md$/, '');
   return `[[${base}]]`;
 }

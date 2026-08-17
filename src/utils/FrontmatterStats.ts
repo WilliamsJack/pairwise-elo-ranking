@@ -59,13 +59,13 @@ export function computeStarsForAll(cohort: CohortData, cfg: StarScaleConfig): Ma
     const sorted = [...rated].sort((a, b) => b.rating - a.rating);
     const m = sorted.length;
     if (m === 1) {
-      map.set(sorted[0].id, quantize(midpoint));
+      const only = sorted[0];
+      if (only) map.set(only.id, quantize(midpoint));
       return map;
     }
     let lastRating: number | undefined;
     let rank = 0;
-    for (let i = 0; i < m; i++) {
-      const { id, rating } = sorted[i];
+    for (const [i, { id, rating }] of sorted.entries()) {
       if (lastRating === undefined || rating !== lastRating) {
         rank = i + 1;
         lastRating = rating;
@@ -103,8 +103,7 @@ export function computeRanksForAll(cohort: CohortData): Map<string, number> {
   let rank = 0;
   let nextRank = 1;
 
-  for (let i = 0; i < entries.length; i++) {
-    const [id, player] = entries[i];
+  for (const [i, [id, player]] of entries.entries()) {
     const rounded = Math.round(player.rating);
     if (lastRating === undefined || rounded !== lastRating) {
       rank = nextRank;

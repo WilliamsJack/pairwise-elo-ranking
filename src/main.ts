@@ -26,8 +26,8 @@ import { refreshCohortRankAndStars } from './utils/FrontmatterStats';
 import { debugWarn, setDebugLogging } from './utils/logger';
 
 export default class GlickoPlugin extends Plugin {
-  dataStore: PluginDataStore;
-  settings: GlickoSettings;
+  dataStore!: PluginDataStore;
+  settings!: GlickoSettings;
   private settingTab!: GlickoSettingsTab;
 
   private currentSession?: ArenaSession;

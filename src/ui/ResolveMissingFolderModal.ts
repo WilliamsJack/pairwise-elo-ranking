@@ -144,6 +144,7 @@ export class ResolveMissingFolderModal extends BasePromiseModal<string | undefin
         const i = idx++;
         if (i >= files.length) break;
         const f = files[i];
+        if (!f) break;
 
         const id = await getNoteId(this.app, f, this.idPropertyName);
         if (id && this.cohortIds.has(id)) {

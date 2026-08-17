@@ -15,13 +15,7 @@ export interface CohortData {
 }
 
 export type CohortKind =
-  | 'vault:all'
-  | 'folder'
-  | 'folder-recursive'
-  | 'tag:any'
-  | 'tag:all'
-  | 'manual'
-  | 'base';
+  'vault:all' | 'folder' | 'folder-recursive' | 'tag:any' | 'tag:all' | 'manual' | 'base';
 
 export type CohortParamsMap = {
   'vault:all': Record<string, never>;

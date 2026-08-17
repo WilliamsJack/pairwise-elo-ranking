@@ -46,18 +46,21 @@ function getByPath(root: unknown, path: string): unknown {
 
 function setByPath(root: Record<string, unknown>, path: string, value: unknown): void {
   const parts = path.split('.');
+  const leaf = parts.pop();
+  if (leaf === undefined) return;
+
   let cur: Record<string, unknown> = root;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const next = cur[parts[i]];
+  for (const part of parts) {
+    const next = cur[part];
     if (next === null || typeof next !== 'object') {
       const created: Record<string, unknown> = {};
-      cur[parts[i]] = created;
+      cur[part] = created;
       cur = created;
     } else {
       cur = next as Record<string, unknown>;
     }
   }
-  cur[parts[parts.length - 1]] = value;
+  cur[leaf] = value;
 }
 
 export default class GlickoSettingsTab extends PluginSettingTab {
@@ -287,13 +290,11 @@ export default class GlickoSettingsTab extends PluginSettingTab {
         if (!def) return;
         void this.deleteCohortWithConfirm(def.key);
       },
-      items: sorted.map(
-        (def): SettingGroupItem => ({
-          name: def.label ?? prettyCohortDefinition(def),
-          desc: `Definition: ${prettyCohortDefinition(def)}`,
-          render: (setting) => this.renderCohortRow(setting, def.key),
-        }),
-      ),
+      items: sorted.map((def): SettingGroupItem => ({
+        name: def.label ?? prettyCohortDefinition(def),
+        desc: `Definition: ${prettyCohortDefinition(def)}`,
+        render: (setting) => this.renderCohortRow(setting, def.key),
+      })),
     };
   }
 

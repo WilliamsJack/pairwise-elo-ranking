@@ -529,22 +529,18 @@ export default class ArenaSession {
     const controls = el.createDiv({ cls: 'glicko-controls' });
 
     if (Platform.isPhone) {
-      this.drawBtn = this.makeButton(doc, 'Draw', () => void this.choose('D'));
-      this.winBtn = this.makeButton(doc, 'Win ✓', () => this.chooseCurrentWinner());
-      this.switchBtn = this.makeButton(doc, '⇄ Switch', () => this.switchNote());
+      this.drawBtn = this.makeButton(controls, 'Draw', () => void this.choose('D'));
+      this.winBtn = this.makeButton(controls, 'Win ✓', () => this.chooseCurrentWinner());
+      this.switchBtn = this.makeButton(controls, '⇄ Switch', () => this.switchNote());
 
-      this.undoBtn = this.makeButton(doc, 'Undo ⌫', () => void this.undo());
-      this.endBtn = this.makeButton(doc, 'End Esc', () => void this.plugin.endSession());
-
-      controls.append(this.drawBtn, this.winBtn, this.switchBtn, this.undoBtn, this.endBtn);
+      this.undoBtn = this.makeButton(controls, 'Undo ⌫', () => void this.undo());
+      this.endBtn = this.makeButton(controls, 'End Esc', () => void this.plugin.endSession());
     } else {
-      this.leftBtn = this.makeButton(doc, '← Left', () => void this.choose('A'));
-      this.drawBtn = this.makeButton(doc, '↑ Draw', () => void this.choose('D'));
-      this.rightBtn = this.makeButton(doc, '→ Right', () => void this.choose('B'));
-      this.undoBtn = this.makeButton(doc, 'Undo ⌫', () => void this.undo());
-      this.endBtn = this.makeButton(doc, 'End Esc', () => void this.plugin.endSession());
-
-      controls.append(this.leftBtn, this.drawBtn, this.rightBtn, this.undoBtn, this.endBtn);
+      this.leftBtn = this.makeButton(controls, '← Left', () => void this.choose('A'));
+      this.drawBtn = this.makeButton(controls, '↑ Draw', () => void this.choose('D'));
+      this.rightBtn = this.makeButton(controls, '→ Right', () => void this.choose('B'));
+      this.undoBtn = this.makeButton(controls, 'Undo ⌫', () => void this.undo());
+      this.endBtn = this.makeButton(controls, 'End Esc', () => void this.plugin.endSession());
     }
 
     el.createDiv({ cls: 'glicko-side right' });
@@ -574,10 +570,8 @@ export default class ArenaSession {
     this.endBtn = undefined;
   }
 
-  private makeButton(doc: Document, text: string, onClick: () => void) {
-    const btn = doc.createElement('button');
-    btn.type = 'button';
-    btn.textContent = text;
+  private makeButton(parent: HTMLElement, text: string, onClick: () => void) {
+    const btn = parent.createEl('button', { text, attr: { type: 'button' } });
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       onClick();
@@ -825,8 +819,15 @@ export default class ArenaSession {
       return;
     }
 
-    this.leftFile = this.files[leftIndex];
-    this.rightFile = this.files[rightIndex];
-    this.lastPair = this.sortedPair(this.leftFile.path, this.rightFile.path);
+    const leftFile = this.files[leftIndex];
+    const rightFile = this.files[rightIndex];
+    if (!leftFile || !rightFile) {
+      this.leftFile = this.rightFile = undefined;
+      return;
+    }
+
+    this.leftFile = leftFile;
+    this.rightFile = rightFile;
+    this.lastPair = this.sortedPair(leftFile.path, rightFile.path);
   }
 }
