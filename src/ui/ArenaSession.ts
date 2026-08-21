@@ -518,7 +518,7 @@ export default class ArenaSession {
 
   private mountOverlay(doc: Document) {
     const el = doc.body.createDiv({ cls: 'glicko-session-bar' });
-    if (Platform.isPhone) el.classList.add('is-mobile');
+    if (Platform.isPhone) el.classList.add('glicko-mobile');
 
     el.createDiv({ cls: 'glicko-side left' });
 

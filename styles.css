@@ -165,7 +165,7 @@
 }
 
 /* Phone layout: stack title + controls, stretch to screen width */
-.glicko-session-bar.is-mobile {
+.glicko-session-bar.glicko-mobile {
   left: var(--size-4-2);
   right: var(--size-4-2);
   transform: none;
@@ -179,7 +179,30 @@
 
   padding: var(--size-4-2);
 
-  bottom: calc(var(--size-4-4) + var(--view-bottom-spacing)); /* 16px + mobile safe area */
+  --glicko-navbar-footprint: var(--navbar-height);
+
+  bottom: calc(var(--size-4-4) + var(--glicko-navbar-footprint)); /* 16px above the navbar */
+
+  transition: transform 300ms ease-out;
+}
+
+body.is-floating-nav .glicko-session-bar.glicko-mobile {
+  --glicko-navbar-footprint: calc(
+    var(--navbar-height) + var(--navbar-bottom-offset) - var(--keyboard-height)
+  );
+}
+
+/* Drop session bar into empty space left by the navigation bar, clear of the safe area */
+body.is-hidden-nav .glicko-session-bar.glicko-mobile {
+  transform: translateY(
+    calc(var(--glicko-navbar-footprint) - var(--safe-area-inset-bottom) + var(--keyboard-height))
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glicko-session-bar.glicko-mobile {
+    transition: none;
+  }
 }
 
 /* Title line for mobile session bar */
@@ -192,17 +215,17 @@
 }
 
 /* Hide left/right labels on mobile */
-.glicko-session-bar.is-mobile .glicko-side {
+.glicko-session-bar.glicko-mobile .glicko-side {
   display: none;
 }
 
 /* Mobile-friendly buttons */
-.glicko-session-bar.is-mobile .glicko-controls {
+.glicko-session-bar.glicko-mobile .glicko-controls {
   flex-wrap: wrap;
   justify-content: space-between;
 }
 
-.glicko-session-bar.is-mobile button {
+.glicko-session-bar.glicko-mobile button {
   min-height: 44px;
   padding: var(--size-4-2) var(--size-4-3);
   font-size: var(--font-ui-medium);
